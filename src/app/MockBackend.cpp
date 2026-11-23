@@ -135,7 +135,7 @@ void MockBackend::restart() {
   tx_.emplace(cfg, TransmissionController::Callbacks{
       [this](std::uint64_t id, Ns from) {
         curId_ = id;
-        openT_ = from + kCfg.preRoll;  // later than the press if it was queued
+        openT_ = tx_->openedAt();  // later than the press if it was queued
         lab_->addEvent(openT_ / 1e9, QString::fromStdString(owner_), openT_ == pressT_ ? tr("down") : tr("open"), tr("TX %1 open").arg(id + kIdOffset), false);
         if (openT_ != pressT_) lab_->setNotice(LabController::None, {});  // was queued
         lab_->showRecording(-1);
@@ -158,12 +158,23 @@ void MockBackend::restart() {
           lab_->setAlert(LabController::Caution, tr("Short tap cancelled"));
         }
       },
-      [this](const Reply&) {
+      [this](const Reply&, PlaybackId id) {
+        playback_ = id;
         pilotEnd_ = now_ + ms(6000);
         lab_->addEvent(sec(), tr("PILOT"), tr("start"), tr("mock speech"), false);
       },
-      [this](const Reply&) {
+      [this](const Reply&, PlaybackId, PilotStop why) {
         pilotEnd_.reset();
+        if (why == PilotStop::Timeout) {
+          lab_->addEvent(sec(), tr("PILOT"), tr("timeout"), tr("no end reported"), true);
+          lab_->setNotice(LabController::Fault, tr("Pilot audio did not finish in time and was stopped."));
+          lab_->setAlert(LabController::Fault, tr("Pilot audio fault: stopped by the time limit"));
+          return;
+        }
+        if (why == PilotStop::PressCameFirst) {
+          lab_->addEvent(sec(), tr("PILOT"), tr("withdrawn"), tr("press came first"), false);
+          return;
+        }
         cutUntil_ = now_ + ms(pilotCutMs_);
         lab_->addEvent(sec(), tr("PILOT"), tr("cut"), tr("interrupted"), true);
       },
@@ -200,7 +211,7 @@ void MockBackend::restart() {
     rec.text = text;
     if (*text) rec.resultInfo = tr("Whisper tiny + prompt  0.34 s");
     rec.audio = synth(p - kCfg.preRoll, r + kCfg.tail, p, r);
-    rec.checks = checksFor(rec.audio, TxEnd::Normal).list;
+    rec.checks = checksFor(rec.audio, int(kCfg.preRoll * kRate / 1'000'000'000), TxEnd::Normal).list;
     const double total = held + .5;
     rec.pressFrac = .3 / total;
     rec.endFrac = (.3 + held) / total;
@@ -331,7 +342,7 @@ void MockBackend::advanceTo(Ns t) {
     if (pilotEnd_ && now_ >= *pilotEnd_) {
       pilotEnd_.reset();
       lab_->addEvent(sec(), tr("PILOT"), tr("end"), tr("mock speech"), false);
-      tx_->onPlaybackDone(now_);
+      tx_->onPlaybackDone(playback_, now_);
     }
     if (cutUntil_ && now_ >= *cutUntil_) cutUntil_.reset();
     if (finalAt_ && now_ >= finalAt_->second) {
@@ -349,7 +360,7 @@ void MockBackend::finish(std::uint64_t id, Ns from, Ns to, TxEnd end) {
   rec.id = int(id) + kIdOffset;
   const Ns keyEnd = end == TxEnd::Stuck ? to : releaseT_;
   rec.audio = synth(from, to, openT_, end == TxEnd::Stuck ? std::nullopt : std::optional<Ns>(releaseT_));
-  const LabChecks checks = checksFor(rec.audio, end);
+  const LabChecks checks = checksFor(rec.audio, int((openT_ - from) * kRate / 1'000'000'000), end);
   rec.checks = checks.list;
   rec.pressFrac = double(openT_ - from) / double(to - from);
   rec.endFrac = double(keyEnd - from) / double(to - from);
@@ -418,8 +429,8 @@ std::vector<std::int16_t> MockBackend::synth(Ns from, Ns to, Ns press, std::opti
   return a;
 }
 
-LabChecks MockBackend::checksFor(const std::vector<std::int16_t>& audio, TxEnd end) const {
-  return labChecks(audio, int(kCfg.preRoll * kRate / 1'000'000'000), end, false, lab_->micLow, lab_->micHigh);
+LabChecks MockBackend::checksFor(const std::vector<std::int16_t>& audio, int preRollSamples, TxEnd end) const {
+  return labChecks(audio, preRollSamples, end, false, lab_->micLow, lab_->micHigh);
 }
 
 void MockBackend::publish() {

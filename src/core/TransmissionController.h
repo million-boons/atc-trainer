@@ -89,6 +89,7 @@ class TransmissionController {
   bool pedalDown() const { return pedalDown_; }
   bool pressBlocked() const { return press_ == Press::Blocked; }  // until release
   bool pressQueued() const { return press_ == Press::Queued; }
+  Ns openedAt() const { return pressT_; }  // of the latest transmission; valid inside txBegin
 
  private:
   void openTx(Ns t, Ns audioFrom);
