@@ -1,5 +1,7 @@
 #include "core/TransmissionController.h"
 
+#include <algorithm>
+
 namespace atc {
 
 std::optional<PressRule> pressRuleFromString(std::string_view s) {
@@ -10,50 +12,75 @@ std::optional<PressRule> pressRuleFromString(std::string_view s) {
 }
 
 void TransmissionController::onPress(Ns t) {
-  tick(t);
+  advance(t);  // not tick: a pilot due at this instant must not start before the press (D-303)
   if (pedalDown_) return;
   pedalDown_ = true;
   eligibleSince_.reset();
 
-  if (speaking_ && cfg_.pressDuringPilot == PressRule::Block) {
-    press_ = Press::Blocked;
-    if (cb_.pressBlocked) cb_.pressBlocked(t);
-    return;
-  }
-  if (speaking_ && cfg_.pressDuringPilot == PressRule::Queue) {
-    press_ = Press::Queued;
-    if (cb_.pressQueued) cb_.pressQueued(t);
-    return;
-  }
-  if (speaking_) {  // D-05
-    Reply r = std::move(*speaking_);
-    speaking_.reset();
-    if (cfg_.repeatInterruptedReply) replies_.push_front(r);
-    if (cb_.pilotInterrupted) cb_.pilotInterrupted(r);
+  if (speaking_ && t <= pilotStart_) {
+    stopPilot(PilotStop::PressCameFirst, t);
+  } else if (speaking_ || (pilotEnd_ && t > pilotStart_ && t < *pilotEnd_)) {
+    // The second case: the pilot ended while this press was still on its way to us.
+    if (cfg_.pressDuringPilot == PressRule::Block) {
+      press_ = Press::Blocked;
+      if (cb_.pressBlocked) cb_.pressBlocked(t);
+      return;
+    }
+    if (cfg_.pressDuringPilot == PressRule::Queue) {
+      press_ = Press::Queued;
+      if (!speaking_) queuedOpenAt_ = *pilotEnd_ + cfg_.queueSettle;
+      if (cb_.pressQueued) cb_.pressQueued(t);
+      return;
+    }
+    if (speaking_) stopPilot(PilotStop::Interrupted, t);  // D-05
   }
   if (tx_ == Tx::Tail && endReason_ == TxEnd::Normal) {  // same transmission continues
     tx_ = Tx::Open;
     return;
   }
   if (tx_ == Tx::Tail) closeTx(t, endReason_);
-  openTx(t);
+  openedFromQueue_ = false;
+  openTx(t, t - cfg_.preRoll);
 }
 
-void TransmissionController::openTx(Ns t) {
+void TransmissionController::stopPilot(PilotStop why, Ns t) {
+  const Reply r = std::move(*speaking_);
+  speaking_.reset();
+  pilotEnd_ = t;
+  const PlaybackId id = playback_;
+  if (why == PilotStop::PressCameFirst || (why == PilotStop::Interrupted && cfg_.repeatInterruptedReply))
+    replies_.push_front(r);
+  if (cb_.pilotStop) cb_.pilotStop(r, id, why);
+}
+
+void TransmissionController::pilotEnded(Ns t) {
+  if (press_ == Press::Queued) queuedOpenAt_ = t + cfg_.queueSettle;
+}
+
+void TransmissionController::openTx(Ns t, Ns audioFrom) {
   tx_ = Tx::Open;
   endReason_ = TxEnd::Normal;
   pressT_ = t;
+  audioFrom_ = audioFrom;
   ++id_;
   open_[id_] = std::nullopt;
-  if (cb_.txBegin) cb_.txBegin(id_, pressT_ - cfg_.preRoll);
+  if (cb_.txBegin) cb_.txBegin(id_, audioFrom_);
 }
 
 void TransmissionController::onRelease(Ns t, ReleaseReason reason) {
-  tick(t);
+  advance(t);
   pedalDown_ = false;
-  if (press_ == Press::Queued && cb_.queuedDropped) cb_.queuedDropped(t);
+  const bool queued = press_ == Press::Queued;
   press_ = Press::Normal;
-  if (tx_ == Tx::Open) {
+  queuedOpenAt_.reset();
+  if (queued && cb_.queuedDropped) cb_.queuedDropped(t);
+  if (tx_ == Tx::Open && openedFromQueue_ && t <= pressT_) {
+    // Reported too late: PTT was already up when the transmission opened.
+    tx_ = Tx::None;
+    open_.erase(id_);
+    if (cb_.txCancelled) cb_.txCancelled(id_);
+    if (cb_.queuedDropped) cb_.queuedDropped(t);
+  } else if (tx_ == Tx::Open) {
     tx_ = Tx::Tail;
     releaseT_ = t;
     endReason_ = reason == ReleaseReason::DeviceLost ? TxEnd::DeviceLost : TxEnd::Normal;
@@ -68,7 +95,7 @@ void TransmissionController::closeTx(Ns audioTo, TxEnd end) {
     if (cb_.txCancelled) cb_.txCancelled(id_);
     return;
   }
-  if (cb_.txEnd) cb_.txEnd(id_, pressT_ - cfg_.preRoll, audioTo, end);
+  if (cb_.txEnd) cb_.txEnd(id_, audioFrom_, audioTo, end);
 }
 
 void TransmissionController::onProcessed(std::uint64_t id, std::optional<Reply> reply, Ns now) {
@@ -91,24 +118,37 @@ void TransmissionController::requestPilot(Reply reply, Ns now) {
   maybeStartPilot(now);
 }
 
-void TransmissionController::onPlaybackDone(Ns now) {
-  tick(now);
-  speaking_.reset();  // harmless if it was interrupted just before
-  if (press_ == Press::Queued) {
-    press_ = Press::Normal;
-    if (cb_.queuedOpened) cb_.queuedOpened(now);
-    openTx(now);  // timed from here, not from the press
-    return;
-  }
+void TransmissionController::onPlaybackDone(PlaybackId id, Ns now) {
+  advance(now);
+  if (!speaking_ || id != playback_) return;
+  speaking_.reset();
+  pilotEnd_ = now;
+  pilotEnded(now);
   maybeStartPilot(now);
 }
 
-void TransmissionController::tick(Ns now) {
+void TransmissionController::advance(Ns now) {
   if (tx_ == Tx::Open && now - pressT_ >= cfg_.maxDuration) {
     // Stuck pedal. pedalDown_ stays true, so nothing reopens until a release.
     closeTx(pressT_ + cfg_.maxDuration, TxEnd::Stuck);
   }
   if (tx_ == Tx::Tail && now - releaseT_ >= cfg_.tail) closeTx(releaseT_ + cfg_.tail, endReason_);
+  if (speaking_ && now >= pilotDeadline_) {
+    stopPilot(PilotStop::Timeout, now);
+    pilotEnded(now);
+  }
+  if (queuedOpenAt_ && now >= *queuedOpenAt_) {
+    const Ns t = *queuedOpenAt_;
+    queuedOpenAt_.reset();
+    press_ = Press::Normal;
+    openedFromQueue_ = true;
+    if (cb_.queuedOpened) cb_.queuedOpened(t);
+    openTx(t, t);  // no pre-roll: speech before the click is lost (D-302)
+  }
+}
+
+void TransmissionController::tick(Ns now) {
+  advance(now);
   maybeStartPilot(now);
 }
 
@@ -124,7 +164,12 @@ void TransmissionController::maybeStartPilot(Ns now) {
   eligibleSince_.reset();
   speaking_ = std::move(replies_.front());
   replies_.pop_front();
-  if (cb_.pilotStart) cb_.pilotStart(*speaking_);
+  ++playback_;
+  pilotStart_ = now;
+  pilotDeadline_ = now + (speaking_->expected > 0 ? std::min(speaking_->expected + cfg_.pilotMargin, cfg_.pilotCap) : cfg_.pilotCap);
+  // A copy: the callback may report the end at once, which destroys speaking_.
+  const Reply r = *speaking_;
+  if (cb_.pilotStart) cb_.pilotStart(r, playback_);
 }
 
 TransmissionController::State TransmissionController::state() const {

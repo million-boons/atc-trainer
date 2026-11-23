@@ -50,7 +50,7 @@ class MockBackend : public QObject {
   std::uint64_t wire(std::uint64_t id) const { return (epoch_ << 32) | id; }
   void finish(std::uint64_t id, atc::Ns from, atc::Ns to, atc::TxEnd end);
   std::vector<std::int16_t> synth(atc::Ns from, atc::Ns to, atc::Ns press, std::optional<atc::Ns> release) const;
-  LabChecks checksFor(const std::vector<std::int16_t>& audio, atc::TxEnd end) const;
+  LabChecks checksFor(const std::vector<std::int16_t>& audio, int preRollSamples, atc::TxEnd end) const;
   double sec() const { return double(now_) / 1e9; }
 
   LabController* lab_;
@@ -70,6 +70,7 @@ class MockBackend : public QObject {
   Speech speech_;
   std::string owner_;
   atc::Ns pressT_ = 0, openT_ = 0, releaseT_ = 0;
+  atc::PlaybackId playback_ = 0;
   bool held_ = false, stuck_ = false, present_ = true, pulse_ = false, muted_ = false;
   atc::PressRule rule_ = atc::PressRule::Interrupt;
   std::uint64_t curId_ = 0;

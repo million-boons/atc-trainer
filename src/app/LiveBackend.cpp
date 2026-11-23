@@ -171,7 +171,7 @@ void LiveBackend::build() {
       [this](std::uint64_t id, Ns from) {
         closeNow();  // an earlier transmission still waiting for its last audio
         curId_ = id;
-        openT_ = from + txCfg_.preRoll;
+        openT_ = tx_->openedAt();
         event(openT_, q(owner_), tr("down"), tr("TX %1 open").arg(id), false);
         cursor_ = ring_.indexAt(from);
         lost_ = false;
@@ -202,7 +202,11 @@ void LiveBackend::build() {
           lab_->setText({}, tr("Waiting"), false, {}, false);
         });
       },
-      {}, [this](const Reply&) { cutUntil_ = monotonicNow() + ms(2000); }, {}, {},
+      {}, [this](const Reply&, PlaybackId, PilotStop why) {
+        if (why == PilotStop::Interrupted) cutUntil_ = monotonicNow() + ms(2000);
+        if (why == PilotStop::Timeout)
+          notice(L::Fault, tr("Pilot audio did not finish in time and was stopped."), L::Fault, tr("Pilot audio fault: stopped by the time limit"));
+      }, {}, {},
       [this](Ns) { ui([this] { emit sideTone(); }); }, {}});
 }
 
@@ -238,7 +242,7 @@ void LiveBackend::closeNow() {
   auto cut = ring_.extract(c.from, c.to);
   const bool gap = lost_ || cut.gap || cut.missingHead || cut.missingTail;
   // A missing head shortens the pre-roll; the press stays where it was.
-  const int pre = std::max(0, int(txCfg_.preRoll * kRate / 1'000'000'000) - int(cut.missingHead));
+  const int pre = std::max(0, int((c.press - c.from) * kRate / 1'000'000'000) - int(cut.missingHead));
   const LabChecks checks = labChecks(cut.samples, pre, c.end, gap, micLow_, micHigh_);
   const bool recognise = streaming_ && c.end == TxEnd::Normal && !checks.noSpeech;
   if (recognise) {
