@@ -1,6 +1,6 @@
 # 06 Vertical slice: departure (taxi, line up, takeoff)
 
-Status: **APPROVED with changes, 2026-11-23** (D-400 to D-409). All phraseology is PLACEHOLDER. Hours are estimates.
+Status: **APPROVED with changes, 2026-11-23** (D-400 to D-409); amended 2026-11-24 (D-410 to D-413). §4.1 is a proposal, not yet approved. All phraseology is PLACEHOLDER. Hours are estimates.
 
 Goal: one departure scenario working end to end on real components, after the Speech Lab and Dashboard run on real backends.
 
@@ -22,6 +22,7 @@ Sessions: b2 = `runtime`, 93 = `stt`, 31 = `ui`, 8d = `engine`.
 | 0a | Finish D-300 tests; adapt `MockBackend` and `LiveBackend` to the new TransmissionController callbacks; merge to `main`; repo sync (§4) | b2 | – | 3–5, sync extra |
 | 0b | Commit current STT and phraseology work; b2 merges | 93 | 0a | 1 |
 | 0c | Contracts and CMake stubs; b2 merges | 8d | 0a | 2 |
+| 0d | Location-independent paths (D-410, §4.1): resolver, relative library paths, tests; b2 merges | b2 | 0a; §4.1 approved; before the first PC-built binary goes to the panel | 2–4 |
 | 1a | `RadioCore`, `PulsePlayer`, Lab playback, speaker check, `StatusController`. Export stays off (D-407) | b2 | 0a, 0c | 7–9 |
 | 1b | Dashboard wireframe, user OK, QML; remaining Lab controls. Start disabled until 3b | 31 | 0c; 1a to connect | 4–5 |
 | **G1** | User tests Lab and Dashboard on the panel with the H540 | user | 1a, 1b | – |
@@ -37,8 +38,8 @@ Sessions: b2 = `runtime`, 93 = `stt`, 31 = `ui`, 8d = `engine`.
 | T | Clean STT timing run on the idle panel (D-406) | 93 | before 3c demo | 1 |
 | 3c | Acceptance run, fixes, panel measurements | all, b2 leads | 3a, 3b, T | 6–10 |
 
-Order: `0a → 0b, 0c → 1a → G1 → 3a → 3b → 3c`. Wave 2 runs beside Wave 1 from 0c.
-Estimate before the move to the PC: 67–88 session-hours, likely 5–6 working days, range 4–8. Not yet re-estimated for the PC: builds get faster, the move itself (§4) is extra.
+Order: `0a → 0b, 0c, 0d → 1a → G1 → 3a → 3b → 3c`. Wave 2 runs beside Wave 1 from 0c.
+Estimate before the move to the PC: 67–88 session-hours (before 0d, which adds 2–4), likely 5–6 working days, range 4–8. Not yet re-estimated for the PC: builds get faster, the move itself (§4) is extra.
 
 ## 3. Where work happens (D-400)
 
@@ -62,14 +63,27 @@ Found 2026-11-23: no git remote; `.git` 2.7 MB; `third_party` 335 MB, not in git
 | Engines, models | `tools/fetch_stt.sh` on the PC (pinned checksums). Then copied to the panel with rsync. |
 | Binaries | Built on the PC, copied with rsync with commit hash and SHA-256 list. |
 | Pilot clips | rsync PC to panel. Audio is never in git (D-31); `manifest.json` with SHA-256 is. |
-| Voice recordings | Stay on the panel until the user rules on it (Q-1). |
+| Voice recordings | Panel → PC only, over the LAN: rsync over ssh, one-way, logged (D-412). On the PC: one folder outside every git working copy, no cloud sync, local access only. Never PC → panel, never in the bare repository or a bundle. |
 
 Conditions for PC-built binaries to run on the panel:
-1. **Same OS libraries:** Ubuntu 22.04, Qt 6.2.4, on the PC or in a 22.04 container there.
-2. **Same absolute path** `/home/user/projects/atc-trainer`. `ATC_ROOT`, `ATC_GGML_DIR` and the library RUNPATH are compiled in. Otherwise they must first be made relative.
+1. **Same OS libraries:** Ubuntu 22.04, Qt 6.2.4, on the PC, or in an Ubuntu 22.04 + Qt 6.2.4 container if the PC runs anything else (D-411).
+2. **No fixed path** (D-410). Today `ATC_ROOT`, `ATC_GGML_DIR` and the library RUNPATH are compiled in as absolute paths, so until 0d is merged a PC-built binary runs on the panel only from the identical path. 0d removes this.
 3. **No newer CPU instructions:** `-march=x86-64-v2` (P-03) is already set; whisper.cpp is built with `GGML_NATIVE=OFF` and run-time variants. Proved by running all tests on the panel after the first copy.
 
 Panel measurement rule: no Claude session, browser, build or sync running; record load, free memory and governor with each result; network off for the 3c acceptance run.
+
+### 4.1 Location-independent paths (task 0d, PROPOSED)
+
+Found 2026-11-24 in the code: `ATC_ROOT` in `src/app/main.cpp`, `tools/ptt_text.cpp`, `tests/test_stt.cpp`, `tests/test_phraseology.cpp`; `ATC_GGML_DIR` in `src/app/main.cpp`, `tools/ptt_text.cpp`, `tools/stt_bench.cpp`; absolute RUNPATH to `third_party/vosk` and `third_party/whisper-install/lib` in `atc_trainer`, `ptt_text`, `stt_bench`, `stt_tests`. Model paths in `config/stt_models.json` are already relative.
+
+1. One Qt-free `PathResolver` (`src/core/`) gives the config, data, models, voices and engine folders. Nothing else builds a path from a compiled-in constant.
+2. Root, first match wins: `--root` option; `ATC_ROOT` environment variable; `root=` in the config file (`~/.config/atc-trainer/paths.conf`, then `/etc/atc-trainer/paths.conf`); relative to the executable (`/proc/self/exe`): `<prefix>/bin` → `<prefix>/share/atc-trainer`, or the project folder above a build folder. The config file may also set the models and voices folders separately.
+3. A location that was set explicitly but is missing is an error that names it. It never falls through to the next one. If nothing matches, the error lists every place tried.
+4. Vosk, whisper and ggml libraries: `$ORIGIN`-relative RUNPATH, and the ggml plugin folder found from the engine folder. `cmake --install` gives `bin/`, `lib/`, `share/atc-trainer/`.
+5. Files the program writes (logs, results, recordings) go to a separate writable folder, never under the prefix.
+6. Tests use the same resolver. Done when: an installed tree copied to a different path, with the source tree out of reach, passes all tests and starts `atc_trainer`, on the PC and then on the panel; and `readelf -d` and `strings` show no build path used at run time.
+
+Not affected: the udev rules and H540 service, which use fixed system paths by design.
 
 ## 5. Piper licence check (D-404, done 2026-11-23 from the primary files; not legal advice)
 
@@ -77,7 +91,7 @@ Panel measurement rule: no Claude session, browser, build or sync running; recor
 |---|---|---|
 | OHF-Voice/piper1-gpl (maintained) | GPL-3 | Tool on the PC only; not linked into or shipped with the trainer |
 | rhasspy/piper (archived) | MIT | Same use; alternative |
-| Voice `en_US-norman-medium` | Dataset public domain (LibriVox); trained from scratch; US English male | **Proposed placeholder voice** |
+| Voice `en_US-norman-medium` | Dataset public domain (LibriVox); trained from scratch; US English male | **Approved placeholder voice** (D-413), PC only, not shipped |
 | Voice `en_US-ljspeech-*`, `en_GB-cori-high` | Dataset public domain; trained from scratch; female | Alternatives |
 | Voice `en_US-libritts-high` | CC BY 4.0; trained from scratch | Alternative, attribution needed |
 | Voice `en_US-ryan-high` | CC BY-NC-SA 4.0 | Not used |
@@ -108,5 +122,6 @@ Out of scope: Phraseology Studio, real recordings, SQLite and resume, injected e
 |---|---|---|
 | O-1 | Pilot readback of a wrong value that **exists in the airfield pools** should become possible, so readback errors can be trained. Values outside the pools: challenge or say again. | Later; not in the slice (D-409) |
 | O-2 | Approved line-up wording | User supplies it if unclassified (D-403) |
-| Q-1 | May voice recordings be copied to the PC over the LAN, or do they stay on the panel (D-44)? 93's accuracy work needs them where it runs. | User |
-| Q-2 | PC operating system and address; is its user name `user`? | User |
+| Q-1 | May voice recordings be copied to the PC? | **Closed:** yes, LAN only, one-way (D-412) |
+| Q-2 | PC operating system, LAN address, user name, GPU. SSH server is installed; the user name no longer has to match the panel (D-410). | **Open:** values left blank in the answer; needed before the first push to the PC and to know whether the container is needed |
+| Q-3 | Approve §4.1 (0d design) | User |

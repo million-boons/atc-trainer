@@ -45,7 +45,7 @@
 | D-41 | 2026-11-23 | Whisper gets equal treatment: prompt generated from `data/phraseology` (all pool values, never only the expected ones) plus a GBNF grammar variant, tuned on the same dev set with the same bias tests. | User |
 | D-42 | 2026-11-23 | User arranges 8 speakers, varied accents, including female voices (4 dev, 4 test). If fewer: 4 test speakers stay separate and dev shrinks. | User |
 | D-43 | 2026-11-23 | Dev set may use placeholder phrases. The locked test set waits for approved phraseology. | User |
-| D-44 | 2026-11-23 | Only unclassified material is shared with the assistant. Restricted SOP text and **all voice recordings stay offline**; no cloud upload of recordings is to be proposed. | User |
+| D-44 | 2026-11-23 | Only unclassified material is shared with the assistant. Restricted SOP text and **all voice recordings stay offline**; no cloud upload of recordings is to be proposed. **Amended 2026-11-24 by D-412:** recordings may be copied from the panel to the PC over the LAN only; everything else here still holds. | User |
 | D-45 | 2026-11-23 | `data/phraseology/` is defined now as the single source; Phraseology Studio edits it later. | User |
 | D-46 | 2026-11-23 | Track B (custom Vosk graph) not yet. If needed, the build uses text and lexicon only, on a separate Linux machine or a temporary AWS instance, unclassified text only. | User |
 | D-47 | 2026-11-23 | whisper small.en is an accuracy reference only, not a run-time candidate. | User |
@@ -69,6 +69,10 @@
 | D-407 | 2026-11-23 | S-8: Speech Lab export stays off. | User |
 | D-408 | 2026-11-23 | S-9: scenario files are checked by hand-written loader checks with file and path in each error; no vendored JSON-schema validator. `01-system.md` §7 updated. | User |
 | D-409 | 2026-11-23 | Vertical slice plan approved with the changes above (`docs/architecture/06-vertical-slice.md`). Open item, not in slice scope: pilot readback of a wrong value that exists in the airfield pools should become possible so readback errors can be trained; values outside pools lead to challenge or say again. | User |
+| D-410 | 2026-11-24 | The same-absolute-path requirement is removed. Config, data, models and voices are found through an install prefix and config file, or relative to the executable, so the panel and later deployments can use any path. Own small task **0d** (`06-vertical-slice.md` §2, §4.1). | User (requirement; placing it as 0d instead of inside 0a: assistant, as the user allowed either) |
+| D-411 | 2026-11-24 | The PC has an SSH server. If its OS is not Ubuntu 22.04, builds run in an Ubuntu 22.04 + Qt 6.2.4 container there. OS, LAN address, user name and GPU are **not yet recorded**: the fields were left blank in the answer (Q-2 stays open). | User |
+| D-412 | 2026-11-24 | Q-1: voice recordings may be copied panel → PC over the LAN only: rsync over ssh, one-way, logged. On the PC they live in one folder outside git, with no cloud sync on it and local access only. Amends D-44. | User |
+| D-413 | 2026-11-24 | `en_US-norman-medium` approved as the placeholder pilot voice. Piper and the voice model are PC-only tools and are not shipped. Completes D-404. | User |
 
 ## Check results
 
