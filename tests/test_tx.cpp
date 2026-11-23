@@ -457,6 +457,36 @@ TEST_F(Tx, ReleaseReportedVeryLateUndoesTheOpening) {
   c.onPress(ms(3000));
   EXPECT_EQ(log.back(), "begin2@2700") << "next press is normal, with pre-roll";
 }
+TEST_F(Tx, NormalTapAfterAQueuedTransmissionIsNotADroppedQueue) {
+  cfg.pressDuringPilot = PressRule::Queue;
+  auto c = make();
+  c.requestPilot({"call", 0}, 0);
+  c.onPress(ms(100));
+  playing = false;
+  c.onPlaybackDone(pid, ms(2000));
+  c.tick(ms(2025));
+  c.onRelease(ms(4000), ReleaseReason::Normal);
+  c.tick(ms(4200));
+  log.clear();
+  c.onPress(ms(5000));
+  c.onRelease(ms(5000), ReleaseReason::Normal);
+  c.tick(ms(5300));
+  EXPECT_EQ(log, (V{"begin2@4700", "cancel2"}));
+}
+TEST_F(Tx, ReplyDelayRestartsAfterALateBlockedPress) {
+  cfg.pressDuringPilot = PressRule::Block;
+  auto c = make();
+  c.requestPilot({"one", 0}, 0);
+  c.requestPilot({"two", ms(500)}, 0);
+  playing = false;
+  c.onPlaybackDone(pid, ms(2000));
+  c.onPress(ms(1995));  // stamped during speech, delivered after
+  c.onRelease(ms(2490), ReleaseReason::Normal);
+  c.tick(ms(2989));
+  EXPECT_FALSE(playing);
+  c.tick(ms(2990));
+  EXPECT_EQ(log.back(), "pilot two");
+}
 TEST_F(Tx, PlaybackThatEndsAtOnceIsSafe) {
   std::vector<std::string> seen;
   TransmissionController* c = nullptr;
