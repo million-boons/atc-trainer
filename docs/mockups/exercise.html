@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exercise and Result mockup</title>
+<!-- Mockup for approval (vertical slice 2g), not product code. Offline. All values are simulated
+     and all phraseology is PLACEHOLDER, not approved wording. -->
+<style>
+@font-face{font-family:Inter;src:url(../../ui/fonts/Inter-Regular.otf)}
+@font-face{font-family:Inter;font-weight:600;src:url(../../ui/fonts/Inter-SemiBold.otf)}
+@font-face{font-family:Inter;font-weight:700;src:url(../../ui/fonts/Inter-Bold.otf)}
+@font-face{font-family:"JetBrains Mono";src:url(../../ui/fonts/JetBrainsMono-Regular.ttf)}
+@font-face{font-family:"JetBrains Mono";font-weight:700;src:url(../../ui/fonts/JetBrainsMono-Bold.ttf)}
+:root{--k:1;--bg:#0B0F14;--surface:#121821;--raised:#19212C;--border:#243041;--divider:#1C2633;--t1:#E6EDF3;--t2:#9AA7B4;--t3:#8592A0;
+--accent:#38BDF8;--tx:#F59E0B;--rx:#22D3EE;--txf:#F59E0B;--rxf:#22D3EE;--on:#0B0F14;--ok:#22C55E;--caution:#EAB308;--fault:#F87171;--atcl:#151F2B;--pill:#13242D}
+[data-theme=night]{--bg:#060708;--surface:#0B0D10;--raised:#101318;--border:#1D232B;--divider:#151A20;--t1:#A8B0B8;--t2:#8A929A;--t3:#7B838B;
+--accent:#2F93BC;--tx:#C07C0A;--rx:#1B9DB0;--txf:#D68B0E;--rxf:#1FABBF;--on:#060708;--ok:#22994D;--caution:#AE860A;--fault:#D85A5A;--atcl:#0D1217;--pill:#0C1518}
+[data-theme=hc]{--bg:#000;--surface:#000;--raised:#101010;--border:#A0A8B0;--divider:#5A626A;--t1:#FFF;--t2:#E0E6EC;--t3:#C0C8D0;
+--accent:#5CCBFF;--tx:#FFB020;--rx:#3DE8FF;--txf:#FFB020;--rxf:#3DE8FF;--on:#000;--ok:#4ADE80;--caution:#FFE04A;--fault:#FF8A8A;--atcl:#07121A;--pill:#04161A}
+*{box-sizing:border-box;margin:0}html,body{height:100%;background:#000}
+#f{width:1280px;height:800px;background:var(--bg);color:var(--t1);font:15px/1.35 Inter,sans-serif;display:grid;grid-template:48px 1fr 32px/88px 1fr;position:relative;overflow:hidden;zoom:var(--k)}
+[data-size=full]{--k:1.35}[data-size=full] #f{width:1422px;height:800px}
+.m{font-family:"JetBrains Mono",monospace}.c{font-size:12px}.t2{color:var(--t2)}.t3{color:var(--t3)}.ok{color:var(--ok)}.caution{color:var(--caution)}.fault{color:var(--fault)}
+svg.i{width:12px;height:12px;flex:none;vertical-align:-1px}
+button{font:inherit;color:inherit;cursor:pointer}
+.b{height:48px;padding:0 16px;border:1px solid var(--border);border-radius:6px;background:var(--raised)}.b:disabled{color:var(--t3);cursor:default}.b.d{border-color:var(--fault)}.b.p{border-color:var(--accent);color:var(--accent)}
+.tag{border:1px solid var(--caution);color:var(--caution);border-radius:4px;font-size:12px;font-weight:600;padding:1px 6px}
+#st{grid-column:1/3;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;padding:0 12px;white-space:nowrap}
+#st .n{font-weight:600;font-size:13px;margin-right:6px}.chip{display:flex;gap:5px;align-items:center;height:28px;padding:0 8px;border:1px solid var(--border);border-radius:4px;background:var(--raised);font-size:12px}
+#st .r{margin-left:auto;display:flex;gap:8px;align-items:center;font-size:12px}
+#nav{background:var(--surface);border-right:1px solid var(--border);padding:8px;display:flex;flex-direction:column;gap:4px}
+#nav div{height:64px;border-radius:6px;color:var(--t2);font-size:12px;display:flex;align-items:center;justify-content:center;text-align:center}
+#nav .on{background:var(--raised);color:var(--t1);border:1px solid var(--border);box-shadow:inset 3px 0 var(--accent)}
+#nav .off{color:var(--t3)}#nav button{margin-top:auto;height:48px;border:1px dashed var(--caution);color:var(--caution);background:none;border-radius:6px;font-size:12px}
+#al{grid-column:1/3;background:var(--surface);border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;padding:0 12px;font-size:13px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden;min-height:0;min-width:0;display:flex;flex-direction:column}
+.hd{height:36px;flex:none;display:flex;align-items:center;gap:8px;padding:0 12px;border-bottom:1px solid var(--divider);font-size:12px;font-weight:600;letter-spacing:.06em;color:var(--t2)}.hd span.x{margin-left:auto;font-weight:400;letter-spacing:0}
+/* exercise */
+#ex{display:grid;gap:12px;padding:12px;grid-template:1fr 128px/268px 1fr 292px;min-height:0}
+#cs{font-size:32px;font-weight:700;line-height:1.1}.kv{display:grid;grid-template-columns:1fr 1fr;gap:10px 8px;padding:10px 12px}
+.kv div span{display:block;font-size:12px;color:var(--t2)}.kv b{font:700 24px/1.1 "JetBrains Mono",monospace}.kv b.s{font-size:18px}
+.list{padding:8px 12px;font-size:13px;display:grid;gap:6px}
+#tr{flex:1;min-height:0;padding:10px 12px;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;overflow:hidden}
+.e{height:94px;flex:none;width:86%;border-radius:6px;padding:7px 10px;border-left:3px solid var(--accent);background:var(--atcl)}
+.e.pilot{align-self:flex-end;border-left:0;border-right:3px solid var(--rx);background:var(--pill);height:66px}.e.note{width:100%;height:30px;background:none;border:1px dashed var(--border);font-size:13px;padding:4px 10px}
+.e .h{display:flex;gap:8px;font-size:12px;color:var(--t2);white-space:nowrap}.e .h b{color:var(--t1)}.e .h span:last-child{margin-left:auto}
+.e p{font:14px/1.25 "JetBrains Mono",monospace;height:36px;overflow:hidden;margin:1px 0 3px}
+.pc{display:inline-block;border:1px solid var(--border);border-radius:4px;padding:1px 6px;font:12px "JetBrains Mono",monospace;margin-right:4px;background:var(--surface)}.pc.q{border-style:dashed;border-color:var(--caution);color:var(--caution)}
+.sp{height:60px;display:grid;grid-template-columns:28px 1fr;align-items:center;padding:0 12px;border-bottom:1px solid var(--divider)}.sp.cur{background:var(--raised);box-shadow:inset 3px 0 var(--accent)}.sp b{display:block}.sp span{font-size:12px;color:var(--t2)}
+#bar{grid-column:1/4;display:grid;grid-template-columns:260px 176px 1fr 176px;gap:12px;padding:12px}
+.ind{border:2px solid var(--border);border-radius:6px;padding:0 14px;height:102px;display:flex;flex-direction:column;justify-content:center}.ind .w{font-size:32px;font-weight:700;line-height:1.1;display:flex;justify-content:space-between;align-items:center;gap:8px}.ind .w .m{font-size:24px}.ind .s{font-size:13px;color:var(--t2);white-space:nowrap}
+.ind.tx{background:var(--txf);border-color:var(--txf);color:var(--on)}.ind.rx{background:var(--rxf);border-color:var(--rxf);color:var(--on)}.ind.tx .s,.ind.rx .s{color:var(--on)}.ind.busy{border-color:var(--tx)}.ind.bad{border:3px solid var(--fault)}.ind.bad .w{font-size:26px;justify-content:flex-start}
+#mt{position:relative;height:20px;background:var(--raised);border:1px solid var(--border);border-radius:4px}#mt i{position:absolute;inset:0 auto 0 0;background:var(--t2)}#mt u{position:absolute;top:0;bottom:0;width:2px;background:var(--ok)}
+/* result */
+#rs{display:grid;gap:12px;padding:12px;grid-template:92px 1fr 64px/ 1fr 372px;min-height:0}
+.big{font-size:24px;font-weight:700}
+table{width:100%;border-collapse:collapse;font-size:13px}th{font-size:12px;font-weight:400;color:var(--t2);text-align:left;padding:6px 12px}td{padding:0 12px;height:44px;border-top:1px solid var(--divider)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px;min-height:0}.rows{padding:4px 12px;font-size:13px}.rows div{display:flex;justify-content:space-between;height:27px;align-items:center;border-bottom:1px solid var(--divider)}
+.tl{height:63px;display:grid;grid-template-columns:66px 1fr 48px;gap:6px;align-items:center;padding:0 6px 0 12px;border-bottom:1px solid var(--divider);font-size:13px}.tl p{line-height:1.2;max-height:32px;overflow:hidden}.tl span{font-size:12px;color:var(--t2)}.tl button{height:48px;width:48px;border:0;background:none;color:var(--accent)}
+#dlg{position:absolute;inset:48px 0 32px 88px;background:#000b;display:none;align-items:center;justify-content:center;z-index:5}#dlg.s{display:flex}#dlg>div{width:560px;background:var(--surface);border:3px solid var(--fault);border-radius:6px;padding:24px;display:grid;gap:12px}
+#ctl{position:absolute;left:96px;bottom:40px;width:760px;background:#1b1b1b;color:#eee;border:2px dashed #eab308;border-radius:6px;padding:10px;z-index:9;display:none;flex-wrap:wrap;gap:6px}#ctl.s{display:flex}#ctl button{height:40px;padding:0 10px;background:#2b2b2b;border:1px solid #555;border-radius:4px;color:#eee;font-size:13px}#ctl button.on{border-color:#eab308;color:#eab308}
+</style></head><body>
+<div id="f"><header id="st"></header><nav id="nav"></nav><main id="main" style="min-height:0;min-width:0;display:grid"></main><footer id="al"></footer><div id="dlg"></div><div id="ctl"></div></div>
+<script>
+const $=i=>document.getElementById(i),P={ok:'M2 6.5 5 9.5 10 3',caution:'M6 1 11.3 11H.7ZM6 4.6V7.6M6 9.2V9.4',fault:'M2 2 10 10M10 2 2 10',cur:'M3 1.5 9.5 6 3 10.5Z',pend:'M6 1.5A4.5 4.5 0 1 1 5.99 1.5Z'};
+const ic=(l,s)=>`<svg class="i ${l}" viewBox="0 0 12 12" ${s?`style="width:${s}px;height:${s}px"`:''}><path d="${P[l]}" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>`;
+const R=document.documentElement,q=new URLSearchParams(location.hash.slice(1));
+// transcript entries: [time, who, text, intent, chips, class, info]
+const A=(t,x,i,c,k,d='2.1 s')=>`<div class="e"><div class="h"><span class="m">${t}</span><b>ATC</b><span>${k[0]=='RECOGNIZED'?ic('ok'):ic('caution')} ${k[0]} &nbsp; ${d}</span></div><p>${x}</p><span class="pc">${i}</span>${c.map(v=>`<span class="pc ${v.endsWith('?')?'q':''}">${v}</span>`).join('')}</div>`;
+const L=(t,x)=>`<div class="e pilot"><div class="h"><span class="m">${t}</span><b>PILOT</b><span>PLACEHOLDER</span></div><p>${x}</p></div>`;
+const N=(l,x)=>`<div class="e note">${ic(l)} ${x}</div>`;
+const T0=L('10:41:20','request taxi, EAGLE-421'),T1=A('10:41:32','eagle four two one taxi via alpha three runway zero nine','TAXI',['EAGLE-421','TWY A3','RWY 09'],['RECOGNIZED'])+L('10:41:38','taxi via A3, runway 09, EAGLE-421'),
+LU=A('10:43:02','eagle four two one line up runway zero nine','LINE UP',['EAGLE-421','RWY 09'],['RECOGNIZED'])+L('10:43:08','line up runway 09, EAGLE-421');
+const base={step:1,att:[1,0,0],tx:['','IDLE','Hold RIGHT to talk',''],rx:0,tr:T0+T1,n:null,al:['ok','Exercise running'],db:-52,cl:['Taxi via A3, runway 09'],timer:'00:14'};
+const S={
+ wait:['Waiting for ATC',{}],
+ call:['Pilot calls first',{step:0,att:[0,0,0],tr:T0,rx:1,cl:[],timer:'-'}],
+ tx:['Transmitting',{tx:['tx','TX','Transmitting','02.6 s'],db:-13,al:['ok','Text appears after release']}],
+ proc:['Processing',{tx:['busy','WAIT','Recognising',''],tr:T0+T1+N('pend','Processing: the text appears here')}],
+ rx:['Pilot replying',{step:2,att:[1,1,0],tr:T1+LU,rx:1,cl:['Taxi via A3, runway 09','Line up runway 09'],timer:'-'}],
+ amb:['Ambiguous: say again',{att:[1,1,0],tr:T1+A('10:43:02','eagle four two one line up runway 0.9','LINE UP',['EAGLE-421','RWY "0.9" ?'],['AMBIGUOUS'],'2.4 s')+L('10:43:09','say again, EAGLE-421'),n:['caution','Runway was not clear. Not counted as your error.'],al:['caution','Suspected speech recognition error']}],
+ wrong:['Wrong runway',{att:[1,1,0],tr:T1+A('10:43:02','eagle four two one line up runway two seven','LINE UP',['EAGLE-421','RWY 27'],['RECOGNIZED'])+L('10:43:08','query instruction, EAGLE-421'),n:['caution','Step not advanced: INCORRECT (runway).'],al:['caution','Line up: attempt 1 INCORRECT']}],
+ cs:['Wrong callsign: silence',{att:[1,1,0],tr:T1+A('10:43:02','eagle four five one line up runway zero nine','LINE UP',['EAGLE-451','RWY 09'],['RECOGNIZED'])+N('caution','No reply from the pilot'),n:['caution','Step not advanced: WRONG CALLSIGN.'],al:['caution','Line up: attempt 1 WRONG CALLSIGN']}],
+ time:['No call: pilot calls again',{tr:T0+T1+N('caution','No ATC call for 30 s')+L('10:42:40','holding short runway 09, EAGLE-421'),rx:1,n:['caution','The pilot is calling again (1 of 2).'],timer:'-'}],
+ cut:['PILOT CUT',{tx:['tx','TX','Transmitting','00.8 s'],cut:1,db:-14,n:['caution','You keyed over the pilot. The reply will be repeated.']}],
+ blocked:['BLOCKED',{tx:['bad','BLOCKED','Press discarded: pilot speaking',''],rx:1,n:['caution','Pilot is speaking: press discarded. Release, wait, then press again.']}],
+ queued:['Queued',{tx:['busy','WAIT','caution:Queued – pilot speaking',''],rx:1,n:['caution','Keep holding. Speak only when TX lights, after the pilot finishes.']}],
+ limit:['Say-again limit',{att:[1,3,0],tr:T1+N('caution','Third "say again" in this step')+L('10:44:20','say again, EAGLE-421'),n:['caution','Instructor: speech was not understood 3 times in this step.'],al:['caution','Instructor attention: say-again limit']}],
+ lost:['PTT lost',{tx:['bad','NO PTT','PTT not connected',''],dlg:1,al:['fault','PTT device lost: exercise paused']}],
+ wd:['Pilot voice fault',{n:['fault','Pilot voice stopped: playback did not finish. The reply is shown as text only.'],al:['fault','Fault logged: pilot speech watchdog']}],
+ done:['All steps complete',{step:3,att:[1,1,1],tr:LU+A('10:44:31','eagle four two one runway zero nine cleared for takeoff','TAKEOFF',['EAGLE-421','RWY 09'],['RECOGNIZED'])+L('10:44:37','runway 09 cleared for takeoff, EAGLE-421'),cl:['Taxi via A3, runway 09','Line up runway 09','Cleared for takeoff 09'],n:['ok','Exercise complete.'],al:['ok','Exercise complete'],timer:'-'}],
+ result:['RESULT: completed',{res:1}],resulta:['RESULT: stopped',{res:2}]};
+const STEPS=['Taxi','Line up','Takeoff'];
+function shell(res){const ch=(n,v,l)=>`<span class="chip">${ic(l)}${n} <b>${v}</b></span>`;
+ $('st').innerHTML=`<span class="n">MILITARY ATC TRAINING SIMULATOR</span>${ch('Mic','OK','ok')}${ch('Speaker','OK','ok')}${ch('PTT','STAND-IN','caution')}${ch('STT',res?'READY':'LOCKED','ok')}${ch('VOICE BANK','COVERAGE OK','ok')}<span class="r"><span class="tag">MOCK</span><span class="t2">Departure 01</span><span class="m">10:44:40Z 16:14L</span></span>`;
+ $('nav').innerHTML=['Dashboard','Scenarios','Exercise','Speech Lab','Assessment','Settings'].map(n=>`<div class="${n==(res?'Assessment':'Exercise')?'on':res?'':'off'}">${n}</div>`).join('')+'<button onclick="tog()">Mock (M)</button>';}
+function ex(s){
+ const mk=(i)=>i<s.step?['ok','Done']:i==s.step?['cur','Now']:['pend','Later'];
+ const sub=s.tx[2].startsWith('caution:')?`<span class="caution">${ic('caution')} ${s.tx[2].slice(8)}</span>`:s.tx[2];
+ return `<div id="ex"><section class="card"><div class="hd">AIRCRAFT</div><div style="padding:10px 12px 0"><div id="cs" class="m">EAGLE-421</div></div>
+ <div class="kv"><div><span>Runway</span><b>09</b></div><div><span>Taxiway</span><b>A3</b></div><div><span>Type</span><b class="s">C295</b></div><div><span>Half-duplex</span><b class="s" style="font-size:15px">interrupt</b></div></div>
+ <div class="hd" style="border-top:1px solid var(--divider)">CLEARANCES ISSUED</div><div class="list">${s.cl.length?s.cl.map(c=>`<div>${ic('ok')} ${c}</div>`).join(''):'<span class="t3">None yet</span>'}</div>
+ <div style="margin-top:auto"><div class="hd" style="border-top:1px solid var(--divider)">SPEECH MODEL</div><div class="list"><div>Whisper tiny + prompt</div><div class="t2 c">Locked for this exercise</div></div></div></section>
+ <section class="card"><div class="hd">TRANSCRIPT <span class="tag">PLACEHOLDER</span><span class="x">text appears after release</span></div><div id="tr">${s.tr}</div></section>
+ <section class="card"><div class="hd">PROCEDURE <span class="x">${Math.min(s.step,3)} of 3 done</span></div>${STEPS.map((n,i)=>{const k=mk(i);return `<div class="sp ${k[0]=='cur'?'cur':''}">${ic(k[0],16)}<div><b>${i+1} ${n}</b><span>${k[1]}${s.att[i]?` &nbsp; attempts ${s.att[i]}`:''}</span></div></div>`}).join('')}
+ <div class="rows"><div><span class="t2">Missed steps</span><b>none</b></div><div><span class="t2">Waiting for ATC</span><b class="m">${s.timer}</b></div></div>
+ <div style="margin-top:auto;padding:12px;display:grid"><button class="b ${s.step==3?'p':'d'}">${s.step==3?'Show result':'Stop exercise'}</button></div></section>
+ <section class="card" id="bar" style="flex-direction:initial"><div class="ind ${s.tx[0]}"><div class="w">${s.tx[0]=='bad'?ic('fault',24):''}<span>${s.tx[1]}</span><span class="m">${s.tx[3]}</span></div><div class="s">${sub}</div></div>
+ <div class="ind ${s.rx?'rx':''}" style="position:relative">${s.cut?'<span class="tag" style="position:absolute;right:8px;top:8px;background:var(--surface);color:var(--t1)">PILOT CUT</span>':''}<div class="w">RX</div><div class="s">${s.rx?'Pilot speaking':'Pilot silent'}</div></div>
+ <div style="min-width:0"><div style="display:flex;justify-content:space-between;font-size:13px"><span>Microphone &nbsp; normal speech -12 dBFS</span><span class="m">${s.db} dBFS</span></div><div id="mt"><i style="width:${(s.db+60)/.6}%"></i><u style="left:66.7%"></u><u style="left:90%"></u></div>
+ <div style="margin-top:22px;font-size:14px;line-height:1.25">${s.n?ic(s.n[0],16)+' '+s.n[1]:'<span class="t3">No notices</span>'}</div></div><button class="b" style="height:102px"><b style="font-size:18px">Screen PTT</b><br><span class="c t2">hold, or Space</span></button></section></div>`;}
+function rs(k){const st=k==2;
+ const row=(n,o,a,f,r,m)=>`<tr><td><b>${n}</b></td><td>${ic(o[0])} ${o[1]}</td><td class="m">${a}</td><td>${f}</td><td class="m">${r}</td><td class="m">${m}</td></tr>`;
+ const tl=(t,w,x,o,l)=>`<div class="tl"><span class="m">${t}</span><div style="min-width:0"><p>${x}</p><span>${l?ic(l):''} ${w}${o?' &nbsp; '+o:''}</span></div><button aria-label="Play">${ic('cur',18)}</button></div>`;
+ return `<div id="rs"><section class="card" style="grid-column:1/3;flex-direction:row;align-items:center;gap:28px;padding:0 20px"><div><div class="big">${st?ic('caution',20)+' STOPPED BY INSTRUCTOR':ic('ok',20)+' COMPLETED'}</div><span class="t2 c">Departure 01 &nbsp; EAGLE-421 &nbsp; 24 Nov 10:41 to 10:44</span></div>
+ <div><b class="m" style="font-size:24px">${st?'1':'3'} of 3</b><br><span class="t2 c">steps completed</span></div><div><b class="m" style="font-size:24px">3:17</b><br><span class="t2 c">duration</span></div><div style="margin-left:auto;text-align:right"><span class="tag">PLACEHOLDER</span><br><span class="t2 c">No pass mark: the content is not validated</span></div></section>
+ <div style="display:grid;grid-template-rows:auto 1fr;gap:12px;min-height:0"><section class="card"><div class="hd">STEPS</div><table><tr><th>Step</th><th>Outcome</th><th>Attempts</th><th>Trainee errors</th><th>Response</th><th>Say again</th></tr>
+ ${row('1 Taxi',['ok','Correct'],1,'none','4.1 s',0)}${st?row('2 Line up',['caution','Not completed'],2,'INCORRECT runway','6.0 s',1)+row('3 Takeoff',['pend','Not reached'],0,'-','-',0):row('2 Line up',['ok','Correct'],3,'INCORRECT runway','5.2 s',1)+row('3 Takeoff',['ok','Correct'],1,'none','3.6 s',0)}</table></section>
+ <div class="two"><section class="card"><div class="hd">PTT DISCIPLINE</div><div class="rows">${[['Transmissions',st?3:5],['Spoke before keying',1],['Released early',0],['Short taps',1],['No speech',0],['Keyed over the pilot',1],['Key to speech, median','0.41 s']].map(r=>`<div><span class="t2">${r[0]}</span><b class="m">${r[1]}</b></div>`).join('')}</div></section>
+ <section class="card"><div class="hd">SUSPECTED SPEECH RECOGNITION ERRORS</div><div style="padding:8px 12px;font-size:13px"><b>${ic('caution')} 1, not counted against the trainee</b><p class="t2" style="margin-top:6px">Line up, attempt 2: runway heard as "0.9", classed AMBIGUOUS. The pilot said "say again".</p></div><div class="rows" style="margin-top:auto;border-top:1px solid var(--divider)"><div><span class="t2">Speech model</span><b>Whisper tiny + prompt</b></div><div><span class="t2">Release to text, median</span><b class="m">2.1 s</b></div><div><span class="t2">Faults during exercise</span><b class="m">0</b></div></div></section></div></div>
+ <section class="card"><div class="hd">TIMELINE <span class="x">tap to play</span></div>${tl('10:41:20','PILOT','request taxi, EAGLE-421','')}${tl('10:41:32','ATC','eagle four two one taxi via alpha three runway zero nine','CORRECT','ok')}${tl('10:41:38','PILOT','taxi via A3, runway 09, EAGLE-421','')}${tl('10:42:10','ATC','eagle four two one line up runway two seven','INCORRECT','caution')}${tl('10:42:16','PILOT','query instruction, EAGLE-421','')}${tl('10:42:31','ATC','eagle four two one line up runway 0.9','AMBIGUOUS, not counted','caution')}${tl('10:42:38','PILOT','say again, EAGLE-421','')}${st?'':tl('10:43:02','ATC','eagle four two one line up runway zero nine','CORRECT','ok')}${st?'':tl('10:43:08','PILOT','line up runway 09, EAGLE-421','')}</section>
+ <section style="grid-column:1/3;display:flex;gap:12px;align-items:center"><button class="b p">Back to Dashboard</button><button class="b">Run again</button><button class="b">Model settings</button><span class="t2 c" style="margin-left:auto">Log and audio: this machine only</span></section></div>`;}
+function show(k){const s={...base,...(S[k]||S.wait)[1]};shell(s.res);$('main').innerHTML=s.res?rs(s.res):ex(s);$('al').innerHTML=s.res?ic('ok')+' Exercise finished':ic(s.al[0])+' '+s.al[1];
+ $('dlg').className=s.dlg?'s':'';$('dlg').innerHTML=s.dlg?`<div><b style="font-size:24px">${ic('fault',24)} PTT disconnected</b><p>The exercise is paused and its timers are stopped. Reconnect the PTT device and make sure it is released.</p><p class="t2">Continues when the PTT is seen released.</p><div style="display:flex;gap:12px"><button class="b">Use Screen PTT</button><button class="b d">Stop exercise</button></div></div>`:'';
+ document.querySelectorAll('#ctl [data-s]').forEach(b=>b.classList.toggle('on',b.dataset.s==k));}
+$('ctl').innerHTML=Object.entries(S).map(([k,v])=>`<button data-s="${k}">${v[0]}</button>`).join('')+[['dark','Dark'],['night','Night'],['hc','High contrast']].map(t=>`<button data-t="${t[0]}">${t[1]}</button>`).join('')+'<button data-z="">1280 x 800</button><button data-z="full">1920 x 1080</button>';
+$('ctl').onclick=e=>{const d=e.target.dataset;if(d.s)show(d.s);if(d.t)R.dataset.theme=d.t;if('z' in d)R.dataset.size=d.z};
+function tog(){$('ctl').classList.toggle('s')}addEventListener('keydown',e=>{if(e.key.toLowerCase()=='m')tog()});
+if(q.get('theme'))R.dataset.theme=q.get('theme');if(q.get('size'))R.dataset.size=q.get('size');show(q.get('state')||'wait');
+</script></body></html>
