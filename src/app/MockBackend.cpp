@@ -133,7 +133,7 @@ void MockBackend::restart() {
   TxConfig cfg = kCfg;
   cfg.pressDuringPilot = rule_;
   tx_.emplace(cfg, TransmissionController::Callbacks{
-      [this](std::uint64_t id, Ns from) {
+      [this](std::uint64_t id, Ns) {
         curId_ = id;
         openT_ = tx_->openedAt();  // later than the press if it was queued
         lab_->addEvent(openT_ / 1e9, QString::fromStdString(owner_), openT_ == pressT_ ? tr("down") : tr("open"), tr("TX %1 open").arg(id + kIdOffset), false);
