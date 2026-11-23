@@ -12,8 +12,10 @@
 *.fst
 *.mdl
 # Engines and models; rebuilt by tools/fetch_stt.sh from pinned checksums.
-/third_party/
+/third_party
 # Local to one machine
 .claude/settings.local.json
 __pycache__/
 *.part
+# One working copy per session (D-304)
+/.worktrees/

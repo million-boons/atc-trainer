@@ -54,6 +54,11 @@
 | D-50 | 2026-11-23 | The STT session (`atc-trainer-93`) owns all STT accuracy work (confirms D-33) and may update `config/stt_models.json`, telling the live session. Peak for the generated-prompt whisper configuration: 161 MB measured. | User |
 | D-51 | 2026-11-23 | H540: persistent AGC off and capture level, at login and hot-plug, separate from the pedal rule, with a check that reports drift. The script is shown to the user before it is run with sudo. | User |
 | D-52 | 2026-11-23 | Order: (1) runway misses by position against the early-release files; (2) decode s1 with a replaced Vosk LM; (3) prepare Step 1b (seeded script generator and recording manifest, 4 dev speakers). Step 2 runs after the 1b recordings exist. | User |
+| D-300 | 2026-11-23 | All six block/queue review findings are fixed, with tests, before the Exercise screen. Tests inject playback events late, duplicated, out of order and never; a randomised fault test asserts that no TX is open while the pilot is audible and that the pilot never starts while PTT is down. Press/release ordering uses the pedal's kernel event timestamps. | User |
+| D-301 | 2026-11-23 | Pilot-speech watchdog: expected duration of the assembled reply + 1.5 s, absolute cap 20 s, both configurable. On timeout: stop playback, end the pilot state, log a fault, show it on screen. | User |
+| D-302 | 2026-11-23 | A queued transmission's audio starts at opening; speech before the click is lost (completes D-24). | User |
+| D-303 | 2026-11-23 | If a press and the pilot's start are due at the same instant, the press is handled first. | User |
+| D-304 | 2026-11-23 | One worktree and branch per session, under `.worktrees/`: `ui` (31), `stt` (93), `runtime` (b2); `third_party/` shared by link. Decision ranges: ui D-100 to D-199, stt D-200 to D-299, runtime D-300 to D-399; existing numbers stay. The runtime session is integration owner: it merges branches into `main`, resolves `CMakeLists.txt` and `docs/decisions.md`, and runs a full build and all tests after each merge. | User |
 
 ## Check results
 
