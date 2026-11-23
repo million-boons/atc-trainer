@@ -207,4 +207,4 @@ third_party/             vendored, versions pinned
 docs/                    decisions.md architecture/ sop/
 ```
 
-Tests use GoogleTest (distro 1.11). JSON: nlohmann-json (distro 3.10.5) plus a vendored JSON-schema validator, licence to be checked at vendoring.
+Tests use GoogleTest (distro 1.11). JSON: nlohmann-json (3.11.3, `third_party/json`). Scenario and airfield files are checked by hand-written loader checks that report file and path (D-408); the schema files in `docs/architecture/schema/` document the format.

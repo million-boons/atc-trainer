@@ -59,6 +59,16 @@
 | D-302 | 2026-11-23 | A queued transmission's audio starts at opening; speech before the click is lost (completes D-24). | User |
 | D-303 | 2026-11-23 | If a press and the pilot's start are due at the same instant, the press is handled first. | User |
 | D-304 | 2026-11-23 | One worktree and branch per session, under `.worktrees/`: `ui` (31), `stt` (93), `runtime` (b2); `third_party/` shared by link. Decision ranges: ui D-100 to D-199, stt D-200 to D-299, runtime D-300 to D-399; existing numbers stay. The runtime session is integration owner: it merges branches into `main`, resolves `CMakeLists.txt` and `docs/decisions.md`, and runs a full build and all tests after each merge. | User |
+| D-400 | 2026-11-23 | S-1: a fourth session (`atc-trainer-8d`) on branch and worktree `engine`, decision range D-400 to D-499 (extends D-304). Development moves to the user's GPU PC: all worktrees, builds, tests and Piper generation. The i3 panel is used only for measurements and acceptance (3c, G1 audio checks, timing) with nothing else running. The repo sync (git push/pull between PC and panel) is planned as part of 0a. Until moved, at most two sessions build/test on the panel. | User |
+| D-401 | 2026-11-23 | S-2: the slice's event log is JSON Lines behind `IEventLog`. | User |
+| D-402 | 2026-11-23 | S-3: schema gains `onEnter`; replies are referenced by id; clip IDs are derived from the reply text; replies live in `data/phraseology/replies/`. | User |
+| D-403 | 2026-11-23 | S-4: line-up wording is "line up runway {runway}", marked PLACEHOLDER. The user supplies approved wording later if unclassified. | User |
+| D-404 | 2026-11-23 | S-5: Piper runs on the GPU PC; only clips are copied. Licences are checked first (result: `06-vertical-slice.md` §5). | User |
+| D-405 | 2026-11-23 | S-6: pilot clips are WAV for now. | User |
+| D-406 | 2026-11-23 | S-7: the slice uses `whisper-tiny-prompt`, locked per exercise; 93 pauses accuracy work for about one day for 2e. Before the demo, 93 does one clean timing run on the idle panel. | User |
+| D-407 | 2026-11-23 | S-8: Speech Lab export stays off. | User |
+| D-408 | 2026-11-23 | S-9: scenario files are checked by hand-written loader checks with file and path in each error; no vendored JSON-schema validator. `01-system.md` §7 updated. | User |
+| D-409 | 2026-11-23 | Vertical slice plan approved with the changes above (`docs/architecture/06-vertical-slice.md`). Open item, not in slice scope: pilot readback of a wrong value that exists in the airfield pools should become possible so readback errors can be trained; values outside pools lead to challenge or say again. | User |
 
 ## Check results
 
