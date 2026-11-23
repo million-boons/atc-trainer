@@ -26,7 +26,7 @@ void SttController::start(std::vector<atc::SttModel> models, atc::SttService::Fa
       words << QString::fromStdString(w.text);
       conf << w.conf;
     }
-    QMetaObject::invokeMethod(this, [this, tx, id, config = QString::fromStdString(config), text = QString::fromStdString(r.text), words, conf, delay] {
+    QMetaObject::invokeMethod(this, [this, tx, id, config = QString::fromStdString(config), text = QString::fromStdString(r.text).trimmed(), words, conf, delay] {
       emit result(tx, nameOf(id), config, text, words, conf, double(delay) / 1e9);
     }, Qt::QueuedConnection);
   };

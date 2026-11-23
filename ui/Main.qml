@@ -5,7 +5,7 @@ import Atc
 Window {
     id: root
     required property LabController lab
-    required property MockBackend mock
+    property MockBackend mock: null   // null: live backend
     required property SttController stt
     required property string themeMode
     required property bool reduceMotion
@@ -31,7 +31,7 @@ Window {
         Rectangle { anchors.fill: parent; color: Theme.bg }
         Keys.onPressed: (e) => {
             if (e.key === Qt.Key_Space) { if (!e.isAutoRepeat) root.lab.pressRequested("SPACE"); e.accepted = true }
-            else if (e.key === Qt.Key_M) { panel.active = !panel.active; e.accepted = true }
+            else if (e.key === Qt.Key_M && root.mock) { panel.active = !panel.active; e.accepted = true }
         }
         Keys.onReleased: (e) => {
             if (e.key === Qt.Key_Space) { if (!e.isAutoRepeat) root.lab.releaseRequested("SPACE"); e.accepted = true }
@@ -42,7 +42,7 @@ Window {
             width: parent.width; height: Theme.px(48)
             chips: root.lab.chips
             scenario: qsTr("No scenario")
-            mock: true
+            mock: root.mock !== null
         }
         NavRail {
             id: nav
@@ -75,6 +75,7 @@ Window {
         BaseButton {
             anchors { left: parent.left; leftMargin: Theme.s8; bottom: alert.top; bottomMargin: Theme.s8 }
             width: Theme.px(72)
+            visible: root.mock !== null
             text: qsTr("Mock (M)")
             tint: Theme.caution; ink: Theme.caution
             font.pixelSize: Theme.caption

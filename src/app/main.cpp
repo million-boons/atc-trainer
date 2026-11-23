@@ -11,9 +11,14 @@
 #include <QQuickItemGrabResult>
 #include <QQuickWindow>
 #include <QTimer>
+#include <memory>
 
 #include "app/LabController.h"
 #include "app/MockBackend.h"
+#ifdef ATC_HAVE_LIVE
+#include "app/LiveBackend.h"
+#include "stt/SttFactory.h"
+#endif
 #include "app/SttController.h"
 #ifdef ATC_HAVE_STT
 #include "stt/SttCatalog.h"
@@ -26,20 +31,25 @@ int main(int argc, char** argv) {
   QGuiApplication app(argc, argv);
   QCommandLineParser cli;
   cli.addHelpOption();
-  const QCommandLineOption mock("mock", "Run on the mock backend (the only backend so far).");
-  const QCommandLineOption config("config", "UI settings file.", "file", "config/ui.json");
+  const QCommandLineOption mock("mock", "Simulated PTT, audio and speech instead of the real devices.");
+  const QCommandLineOption config("config", "UI settings file.", "file", ATC_ROOT "/config/ui.json");
   const QCommandLineOption size("size", "Window size, e.g. 1280x800. Default: full screen.", "WxH");
   const QCommandLineOption theme("theme", "dark, night or hc.", "mode");
   const QCommandLineOption state("state", "Mock case to show.", "id");
   const QCommandLineOption grab("grab", "Save a screenshot and quit.", "file.png");
-  const QCommandLineOption modelsOpt("models", "Speech model list.", "file", "config/stt_models.json");
-  const QCommandLineOption root("root", "Project folder, for the model paths.", "dir", ".");
-  cli.addOptions({modelsOpt, root, mock, config, size, theme, state, grab});
+  const QCommandLineOption modelsOpt("models", "Speech model list.", "file", ATC_ROOT "/config/stt_models.json");
+  const QCommandLineOption root("root", "Project folder, for the model paths.", "dir", ATC_ROOT);
+  const QCommandLineOption pttOpt("ptt-device", "PTT input device (overrides the settings file); \"none\" for no device.", "path");
+  const QCommandLineOption pulseOpt("pulse-server", "PulseAudio server.", "address");
+  cli.addOptions({pttOpt, pulseOpt, modelsOpt, root, mock, config, size, theme, state, grab});
   cli.process(app);
-  if (!cli.isSet(mock)) {
-    qCritical("Only the mock backend exists. Start with --mock.");
+  const bool useMock = cli.isSet(mock);
+#ifndef ATC_HAVE_LIVE
+  if (!useMock) {
+    qCritical("Built without microphone, PTT or speech libraries. Start with --mock.");
     return 2;
   }
+#endif
 
   QJsonObject cfg;
   QFile f(cli.value(config));
@@ -73,17 +83,42 @@ int main(int argc, char** argv) {
 #else
   stt.setCatalogError("built without the speech engines (tools/fetch_stt.sh)");
 #endif
-  stt.start(std::move(models), MockBackend::fakeEngine, [](const atc::SttModel& m) { return "{\"mock\":\"" + m.id + "\"}"; });
-  MockBackend backend(&lab, &stt, cfg["pilotCutNoticeMs"].toInt(2000));
+  std::unique_ptr<MockBackend> mockBackend;
+  if (useMock) {
+    stt.start(std::move(models), MockBackend::fakeEngine, [](const atc::SttModel& m) { return "{\"mock\":\"" + m.id + "\"}"; });
+    mockBackend = std::make_unique<MockBackend>(&lab, &stt, cfg["pilotCutNoticeMs"].toInt(2000));
+  }
+#ifdef ATC_HAVE_LIVE
+  std::unique_ptr<LiveBackend> live;
+  if (!useMock) {
+    LiveConfig lc;
+    lc.pttDevice = cli.isSet(pttOpt) ? cli.value(pttOpt) : cfg["pttDevice"].toString();
+    if (lc.pttDevice == "none") lc.pttDevice.clear();
+    lc.pttName = cfg["pttName"].toString("PTT device");
+    lc.pttGrab = cfg["pttGrab"].toBool(false);
+    lc.micSource = cfg["micSource"].toString().toStdString();
+    lc.pulseServer = cli.value(pulseOpt).toStdString();
+    lab.textTag = "NOT VALIDATED";
+    if (lc.pttDevice.isEmpty()) lab.idleHint = "Hold Screen PTT or Space";
+    stt.start(std::move(models), [](const atc::SttModel& m, std::string& e) { return atc::makeRecognizer(m, ATC_GGML_DIR, e); },
+              atc::describeModel, atc::availableMemoryMb);
+    live = std::make_unique<LiveBackend>(&lab, &stt, lc);
+    live->start();
+  }
+#endif
 
 #ifdef ATC_HAVE_PULSE
   atc::PulseSideTone tone({.lengthMs = cfg["sideToneMs"].toInt(20), .hz = cfg["sideToneHz"].toDouble(1000),
                            .dbfs = cfg["sideToneDbfs"].toDouble(-18)});
   if (cfg["sideTone"].toBool(true) && !cli.isSet(grab)) {
     tone.start();
-    QObject::connect(&backend, &MockBackend::sideTone, &app, [&] {
+    const auto play = [&] {
       if (!tone.play()) qWarning("side-tone not played: no audio server");
-    });
+    };
+    if (mockBackend) QObject::connect(mockBackend.get(), &MockBackend::sideTone, &app, play);
+#ifdef ATC_HAVE_LIVE
+    if (live) QObject::connect(live.get(), &LiveBackend::sideTone, &app, play);
+#endif
   }
 #endif
 
@@ -92,7 +127,7 @@ int main(int argc, char** argv) {
   QQmlApplicationEngine engine;
   engine.addImportPath("qrc:/");
   engine.setInitialProperties({{"lab", QVariant::fromValue(&lab)},
-                               {"mock", QVariant::fromValue(&backend)},
+                               {"mock", QVariant::fromValue(mockBackend.get())},
                                {"stt", QVariant::fromValue(&stt)},
                                {"themeMode", cli.isSet(theme) ? cli.value(theme) : cfg["theme"].toString("dark")},
                                {"reduceMotion", cfg["reduceMotion"].toBool(false)}});
@@ -105,9 +140,9 @@ int main(int argc, char** argv) {
   } else {
     win->showFullScreen();
   }
-  if (cli.isSet(state)) backend.run(cli.value(state));
+  if (mockBackend && cli.isSet(state)) mockBackend->run(cli.value(state));
   if (cli.isSet(grab))
-    QTimer::singleShot(700, &app, [&] {
+    QTimer::singleShot(useMock ? 700 : 2500, &app, [&] {
       // Item grab, not window grab: the offscreen platform cannot read its window back.
       const auto shot = win->contentItem()->grabToImage();
       if (!shot) { qCritical("grab: not possible"); return app.exit(3); }

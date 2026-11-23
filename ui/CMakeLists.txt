@@ -25,6 +25,7 @@ qt_add_qml_module(atc_trainer
   SOURCES
     ${APP}/RowModel.h ${APP}/LabController.h ${APP}/LabController.cpp
     ${APP}/SttController.h ${APP}/SttController.cpp
+    ${APP}/LabChecks.h ${APP}/LabChecks.cpp
     ${APP}/Painted.h ${APP}/Painted.cpp ${APP}/MockBackend.h ${APP}/MockBackend.cpp)
 
 qt_add_resources(atc_trainer fonts PREFIX /Atc FILES
@@ -40,3 +41,10 @@ if(TARGET atc_pulse)
   target_link_libraries(atc_trainer PRIVATE atc_pulse)
   target_compile_definitions(atc_trainer PRIVATE ATC_HAVE_PULSE)
 endif()
+# Live backend: needs the microphone, PTT and speech libraries.
+if(TARGET atc_stt AND TARGET atc_pulse AND TARGET atc_evdev)
+  target_sources(atc_trainer PRIVATE ${APP}/LiveBackend.h ${APP}/LiveBackend.cpp)
+  target_link_libraries(atc_trainer PRIVATE atc_evdev)
+  target_compile_definitions(atc_trainer PRIVATE ATC_HAVE_LIVE ATC_GGML_DIR="${GGML_DIR}")
+endif()
+target_compile_definitions(atc_trainer PRIVATE ATC_ROOT="${CMAKE_SOURCE_DIR}")

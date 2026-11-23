@@ -94,7 +94,7 @@ Item {
                         text: s.stt.message || s.lab.resultInfo
                         elide: s.stt.message ? Text.ElideRight : Text.ElideMiddle
                         color: s.stt.message ? Theme.textPrimary : Theme.textSecondary }
-                Tag { visible: s.lab.textPlaceholder; text: qsTr("PLACEHOLDER") }
+                Tag { visible: s.lab.textPlaceholder; text: s.lab.textTag }
             }
             Label { id: textState; anchors { right: parent.right; rightMargin: Theme.s12 } y: Theme.px(60); height: Theme.px(22)
                     text: s.lab.textState; font.pixelSize: Theme.caption }

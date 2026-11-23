@@ -56,7 +56,7 @@ QString LabController::txLabel() const {
 
 QString LabController::txSub() const {
   switch (tx_) {
-    case TxDisplay::Idle: return tr("Hold RIGHT to talk");
+    case TxDisplay::Idle: return idleHint;
     case TxDisplay::Tx: return tr("Transmitting");
     case TxDisplay::Tail: return tr("Closing transmission");
     case TxDisplay::Wait: return tr("Recognising TX %1").arg(txId_);
