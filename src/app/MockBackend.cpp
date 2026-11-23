@@ -6,7 +6,6 @@
 #include <thread>
 #include <utility>
 
-#include "audio/UtteranceChecks.h"
 
 using namespace atc;
 
@@ -17,10 +16,6 @@ const QList<double> kConf{.93, .9, .88, .91, .97, .86, .9, .58, .95, .96, .98, .
 constexpr int kIdOffset = 13;  // seeded recordings use TX 8..13
 constexpr int kRate = 16000;
 const TxConfig kCfg;
-
-QVariantMap check(LabController::Level l, const QString& t, const QString& d) {
-  return {{"level", int(l)}, {"title", t}, {"detail", d}};
-}
 
 class FakeEngine : public ISpeechRecognizer {
  public:
@@ -145,8 +140,9 @@ void MockBackend::restart() {
         if (openT_ != pressT_) lab_->setNotice(LabController::None, {});  // was queued
         lab_->showRecording(-1);
         lab_->setWords({}, {});
-        lab_->setText({}, tr("Live"), true, {}, false);
         sttOpen_ = !frozen_ && stt_->service() && stt_->service()->begin(wire(id));
+        lab_->setText(frozen_ || sttOpen_ ? tr("Text appears after release") : tr("No speech model loaded: recording only"),
+                      tr("Listening"), true, {}, false);
       },
       [this](std::uint64_t id, Ns from, Ns to, TxEnd end) { finish(id, from, to, end); },
       [this](std::uint64_t id) {
@@ -204,7 +200,7 @@ void MockBackend::restart() {
     rec.text = text;
     if (*text) rec.resultInfo = tr("Whisper tiny + prompt  0.34 s");
     rec.audio = synth(p - kCfg.preRoll, r + kCfg.tail, p, r);
-    rec.checks = checksFor(rec.audio, TxEnd::Normal);
+    rec.checks = checksFor(rec.audio, TxEnd::Normal).list;
     const double total = held + .5;
     rec.pressFrac = .3 / total;
     rec.endFrac = (.3 + held) / total;
@@ -353,12 +349,12 @@ void MockBackend::finish(std::uint64_t id, Ns from, Ns to, TxEnd end) {
   rec.id = int(id) + kIdOffset;
   const Ns keyEnd = end == TxEnd::Stuck ? to : releaseT_;
   rec.audio = synth(from, to, openT_, end == TxEnd::Stuck ? std::nullopt : std::optional<Ns>(releaseT_));
-  rec.checks = checksFor(rec.audio, end);
+  const LabChecks checks = checksFor(rec.audio, end);
+  rec.checks = checks.list;
   rec.pressFrac = double(openT_ - from) / double(to - from);
   rec.endFrac = double(keyEnd - from) / double(to - from);
   rec.endLabel = end == TxEnd::Stuck ? tr("30 s LIMIT") : end == TxEnd::DeviceLost ? tr("LOST") : tr("RELEASE");
   rec.tailLabel = end == TxEnd::Stuck ? tr("no tail") : tr("tail");
-  const QVariantList checks = rec.checks;
   lab_->addRecording(std::move(rec), QTime::currentTime().toString("HH:mm:ss"));
 
   if (end == TxEnd::Stuck) {
@@ -367,27 +363,17 @@ void MockBackend::finish(std::uint64_t id, Ns from, Ns to, TxEnd end) {
     lab_->setNotice(LabController::Fault, tr("Transmission closed at 30 s. Lift your foot to transmit again."));
     lab_->setAlert(LabController::Fault, tr("PTT stuck: closed at maximum duration"));
   }
-  const bool noSpeech = checks[0].toMap()["title"] == tr("No speech");
-  if (end == TxEnd::Normal) {
-    const struct { int i; const char* title; QString notice; LabController::Level l; } texts[] = {
-        {2, "Too loud", tr("Microphone too loud. Speech is distorted; lower the headset volume and repeat."), LabController::Fault},
-        {0, "No speech", tr("Nothing was said during the transmission."), LabController::Caution},
-        {0, "Spoke early", tr("Speech began before the pedal was pressed."), LabController::Caution},
-        {1, "Released early", tr("Pedal released while still speaking. The end of the message may be lost."), LabController::Caution}};
-    for (const auto& x : texts)
-      if (checks[x.i].toMap()["title"] == tr(x.title)) {
-        lab_->setNotice(x.l, x.notice);
-        lab_->setAlert(LabController::Caution, tr("TX %1: %2").arg(id + kIdOffset).arg(tr(x.title).toLower()));
-        break;
-      }
+  if (checks.issue) {
+    lab_->setNotice(checks.issue->level, checks.issue->notice);
+    lab_->setAlert(LabController::Caution, tr("TX %1: %2").arg(id + kIdOffset).arg(checks.issue->title.toLower()));
   }
   const bool open = std::exchange(sttOpen_, false);
-  if (noSpeech || end != TxEnd::Normal) {  // nothing scored or recognised
+  if (checks.noSpeech || end != TxEnd::Normal) {  // nothing scored or recognised
     if (open) stt_->service()->cancel();
     lab_->setText({}, tr("Not run"), false, {}, false);
     tx_->onProcessed(id, std::nullopt, now_);
   } else {
-    lab_->setText(frozen_ ? liveText(releaseT_) : QString(), tr("Finishing"), true, {}, frozen_);
+    lab_->setText(tr("Processing"), tr("Processing"), true, {}, false);
     if (frozen_) {
       finalAt_ = {id, now_ + ms(140)};
     } else if (open) {
@@ -432,26 +418,8 @@ std::vector<std::int16_t> MockBackend::synth(Ns from, Ns to, Ns press, std::opti
   return a;
 }
 
-QVariantList MockBackend::checksFor(const std::vector<std::int16_t>& audio, TxEnd end) const {
-  using L = LabController;
-  const UtteranceReport r = checkUtterance(audio, int(kCfg.preRoll * kRate / 1'000'000'000));
-  const QString peak = tr("peak %1 dBFS").arg(r.peakDbfs, 0, 'f', 1);
-  QVariantList c;
-  c << (r.empty ? check(L::Caution, tr("No speech"), {})
-        : r.spokeBeforeKeying ? check(L::Caution, tr("Spoke early"), tr("before keying"))
-                              : check(L::Ok, tr("Start clean"), tr("nothing cut")));
-  // A transmission closed by the limit or by unplugging has no meaningful release.
-  c << (end != TxEnd::Normal ? check(L::Caution, tr("Not checked"), tr("no release"))
-        : r.empty ? check(L::Caution, tr("No speech"), {})
-        : r.releasedEarly ? check(L::Caution, tr("Released early"), tr("speech at cut end"))
-                          : check(L::Ok, tr("End clean"), tr("nothing cut")));
-  c << (r.overload ? check(L::Fault, tr("Too loud"), peak)
-        : r.peakDbfs > lab_->micHigh ? check(L::Caution, tr("Level high"), peak)
-        : r.peakDbfs < lab_->micLow ? check(L::Caution, tr("Level low"), peak)
-                                    : check(L::Ok, tr("Level good"), peak));
-  c << (r.keyToSpeechMs ? check(L::Ok, tr("%1 s").arg(*r.keyToSpeechMs / 1e3, 0, 'f', 2), tr("key to speech"))
-                        : check(L::Caution, tr("Not measured"), tr("key to speech")));
-  return c;
+LabChecks MockBackend::checksFor(const std::vector<std::int16_t>& audio, TxEnd end) const {
+  return labChecks(audio, int(kCfg.preRoll * kRate / 1'000'000'000), end, false, lab_->micLow, lab_->micHigh);
 }
 
 void MockBackend::publish() {
@@ -477,11 +445,4 @@ void MockBackend::publish() {
   int peak = 0;
   for (auto v : a) peak = std::max(peak, std::abs(int(v)));
   lab_->setMic(peak == 0 ? -120 : 20 * std::log10(peak / 32768.0));
-  if (frozen_ && (open || s == S::TxTail) && speech_.gain > 0) lab_->setText(liveText(open ? now_ : releaseT_), tr("Live"), true, {}, true);
-}
-
-// Scripted partial text: about two words per second of speech.
-QString MockBackend::liveText(Ns until) const {
-  const double t = double(until - openT_) / 1e9 - speech_.startMs / 1e3;
-  return QStringList(kWords.mid(0, std::clamp(int(t * 2.0), 0, int(kWords.size())))).join(' ');
 }

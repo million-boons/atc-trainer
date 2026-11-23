@@ -8,6 +8,7 @@
 #include <optional>
 #include <vector>
 
+#include "app/LabChecks.h"
 #include "app/LabController.h"
 #include "app/SttController.h"
 #include "ptt/PttInputManager.h"
@@ -44,13 +45,12 @@ class MockBackend : public QObject {
   void at(double ms, std::function<void()> f);
   void edge(double tMs, const char* src, bool down) { ptt_->rawEdge(atc::ms(0) + atc::Ns(tMs * 1e6), src, down); }
   void publish();
-  QString liveText(atc::Ns until) const;
   void showFinal(std::uint64_t id, const QString& text, const QStringList& words, const QList<double>& conf,
                  const QString& info, const QString& config);
   std::uint64_t wire(std::uint64_t id) const { return (epoch_ << 32) | id; }
   void finish(std::uint64_t id, atc::Ns from, atc::Ns to, atc::TxEnd end);
   std::vector<std::int16_t> synth(atc::Ns from, atc::Ns to, atc::Ns press, std::optional<atc::Ns> release) const;
-  QVariantList checksFor(const std::vector<std::int16_t>& audio, atc::TxEnd end) const;
+  LabChecks checksFor(const std::vector<std::int16_t>& audio, atc::TxEnd end) const;
   double sec() const { return double(now_) / 1e9; }
 
   LabController* lab_;

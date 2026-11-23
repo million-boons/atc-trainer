@@ -38,6 +38,7 @@ class LabController : public QObject {
   Q_PROPERTY(double micLow MEMBER micLow CONSTANT)
   Q_PROPERTY(double micHigh MEMBER micHigh CONSTANT)
   Q_PROPERTY(double micTarget MEMBER micTarget CONSTANT)
+  Q_PROPERTY(QString textTag MEMBER textTag CONSTANT)
   Q_PROPERTY(QVariantList chips READ chips NOTIFY chipsChanged)
   Q_PROPERTY(QString pttSource READ pttSource NOTIFY chipsChanged)
   Q_PROPERTY(bool rightDown READ rightDown NOTIFY buttonsChanged)
@@ -74,6 +75,8 @@ class LabController : public QObject {
 
   // Configurable starting values (D-13, D-22). Set before QML loads.
   double micLow = -20, micHigh = -6, micTarget = -12;
+  QString textTag = "PLACEHOLDER";              // tag beside recognised text
+  QString idleHint = "Hold RIGHT to talk";
 
   // Setters for the backend.
   void setTx(atc::TxDisplay s, int txId);
