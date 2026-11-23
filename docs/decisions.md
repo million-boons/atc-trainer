@@ -59,6 +59,12 @@
 | D-302 | 2026-11-23 | A queued transmission's audio starts at opening; speech before the click is lost (completes D-24). | User |
 | D-303 | 2026-11-23 | If a press and the pilot's start are due at the same instant, the press is handled first. | User |
 | D-304 | 2026-11-23 | One worktree and branch per session, under `.worktrees/`: `ui` (31), `stt` (93), `runtime` (b2); `third_party/` shared by link. Decision ranges: ui D-100 to D-199, stt D-200 to D-299, runtime D-300 to D-399; existing numbers stay. The runtime session is integration owner: it merges branches into `main`, resolves `CMakeLists.txt` and `docs/decisions.md`, and runs a full build and all tests after each merge. | User |
+| D-100 | 2026-11-24 | Recordings: session b2 does Lab playback in 1a (reusing or dropping `PulsePlayback`; stop is immediate per D-300). The ui session finishes saving and the screen parts after 1a merges, as package 1c (the user asks session 8d to add it). | User |
+| D-101 | 2026-11-24 | Every Speech Lab transmission is saved automatically, with "Saved on this machine only" on screen and an off switch in Settings. A **speaker ID is required before saving**, so dev/test splits are possible. Only consented speakers are recorded. | User |
+| D-102 | 2026-11-24 | No automatic deletion of recordings. Deleting is for the instructor role only and is logged. A warning shows when free space is below a configurable limit. | User |
+| D-103 | 2026-11-24 | Dashboard wireframe approved with fixes: the ready count is computed from the tiles; the Speech model tile has "Load exercise model" (loads the configured default, locked at Start); every tile shows whether it blocks Start or only warns. Voice bank missing and model not loaded block; speaker not checked warns. | User |
+| D-104 | 2026-11-24 | Exercise and Result mockups (2g) are drafted now, without a build. | User |
+| D-105 | 2026-11-24 | Commits: the ui session commits only its own files and works in its worktree (confirms D-31 and D-304). Session b2 edits `MockBackend.cpp` and `LiveBackend.cpp` when its TransmissionController changes merge; the ui session then checks the screens and reports. | User |
 
 ## Check results
 
