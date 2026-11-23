@@ -517,7 +517,7 @@ TEST(TxFaults, RandomisedPlaybackAndPedalFaults) {
             if (hangs || kind == 0) return;                                        // never
             events.emplace(now + length + ms(kind == 1 ? rnd(30'000) : rnd(20)), done);  // late
             if (kind == 2) events.emplace(now + length + ms(rnd(25'000)), done);   // twice
-            if (kind == 3) events.emplace(now + length + ms(rnd(5000)), [&, id] { cp->onPlaybackDone(id + 1 + g() % 2, now); if (cp->state() == S::PilotSpeaking && audible) SUCCEED(); });
+            if (kind == 3) events.emplace(now + ms(rnd(5000)), [&] { cp->onPlaybackDone(1'000'000'000, now); });  // unknown
             if (kind == 4 && id > 1) events.emplace(now + ms(rnd(2000)), [&, id] { cp->onPlaybackDone(id - 1, now); });  // out of order
           },
           [&](const Reply&, PlaybackId id, PilotStop why) {
