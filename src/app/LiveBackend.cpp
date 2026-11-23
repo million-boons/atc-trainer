@@ -205,7 +205,7 @@ void LiveBackend::build() {
       {}, [this](const Reply&, PlaybackId, PilotStop why) {
         if (why == PilotStop::Interrupted) cutUntil_ = monotonicNow() + ms(2000);
         if (why == PilotStop::Timeout)
-          notice(L::Fault, tr("Pilot audio did not finish in time and was stopped."), L::Fault, tr("Pilot audio fault: stopped by the time limit"));
+          notice(L::Fault, tr("Pilot voice stopped: playback did not finish in time."), L::Fault, tr("Pilot voice fault: stopped by the time limit"));
       }, {}, {},
       [this](Ns) { ui([this] { emit sideTone(); }); }, {}});
 }
@@ -260,6 +260,7 @@ void LiveBackend::closeNow() {
   rec->checks = checks.list;
   rec->pressFrac = std::clamp(pre / n, 0.0, 1.0);
   rec->endFrac = std::clamp((pre + keyed) / n, 0.0, 1.0);
+  if (c.press == c.from) rec->startLabel = tr("TX OPEN");  // queued: no pre-roll
   rec->endLabel = c.end == TxEnd::Stuck ? tr("30 s LIMIT") : c.end == TxEnd::DeviceLost ? tr("LOST") : tr("RELEASE");
   rec->tailLabel = c.end == TxEnd::Stuck ? tr("no tail") : tr("tail");
   rec->audio = std::move(cut.samples);

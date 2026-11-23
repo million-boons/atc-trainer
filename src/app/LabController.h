@@ -17,7 +17,7 @@ struct LabRecording {
   QString modelConfig; // exact model and settings (D-39)
   std::vector<std::int16_t> audio;  // pre-roll + keyed speech + tail
   double pressFrac = 0, endFrac = 1;
-  QString endLabel, tailLabel;
+  QString startLabel = "PRESS", endLabel, tailLabel;
   QVariantList checks;  // 4 x {level, title, detail}
 };
 
@@ -58,6 +58,7 @@ class LabController : public QObject {
   Q_PROPERTY(QVariantList checks READ checks NOTIFY recordingChanged)
   Q_PROPERTY(double pressFrac READ pressFrac NOTIFY recordingChanged)
   Q_PROPERTY(double endFrac READ endFrac NOTIFY recordingChanged)
+  Q_PROPERTY(QString startLabel READ startLabel NOTIFY recordingChanged)
   Q_PROPERTY(QString endLabel READ endLabel NOTIFY recordingChanged)
   Q_PROPERTY(QString tailLabel READ tailLabel NOTIFY recordingChanged)
   Q_PROPERTY(int selectedRow READ selectedRow NOTIFY recordingChanged)
@@ -130,6 +131,7 @@ class LabController : public QObject {
   QVariantList checks() const;
   double pressFrac() const { return sel_ < 0 ? 0 : recs_[sel_].pressFrac; }
   double endFrac() const { return sel_ < 0 ? 1 : recs_[sel_].endFrac; }
+  QString startLabel() const { return sel_ < 0 ? QString() : recs_[sel_].startLabel; }
   QString endLabel() const { return sel_ < 0 ? QString() : recs_[sel_].endLabel; }
   QString tailLabel() const { return sel_ < 0 ? QString() : recs_[sel_].tailLabel; }
   int selectedRow() const { return sel_; }

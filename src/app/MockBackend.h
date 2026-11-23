@@ -71,7 +71,7 @@ class MockBackend : public QObject {
   std::string owner_;
   atc::Ns pressT_ = 0, openT_ = 0, releaseT_ = 0;
   atc::PlaybackId playback_ = 0;
-  bool held_ = false, stuck_ = false, present_ = true, pulse_ = false, muted_ = false;
+  bool held_ = false, stuck_ = false, present_ = true, pulse_ = false, muted_ = false, pilotHangs_ = false;
   atc::PressRule rule_ = atc::PressRule::Interrupt;
   std::uint64_t curId_ = 0;
   std::optional<std::pair<std::uint64_t, atc::Ns>> finalAt_;

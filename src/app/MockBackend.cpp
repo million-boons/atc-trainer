@@ -72,7 +72,7 @@ QVariantList MockBackend::scripts() const {
       {"tap", "Short tap"}, {"other", "Second source"}, {"stuck", "Stuck (30 s)"}, {"lost", "PTT unplugged"},
       {"pulse", "Pulse-type pedal"}, {"muted", "Mic muted"}, {"rx", "Pilot speaking"},
       {"cut", "PILOT CUT (interrupt)"}, {"blocked", "BLOCKED (rule block)"},
-      {"queued", "WAIT (rule queue)"}, {"queueopen", "Queued, then TX"}, {"queuedrop", "Queued, dropped"},
+      {"queued", "WAIT (rule queue)"}, {"queueopen", "Queued, then TX"}, {"queuedrop", "Queued, dropped"}, {"queuetalk", "Queued, talked too soon"}, {"ptimeout", "Pilot voice timeout"},
       {"mloading", "Model LOADING"}, {"mfailed", "Model FAILED"}, {"mother", "Other model selected"}, {"mlocked", "Model locked"},
       {"vloaded", "Bank loaded"}, {"vok", "Bank coverage OK"}, {"vmissing", "Bank missing clips"}, {"vfailed", "Bank failed"}};
   QVariantList l;
@@ -90,7 +90,7 @@ void MockBackend::restart() {
   script_.clear();
   speech_ = {};
   owner_.clear();
-  held_ = stuck_ = pulse_ = muted_ = false;
+  held_ = stuck_ = pulse_ = muted_ = pilotHangs_ = false;
   present_ = true;
   curId_ = 0;
   finalAt_.reset();
@@ -160,15 +160,15 @@ void MockBackend::restart() {
       },
       [this](const Reply&, PlaybackId id) {
         playback_ = id;
-        pilotEnd_ = now_ + ms(6000);
+        if (!pilotHangs_) pilotEnd_ = now_ + ms(6000);
         lab_->addEvent(sec(), tr("PILOT"), tr("start"), tr("mock speech"), false);
       },
       [this](const Reply&, PlaybackId, PilotStop why) {
         pilotEnd_.reset();
         if (why == PilotStop::Timeout) {
           lab_->addEvent(sec(), tr("PILOT"), tr("timeout"), tr("no end reported"), true);
-          lab_->setNotice(LabController::Fault, tr("Pilot audio did not finish in time and was stopped."));
-          lab_->setAlert(LabController::Fault, tr("Pilot audio fault: stopped by the time limit"));
+          lab_->setNotice(LabController::Fault, tr("Pilot voice stopped: playback did not finish in time."));
+          lab_->setAlert(LabController::Fault, tr("Pilot voice fault: stopped by the time limit"));
           return;
         }
         if (why == PilotStop::PressCameFirst) {
@@ -280,6 +280,7 @@ void MockBackend::run(const QString& id) {
     lab_->setAlert(LabController::Fault, tr("Mic: no signal (headset mute?)"));
   }
   else if (id == "rx") { pilot(); freeze = 1500; }
+  else if (id == "ptimeout") { pilotHangs_ = true; pilot(); freeze = 21000; }
   else if (id == "cut") {
     pilot();
     at(2000, [this] { edge(2000, "RIGHT", true); });
@@ -293,8 +294,12 @@ void MockBackend::run(const QString& id) {
   else if (id.startsWith("queue")) {
     pilot();
     at(2000, [this] { edge(2000, "RIGHT", true); });
+    if (id == "queuetalk") {
+      speech_.startMs = -400;
+      at(9000, [this] { edge(9000, "RIGHT", false); });
+    }
     if (id == "queuedrop") at(3000, [this] { edge(3000, "RIGHT", false); });
-    freeze = id == "queueopen" ? 8500 : id == "queuedrop" ? 3500 : 2800;
+    freeze = id == "queuetalk" ? 9700 : id == "queueopen" ? 8500 : id == "queuedrop" ? 3500 : 2800;
   }
   advanceTo(Ns(freeze * 1e6));
   current_ = id;
@@ -364,6 +369,7 @@ void MockBackend::finish(std::uint64_t id, Ns from, Ns to, TxEnd end) {
   rec.checks = checks.list;
   rec.pressFrac = double(openT_ - from) / double(to - from);
   rec.endFrac = double(keyEnd - from) / double(to - from);
+  if (openT_ == from) rec.startLabel = tr("TX OPEN");  // queued: no pre-roll
   rec.endLabel = end == TxEnd::Stuck ? tr("30 s LIMIT") : end == TxEnd::DeviceLost ? tr("LOST") : tr("RELEASE");
   rec.tailLabel = end == TxEnd::Stuck ? tr("no tail") : tr("tail");
   lab_->addRecording(std::move(rec), QTime::currentTime().toString("HH:mm:ss"));

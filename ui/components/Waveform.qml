@@ -23,9 +23,9 @@ Item {
         color: Theme.surface
         Label { id: t; anchors.centerIn: parent; font.pixelSize: Theme.caption; color: Theme.textMuted }
     }
-    Mark { text: qsTr("PRESS"); ink: Theme.tx; x: wf.width * wf.lab.pressFrac + Theme.s4; y: Theme.px(2) }
+    Mark { text: wf.lab.startLabel; ink: Theme.tx; x: wf.width * wf.lab.pressFrac + Theme.s4; y: Theme.px(2) }
     Mark { text: wf.lab.endLabel; ink: Theme.tx; x: wf.width * wf.lab.endFrac - width - Theme.s4; y: Theme.px(2) }
-    Mark { text: qsTr("pre-roll"); x: Theme.px(2); y: wf.height - height - Theme.px(2) }
+    Mark { visible: wf.lab.hasRecording && wf.lab.pressFrac > 0; text: qsTr("pre-roll"); x: Theme.px(2); y: wf.height - height - Theme.px(2) }
     Mark { text: wf.lab.tailLabel; x: wf.width - width - Theme.px(2); y: wf.height - height - Theme.px(2) }
     Label {
         visible: !wf.lab.hasRecording

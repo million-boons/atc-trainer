@@ -15,6 +15,7 @@ struct LabChecks {
   struct Issue { LabController::Level level; QString title, notice; };
   std::optional<Issue> issue;  // the most important one
 };
-// audio = pre-roll + keyed speech + tail. gap: audio was lost inside the cut.
+// audio = pre-roll + keyed speech + tail. preRollSamples 0: a queued transmission, which has
+// no audio from before TX opened (D-302). gap: audio was lost inside the cut.
 LabChecks labChecks(std::span<const std::int16_t> audio, int preRollSamples, atc::TxEnd end, bool gap, double micLow,
                     double micHigh);
