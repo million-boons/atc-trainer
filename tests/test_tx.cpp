@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <functional>
 #include <map>
 #include <random>
@@ -530,7 +531,7 @@ TEST(TxFaults, RandomisedPlaybackAndPedalFaults) {
       cp = &c;
       PttInputManager p({}, {[&](Ns t, const std::string&) { c.onPress(t); },
                              [&](Ns t, const std::string&, ReleaseReason why) { c.onRelease(t, why); }, nullptr, nullptr});
-      Ns edge = ms(500);
+      Ns edge = ms(500), lastDelivery = 0;
       bool down = false;
       const auto step = [&] {
         now += ms(5);
@@ -548,7 +549,8 @@ TEST(TxFaults, RandomisedPlaybackAndPedalFaults) {
         if (now >= edge) {
           down = !down;
           const Ns stamp = now;
-          const Ns delivery = now + ms(rnd(15));
+          // Late, but in order: the kernel queue never reorders one device.
+          const Ns delivery = lastDelivery = std::max(lastDelivery + 1, now + ms(rnd(15)));
           const bool lost = !down && rnd(10) == 0;
           events.emplace(delivery, [&, stamp, d = down, lost] {
             if (lost) p.deviceLost(stamp, "p");
@@ -567,7 +569,7 @@ TEST(TxFaults, RandomisedPlaybackAndPedalFaults) {
       }
       // Recovery: after the faults stop, the radio must become usable again.
       faults = false;
-      if (down) events.emplace(now, [&, stamp = now] { p.rawEdge(stamp, "p", false); });
+      if (down) events.emplace(std::max(now, lastDelivery + 1), [&, stamp = now] { p.rawEdge(stamp, "p", false); });
       for (Ns end = now + ms(25'000); now < end;) {
         for (auto id : std::exchange(toProcess, {})) c.onProcessed(id, std::nullopt, now);
         step();
