@@ -1,0 +1,50 @@
+#!/bin/bash
+# Applies /etc/atc-h540.conf to the H540 and reads it back. Runs as the logged-in user.
+# Exit 0: both settings confirmed, or no H540 connected. Otherwise 1, with the reason.
+set -u
+CONF=/etc/atc-h540.conf
+AGC=off
+CAPTURE_PERCENT=70
+# Read values only; the file is never executed.
+while IFS='=' read -r k v; do
+  case "$k" in
+    AGC) case "$v" in on|off) AGC=$v ;; *) echo "bad AGC value in $CONF" >&2; exit 1 ;; esac ;;
+    CAPTURE_PERCENT)
+      if [[ "$v" =~ ^[0-9]{1,3}$ ]] && [ "$((10#$v))" -ge 1 ] && [ "$((10#$v))" -le 100 ]; then CAPTURE_PERCENT=$((10#$v))
+      else echo "bad CAPTURE_PERCENT value in $CONF (1 to 100)" >&2; exit 1; fi ;;
+  esac
+done < "$CONF" || { echo "cannot read $CONF" >&2; exit 1; }
+export LC_ALL=C
+
+card=""
+for f in /proc/asound/card*/usbid; do
+  [ -r "$f" ] && [ "$(cat "$f")" = "046d:0a37" ] && card=${f#/proc/asound/card} && card=${card%/usbid} && break
+done
+[ -n "$card" ] || { echo "H540 not connected"; exit 0; }
+
+# PulseAudio may still be starting or opening the card.
+src=""
+for _ in $(seq 60); do
+  src=$(pactl list short sources 2>/dev/null | awk '$2 ~ /^alsa_input\.usb-Logitech_Inc_Logitech_USB_Headset_H540_/ {print $2; exit}')
+  [ -n "$src" ] && break
+  sleep 0.5
+done
+
+rc=0
+# AGC first: it changes the level.
+amixer -q -c "$card" cset name='Auto Gain Control' "$AGC" >/dev/null || rc=1
+if [ -n "$src" ]; then
+  pactl set-source-volume "$src" "${CAPTURE_PERCENT}%" || rc=1
+else
+  echo "PulseAudio did not show the H540 microphone within 30 s" >&2
+  rc=1
+fi
+
+agc=$(amixer -c "$card" cget name='Auto Gain Control' 2>/dev/null | sed -n 's/^ *: values=//p')
+[ "$agc" = "$AGC" ] || { echo "AGC is '$agc', wanted '$AGC'" >&2; rc=1; }
+if [ -n "$src" ]; then
+  vol=$(pactl get-source-volume "$src" 2>/dev/null | grep -o '[0-9]*%' | sort -u | paste -sd' ')
+  [ "$vol" = "${CAPTURE_PERCENT}%" ] || { echo "capture volume is '$vol', wanted ${CAPTURE_PERCENT}%" >&2; rc=1; }
+fi
+[ $rc = 0 ] && echo "H540: AGC $AGC, capture ${CAPTURE_PERCENT}% confirmed"
+exit $rc

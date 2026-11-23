@@ -1,0 +1,22 @@
+{
+  "comment": "Speech models offered in the Speech Lab. Paths are relative to the project folder. peakMb: highest process memory measured 2026-11-23 on speaker s1 or synthetic speech; not a limit. None of these has passed the accuracy target.",
+  "models": [
+    { "id": "whisper-tiny-prompt", "name": "Whisper tiny + prompt", "engine": "whisper",
+      "path": "third_party/archives/ggml-tiny.en-q5_1.bin", "threads": 4, "audioCtx": 768,
+      "promptFile": "data/bench/placeholder_prompt.txt", "peakMb": 125,
+      "note": "Best so far on one speaker (78 of 102 fields). Text after release." },
+    { "id": "vosk-grammar", "name": "Vosk small, limited words", "engine": "vosk",
+      "path": "third_party/vosk-model-small-en-in-0.4", "grammarFile": "data/bench/placeholder_vocabulary.txt",
+      "peakMb": 105, "note": "Fastest. Drops digits on one speaker (37 of 102 fields)." },
+    { "id": "vosk-free", "name": "Vosk small, all words", "engine": "vosk",
+      "path": "third_party/vosk-model-small-en-in-0.4", "peakMb": 280,
+      "note": "Poor on aviation wording (8 of 102 fields)." },
+    { "id": "whisper-tiny", "name": "Whisper tiny, no prompt", "engine": "whisper",
+      "path": "third_party/archives/ggml-tiny.en-q5_1.bin", "threads": 4, "audioCtx": 0, "peakMb": 115,
+      "note": "About 3 s after release (39 of 102 fields)." },
+    { "id": "whisper-base-prompt", "name": "Whisper base + prompt", "engine": "whisper",
+      "path": "third_party/archives/ggml-base.en-q5_1.bin", "threads": 4, "audioCtx": 768,
+      "promptFile": "data/bench/placeholder_prompt.txt", "peakMb": 170,
+      "note": "Not better than tiny so far (76 of 102 fields). Delay not yet measured." }
+  ]
+}

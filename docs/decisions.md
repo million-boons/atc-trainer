@@ -1,0 +1,60 @@
+# Approved decisions
+
+| ID | Date | Decision | Source |
+|---|---|---|---|
+| D-01 | 2026-11-23 | RT communication starts when the **right** button is pressed and stops when it is **released** (hold-to-talk). Left down/release are to be reported as well; their function is not yet defined. | User |
+| D-02 | 2026-11-23 | Check whether the PTT button works before anything else. | User |
+| D-03 | 2026-11-23 | Proceed as if the PTT works. Develop with a stand-in PTT source; test a working pedal when one is available. The pedal is **not** passed: D-02 result stands, and the pedal gate is deferred, not waived. | User |
+| D-04 | 2026-11-23 | Architecture v0.1 approved: P-01 to P-13 as written in `docs/architecture/README.md`. STT engine is still chosen only from measured panel results. | User |
+| D-05 | 2026-11-23 | C-1: a press during pilot speech **interrupts** the pilot. The event is logged; the reply can be repeated. | User |
+| D-06 | 2026-11-23 | First build: PTT and Speech Lab (Phase 2). | User |
+| D-07 | 2026-11-23 | SOP/phraseology: marked placeholders for now. Validated content comes later and gates assessed use. | User |
+| D-08 | 2026-11-23 | Build the speech benchmark now with placeholder phrases. Placeholder results cannot choose the STT engine. | User (choice of engine rule: P-04) |
+| D-09 | 2026-11-23 | U-01: Speech Lab layout approved as in `docs/mockups/speech-lab.html`. | User |
+| D-10 | 2026-11-23 | U-02: Dark `text-muted` is `#8592A0`; `fault` is `#F87171`. | User |
+| D-11 | 2026-11-23 | U-03: Night and High-contrast palettes approved, with the contrast table to be re-measured and shown (`04-ui.md` §4). | User |
+| D-12 | 2026-11-23 | U-04: TX states are IDLE, TX, TAIL, WAIT, BLOCKED, STUCK, NO PTT, NO HOLD (`04-ui.md` §3). Clarifies D-05: interrupt is only the **default**; half-duplex is configurable per scenario (block / interrupt / queue). BLOCKED appears when the scenario rule is "block". A short "PILOT CUT" notice is shown on an interrupt. | User |
+| D-13 | 2026-11-23 | U-05: microphone target band -20 to -6 dBFS, as a **configurable starting value**. The user lowers the H540 input gain so normal speech peaks near -6 dBFS, then it is tuned. | User |
+| D-14 | 2026-11-23 | Theme has a scale factor based on screen height, 1.0 at 800 px, for text and touch targets. Check 1280×800 and 1920×1080. | User |
+| D-15 | 2026-11-23 | Phraseology Studio is added to `04-ui.md`. Its wireframe is shown to the user **before** it is built. | User |
+| D-16 | 2026-11-23 | Install Qt 6.2.4 from the Ubuntu 22.04 apt archive; only Qt 6.2-compatible APIs. Inter and JetBrains Mono (OFL) are bundled in `ui/fonts` through qrc, not installed system-wide. | User |
+| D-17 | 2026-11-23 | Build the Theme, components and Speech Lab screen with the mock backend. | User |
+| D-18 | 2026-11-23 | The speech model is **selectable**: choose it from a dropdown, press Load, then run, rather than fixing one engine. Amends P-04: the benchmark informs the list and its notes instead of picking a single winner. Dropdown layout not yet approved. | User |
+| D-19 | 2026-11-23 | Night fills `#D68B0E` (TX) and `#1FABBF` (RX) approved, provided text and icons on them measure at least 7:1. Measured: 7.26 and 7.33 (`04-ui.md` §4). Completes D-11. | User |
+| D-20 | 2026-11-23 | Half-duplex rules: "queue" shows WAIT with sub-text "Queued – pilot speaking" in caution colour, never BLOCKED. BLOCKED only under rule "block", where the press is discarded. Both are implemented in `TransmissionController`, with tests, before the Exercise screen. Completes D-12. | User |
+| D-21 | 2026-11-23 | Phraseology Studio wireframe approved with changes: (a) ATC examples also show the S/D segment strip, because they generate the Vosk LM corpus, but have no record dots and no recorder; (b) "Say this" uses the real template in which the clip is used, with the target in bold and spoken-number spelling ("zero niner"); (c) each intent has a Draft/Validated status and an SOP reference field. Completes D-15. | User |
+| D-22 | 2026-11-23 | Microphone: normal speech targets about -12 dBFS; -6 dBFS stays the high limit. Amends D-13. | User |
+| D-23 | 2026-11-23 | D-18: the speech-model selector is allowed only on the Speech Lab screen and is hidden during exercises. Consistent with D-38 and D-39. | User |
+| D-24 | 2026-11-23 | Queue holds the press, not the speech: speech during pilot speech is lost, and an early release drops the press and is logged. When a queued press opens TX, a short side-tone click plays with the TX light, and clipped-start and key-to-speech timing start from that moment, not from the press. Confirms and completes D-20. | User |
+| D-25 | 2026-11-23 | Phraseology Studio: Validated requires an SOP reference; editing a Validated intent returns it to Draft; `validated_by` and `validated_at` are stored; only the instructor role can set Validated. Completes D-21. | User |
+| D-26 | 2026-11-23 | Speech-model selector built into the Speech Lab now: RECOGNISED TEXT header has Model [dropdown] [Load] + status (NOT LOADED / LOADING / READY / BUSY / FAILED with reason). The dropdown lists `config/stt_models.json` with notes, not-installed models greyed out. Load is disabled during a transmission or while text is pending. Each result line shows model name and release-to-text delay. Not on the Exercise screen: there the model is locked and read-only. The speech session owns the backend, the UI session the screen files. Completes D-18, D-23, D-38. | User |
+| D-27 | 2026-11-23 | P-08 is **withdrawn**. Pilot voice is a prerecorded voice bank with no runtime TTS. The TTS chip is renamed VOICE BANK, with states loaded / coverage OK / missing clips (count) / failed. | User |
+| D-28 | 2026-11-23 | Use the Qt already installed on this machine; do not install it. Found: Qt 6.2.4 from apt (`/usr/lib/qt6/bin/qtpaths6`), in CMake's default path. Amends D-16. | User |
+| D-29 | 2026-11-23 | Live text: interim, the screen shows "Text appears after release" with a Processing indicator. Vosk live text (grey, display-only, Speech Lab only, **never on the Exercise screen**) is approved in principle but deferred until the engine decision. No repeated whisper decoding. | User |
+| D-30 | 2026-11-23 | H540: install only `deploy/h540/`. Session 93 removes its duplicate set after the user confirms the install works. The user reviews both installers before running sudo. | User |
+| D-31 | 2026-11-23 | Git: one repository, no audio or model files; tag `baseline-2026-11-23`. Every session commits its own folders with clear messages, commits before every build, and runs `git status` before editing. Worktrees per session only if the user agrees. | User |
+| D-32 | 2026-11-23 | Session `atc-trainer-b2` reviews the block/queue code: read first, run tests only when nobody is building. | User |
+| D-33 | 2026-11-23 | Session `atc-trainer-93` owns all STT accuracy work (items b to f) and reconciles `data/speech/` and `tools/gen_speech_data.py` into `data/phraseology/` (D-45). Session `atc-trainer-b2` keeps the live side: model load and lock, PTT gate, pedal, TransmissionController. | User |
+| D-34 | 2026-11-23 | Replacing only the Vosk language model is **Track A and allowed**. D-46 refers to the lexicon/graph rebuild (Track B). | User |
+| D-35 | 2026-11-23 | 8 speakers (confirms D-42). | User |
+| D-36 | 2026-11-23 | Number slots in every grammar, prompt or language model accept **any digits**, never only pool values. | User |
+| D-37 | 2026-11-23 | Do not build or run tests while another session is building; check `git status` first (git set up the same day, D-31). H540 settings (AGC off and capture level) are to be persistent across replug and reboot, separate from the PTT rule. | User |
+| D-38 | 2026-11-23 | Model dropdown approved, on the **Speech Lab screen only** (completes D-18). | User |
+| D-39 | 2026-11-23 | The speech model is **locked for a whole exercise**; model id and configuration are saved with every result and log entry. | User |
+| D-40 | 2026-11-23 | STT accuracy plan approved (steps 0, 1a, 1b, 2, 3, 4; report before 1b). Pass targets on the locked test set: wrong critical value accepted 0 of 160; values pulled to the step's expected value 0 (bias test); critical fields right at least 95 % overall **and** at least 90 % for every speaker (replaces 95 % per speaker in `02-speech-ptt.md` §3.1); callsign, runway, heading/level, hold short at least 93 % each; correct speech sent to "say again" at most 10 %; off-script accepted at most 1 of 80; scripted WER at most 8 % (diagnostic, not a gate); niner/tree/fife and Indian-English subset within 3 points of the rest; release-to-text p95 at most 2 s, max at most 3 s; engine memory at most 450 MB; CPU during TX at most 1 core (Vosk); no memory growth over 4 h. | User |
+| D-41 | 2026-11-23 | Whisper gets equal treatment: prompt generated from `data/phraseology` (all pool values, never only the expected ones) plus a GBNF grammar variant, tuned on the same dev set with the same bias tests. | User |
+| D-42 | 2026-11-23 | User arranges 8 speakers, varied accents, including female voices (4 dev, 4 test). If fewer: 4 test speakers stay separate and dev shrinks. | User |
+| D-43 | 2026-11-23 | Dev set may use placeholder phrases. The locked test set waits for approved phraseology. | User |
+| D-44 | 2026-11-23 | Only unclassified material is shared with the assistant. Restricted SOP text and **all voice recordings stay offline**; no cloud upload of recordings is to be proposed. | User |
+| D-45 | 2026-11-23 | `data/phraseology/` is defined now as the single source; Phraseology Studio edits it later. | User |
+| D-46 | 2026-11-23 | Track B (custom Vosk graph) not yet. If needed, the build uses text and lexicon only, on a separate Linux machine or a temporary AWS instance, unclassified text only. | User |
+| D-47 | 2026-11-23 | whisper small.en is an accuracy reference only, not a run-time candidate. | User |
+| D-48 | 2026-11-23 | Step-dependent recognition is a **weighting, not a restriction**: every step contains all intents and all critical values. Step-weighted and general results are compared; differing critical fields make the result AMBIGUOUS. Part of the plan approved in D-40. | User |
+| D-49 | 2026-11-23 | `data/phraseology/` format approved with per-intent validation (status, sopRef, validated_by, validated_at); it is the single source (completes D-45, D-21, D-25). The optional edit-detecting hash was not asked for and is left out. | User |
+| D-50 | 2026-11-23 | The STT session (`atc-trainer-93`) owns all STT accuracy work (confirms D-33) and may update `config/stt_models.json`, telling the live session. Peak for the generated-prompt whisper configuration: 161 MB measured. | User |
+| D-51 | 2026-11-23 | H540: persistent AGC off and capture level, at login and hot-plug, separate from the pedal rule, with a check that reports drift. The script is shown to the user before it is run with sudo. | User |
+| D-52 | 2026-11-23 | Order: (1) runway misses by position against the early-release files; (2) decode s1 with a replaced Vosk LM; (3) prepare Step 1b (seeded script generator and recording manifest, 4 dev speakers). Step 2 runs after the 1b recordings exist. | User |
+
+## Check results
+
+- **D-02, 2026-11-23: current pedal (04d8:0055) FAILS D-01.** Guided test: RIGHT sends a 1 ms pulse on press and nothing on release. Evidence: `docs/architecture/02-speech-ptt.md` §1.2. Open: replacement (P-13).

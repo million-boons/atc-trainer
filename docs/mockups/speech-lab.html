@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-size="panel">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Speech Lab mockup</title>
+<!-- Wireframe for approval, not product code. Offline: no external resources.
+     All values are simulated. Phrases come from data/bench/placeholder_phrases.txt (PLACEHOLDER). -->
+<style>
+:root{
+  --bg:#0B0F14;--surface:#121821;--raised:#19212C;--border:#243041;--divider:#1C2633;
+  --t1:#E6EDF3;--t2:#9AA7B4;--t3:#8592A0;--accent:#38BDF8;
+  --tx:#F59E0B;--rx:#22D3EE;--ok:#22C55E;--caution:#EAB308;--fault:#F87171;--on:#0B0F14;
+  --ui:Inter,Ubuntu,"DejaVu Sans",sans-serif;--mono:"JetBrains Mono","DejaVu Sans Mono",monospace;
+}
+:root[data-theme=night]{
+  --bg:#060708;--surface:#0B0D10;--raised:#101318;--border:#1D232B;--divider:#151A20;
+  --t1:#A8B0B8;--t2:#8A929A;--t3:#7B838B;--accent:#2F93BC;
+  --tx:#C07C0A;--rx:#1B9DB0;--ok:#22994D;--caution:#AE860A;--fault:#D85A5A;--on:#060708;
+}
+:root[data-theme=hc]{
+  --bg:#000;--surface:#000;--raised:#101010;--border:#A0A8B0;--divider:#5A626A;
+  --t1:#FFF;--t2:#E0E6EC;--t3:#C0C8D0;--accent:#5CCBFF;
+  --tx:#FFB020;--rx:#3DE8FF;--ok:#4ADE80;--caution:#FFE04A;--fault:#FF8A8A;--on:#000;
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:#000;overflow:auto}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.m{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.t2{color:var(--t2)}.t3{color:var(--t3)}.cap{font-size:12px}
+.ok{color:var(--ok)}.caution{color:var(--caution)}.fault{color:var(--fault)}.txc{color:var(--tx)}.rxc{color:var(--rx)}
+
+/* ---------- shell ---------- */
+#frame{width:1280px;height:800px;background:var(--bg);color:var(--t1);font:15px/1.35 var(--ui);
+  display:grid;grid-template:48px 1fr 32px / 88px 1fr;position:relative;overflow:hidden}
+[data-size=full] #frame{width:1920px;height:1080px}
+#status{grid-column:1/3;background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:8px;padding:0 12px;white-space:nowrap}
+#status .name{font-weight:600;font-size:14px;letter-spacing:.04em;margin-right:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 8px;border:1px solid var(--border);
+  border-radius:4px;background:var(--raised);font-size:12px}
+.chip svg{width:12px;height:12px;flex:none}
+#status .r{margin-left:auto;display:flex;gap:12px;align-items:center}
+.ph{border:1px dashed var(--caution);color:var(--caution);border-radius:4px;font-size:12px;padding:2px 6px;font-weight:600}
+#nav{background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:8px;gap:4px}
+#nav button{height:64px;border:1px solid transparent;border-radius:6px;background:none;color:var(--t2);font-size:12px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;line-height:1.1}
+#nav svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.75}
+#nav .on{background:var(--raised);color:var(--t1);border-color:var(--border);box-shadow:inset 3px 0 0 var(--accent)}
+#nav .mock{margin-top:auto;border:1px dashed var(--caution);color:var(--caution);height:48px}
+#alert{grid-column:1/3;background:var(--surface);border-top:1px solid var(--border);display:flex;align-items:center;
+  gap:8px;padding:0 12px;font-size:13px}
+#alert svg{width:14px;height:14px}
+
+/* ---------- lab content ---------- */
+#lab{display:grid;gap:12px;padding:12px;min-height:0;grid-template:1fr 128px / 312px 1fr 288px;
+  grid-template-areas:"log mid hist" "bar bar bar"}
+[data-size=full] #lab{grid-template-columns:420px 1fr 400px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;min-height:0;overflow:hidden;
+  display:flex;flex-direction:column}
+.hd{display:flex;align-items:center;gap:8px;height:36px;padding:0 12px;border-bottom:1px solid var(--divider);flex:none;
+  font-size:12px;font-weight:600;color:var(--t2);letter-spacing:.06em}
+.hd .x{margin-left:auto;font-weight:400;letter-spacing:0}
+#log{grid-area:log}#hist{grid-area:hist}
+#mid{grid-area:mid;display:grid;gap:12px;grid-template-rows:172px 92px 1fr;min-height:0}
+
+#btns{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 12px;border-bottom:1px solid var(--divider);flex:none}
+.sw{border:1px solid var(--border);border-radius:6px;background:var(--raised);padding:8px;height:60px}
+.sw b{display:block;font-size:18px;line-height:1.1}
+.sw.down{border-color:var(--tx);box-shadow:inset 0 0 0 1px var(--tx)}
+#rows{flex:1;overflow:hidden}
+.row{display:grid;grid-template-columns:60px 52px 52px 1fr;gap:8px;height:28px;align-items:center;padding:0 12px;
+  border-bottom:1px solid var(--divider);font-size:12px;white-space:nowrap}
+.row span:last-child{overflow:hidden;text-overflow:ellipsis}
+
+.txt{padding:8px 12px;flex:1;min-height:0}
+#final{font-size:18px;line-height:1.35;height:50px;overflow:hidden}
+#final.partial{color:var(--t2);font-style:italic}
+#sttmeta{font-weight:400;letter-spacing:0;display:flex;gap:10px;align-items:center;margin-left:8px;white-space:nowrap}
+
+#words{display:flex;flex-wrap:wrap;gap:4px 8px;align-content:flex-start;overflow:hidden;height:52px;margin-top:6px}
+.w{font-size:12px;width:56px}.w i{display:block;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.w i u{display:block;height:100%;background:var(--t2)}
+.w.low i u{background:var(--caution)}.w.low span::after{content:" ?";color:var(--caution);font-weight:700}
+.w span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono)}
+
+#wave{flex:1;min-height:0;position:relative}
+#wave svg{width:100%;height:100%;display:block}
+#checks{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--divider);flex:none}
+.ck{padding:6px 8px;border-right:1px solid var(--divider);font-size:12px;height:52px;overflow:hidden}
+.ck:last-child{border:0}.ck b{display:block;font-size:13px;white-space:nowrap}
+#play{display:flex;gap:8px;padding:8px 12px;border-top:1px solid var(--divider);flex:none;align-items:center}
+.b{height:48px;min-width:48px;padding:0 16px;border-radius:6px;border:1px solid var(--border);background:var(--raised);white-space:nowrap}
+.b.pri{border-color:var(--accent);color:var(--accent)}
+.b:disabled{color:var(--t3);border-color:var(--border);border-style:dashed;cursor:default}
+
+#items{flex:1;overflow:hidden}
+.it{display:block;width:100%;text-align:left;height:64px;padding:6px 12px;border:0;border-bottom:1px solid var(--divider);background:none}
+.it.sel{background:var(--raised);box-shadow:inset 3px 0 0 var(--accent)}
+.it div{display:flex;justify-content:space-between;font-size:12px}
+.it div span{display:flex;gap:4px;align-items:center}.it svg{width:11px;height:11px}
+#wave .cap{background:var(--surface);padding:0 3px;border-radius:3px}
+.it p{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+#hist .ft{padding:8px 12px;border-top:1px solid var(--divider);display:flex;gap:8px}
+#hist .ft .b{flex:1;padding:0 8px}
+
+/* ---------- radio bar ---------- */
+#bar{grid-area:bar;display:grid;grid-template-columns:260px 176px 1fr 176px;gap:12px;padding:12px;flex-direction:initial}
+.ind{border:2px solid var(--border);border-radius:6px;padding:0 14px;display:flex;flex-direction:column;justify-content:center;height:102px}
+.ind .big{font-size:32px;font-weight:700;line-height:1.1;display:flex;justify-content:space-between;align-items:baseline}
+.ind .big .m{font-size:24px;font-weight:600}
+.ind .sub{font-size:13px;color:var(--t2);white-space:nowrap}
+#tx.open{background:var(--tx);border-color:var(--tx);color:var(--on)}#tx.open .sub{color:var(--on)}
+#tx.bad{border-color:var(--fault);border-style:dashed}#tx.bad .big{color:var(--fault)}
+#tx.busy{border-color:var(--tx)}
+#rx .big{color:var(--t3)}
+#mic{display:grid;grid-template-rows:20px 24px 18px 1fr;align-content:center;gap:2px;min-width:0}
+#meter{position:relative;height:20px;background:var(--raised);border:1px solid var(--border);border-radius:4px;overflow:hidden}
+#fill{position:absolute;inset:0 auto 0 0;width:0;background:var(--t2)}
+#fill.hot{background:var(--fault)}
+#good{position:absolute;top:0;bottom:0;left:66.7%;width:23.3%;border-left:2px solid var(--ok);border-right:2px solid var(--ok)}
+#scale{position:relative;font-size:12px;color:var(--t2)}#scale span{position:absolute;transform:translateX(-50%)}
+#notice{font-size:14px;display:flex;gap:8px;align-items:center;min-width:0}
+#notice svg{width:16px;height:16px;flex:none}
+#notice span{overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.2}
+#ptt{height:102px;width:100%;font-size:15px;touch-action:none;user-select:none;-webkit-user-select:none}
+#ptt b{display:block;font-size:18px}
+#ptt.down{border-color:var(--tx);color:var(--tx)}
+
+/* ---------- mock control overlay (not part of the design) ---------- */
+#ctl{position:absolute;left:96px;bottom:40px;z-index:9;background:#1b1b1b;color:#eee;border:2px dashed #eab308;border-radius:6px;
+  padding:12px;width:600px;font-size:13px;display:none}
+#ctl.show{display:block}
+#ctl h4{font-size:12px;margin:8px 0 4px;color:#eab308}#ctl h4:first-child{margin-top:0}
+#ctl .g{display:flex;flex-wrap:wrap;gap:6px}
+#ctl button{height:40px;padding:0 10px;background:#2b2b2b;border:1px solid #555;border-radius:4px;color:#eee}
+#ctl button.on{border-color:#eab308;color:#eab308}
+</style>
+</head>
+<body>
+<div id="frame">
+  <header id="status">
+    <span class="name">MILITARY ATC TRAINING SIMULATOR</span>
+    <span id="chips" style="display:flex;gap:6px"></span>
+    <span class="r"><span class="ph">MOCK DATA</span><span class="t2" style="font-size:13px">No scenario</span>
+      <span class="m" id="utc" style="font-size:13px"></span></span>
+  </header>
+
+  <nav id="nav"></nav>
+
+  <main id="lab">
+    <section class="card" id="log">
+      <div class="hd">PTT EVENTS <span class="x" id="src"></span></div>
+      <div id="btns">
+        <div class="sw" id="swR"><span class="cap t2">RIGHT (talk)</span><b id="swRt">UP</b></div>
+        <div class="sw" id="swL"><span class="cap t2">LEFT (no function)</span><b id="swLt">UP</b></div>
+      </div>
+      <div id="rows"></div>
+    </section>
+
+    <section id="mid">
+      <div class="card">
+        <div class="hd">RECOGNISED TEXT <span id="sttmeta"></span><span class="x" id="txtstate"></span></div>
+        <div class="txt"><div id="final" class="m"></div>
+          <div id="words"></div><div class="cap t3">Bars: word confidence on the engine's own scale. "?" marks a low value.</div></div>
+      </div>
+      <div class="card">
+        <div class="hd">INTENT AND PARAMETERS</div>
+        <div style="padding:8px 12px;font-size:13px"><b>Parser not installed</b>
+          <span class="t2">Arrives in Phase 3. Nothing is interpreted or scored here until then.</span></div>
+      </div>
+      <div class="card">
+        <div class="hd">RECORDING <span class="x m" id="recid"></span></div>
+        <div id="wave"></div>
+        <div id="checks"></div>
+        <div id="play"></div>
+      </div>
+    </section>
+
+    <section class="card" id="hist">
+      <div class="hd">RECORDINGS <span class="x" id="count"></span></div>
+      <div id="items"></div>
+      <div class="ft"><button class="b">Older</button><button class="b">Export</button></div>
+    </section>
+
+    <section class="card" id="bar">
+      <div class="ind" id="tx"><div class="big"><span id="txT"></span><span class="m" id="txD"></span></div><div class="sub" id="txS"></div></div>
+      <div class="ind" id="rx"><div class="big"><span>RX</span></div><div class="sub">No pilot in the lab</div></div>
+      <div id="mic">
+        <div style="display:flex;justify-content:space-between;font-size:13px"><span>Microphone</span><span class="m" id="db"></span></div>
+        <div id="meter"><div id="fill"></div><div id="good"></div></div>
+        <div id="scale" class="m"></div>
+        <div id="notice"></div>
+      </div>
+      <button class="b" id="ptt"><b>Screen PTT</b><span class="cap t2">hold, or Space</span></button>
+    </section>
+  </main>
+
+  <footer id="alert"></footer>
+
+  <div id="ctl">
+    <h4>MOCK CONTROLS: not part of the design</h4><div class="g" id="cS"></div>
+    <h4>THEME</h4><div class="g" id="cT"></div>
+    <h4>SIZE</h4><div class="g" id="cZ"></div>
+    <p style="margin-top:8px;color:#aaa">Press M to open or close. URL: #state=clipped&amp;theme=night&amp;size=full</p>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const I={ // state icons: shape differs as well as colour
+ ok:'<svg viewBox="0 0 12 12"><path d="M2 6.5 5 9.5 10 3" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+ caution:'<svg viewBox="0 0 12 12"><path d="M6 1 11.5 11H.5Z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 4.5V7.5M6 8.7v1" stroke="currentColor" stroke-width="1.5"/></svg>',
+ fault:'<svg viewBox="0 0 12 12"><path d="M2 2 10 10M10 2 2 10" stroke="currentColor" stroke-width="2"/></svg>'};
+const chip=(n,t,s)=>`<span class="chip"><span class="${s}" style="display:flex">${I[s]}</span>${n} <b>${t}</b></span>`;
+
+const NAV=[['Dashboard','M3 3h6v6H3zM11 3h6v6h-6zM3 11h6v6H3zM11 11h6v6h-6z'],['Scenarios','M4 4h12M4 10h12M4 16h12'],
+['Exercise','M10 3v6M6 6a5 5 0 1 0 8 0M10 14v3'],['Speech Lab','M7 4v7a3 3 0 0 0 6 0V4a3 3 0 0 0-6 0M4 10a6 6 0 0 0 12 0M10 16v2'],
+['Assessment','M4 16V9M10 16V4M16 16v-5'],['Settings','M3 6h8M15 6h2M3 14h2M9 14h8M13 4v4M7 12v4']];
+$('nav').innerHTML=NAV.map(([n,p])=>`<button class="${n=='Speech Lab'?'on':''}" ${n=='Speech Lab'?'aria-current="page"':''}><svg viewBox="0 0 20 20"><path d="${p}"/></svg>${n}</button>`).join('')
+ +'<button class="mock" onclick="toggleCtl()">Mock (M)</button>';
+$('scale').innerHTML=[-60,-40,-20,-12,-6,0].map(d=>`<span style="left:${d==0?98:(d+60)/60*100+(d==-60?2:0)}%">${d}</span>`).join('');
+$('good').style.left=(40/60*100)+'%';$('good').style.width=(14/60*100)+'%'; // -20..-6 dBFS target: to be confirmed
+
+// PLACEHOLDER phrase, from data/bench/placeholder_phrases.txt
+const TEXT='eagle four two one taxi via alpha three hold short runway zero nine';
+const CONF=[.93,.9,.88,.91,.97,.86,.9,.58,.95,.96,.98,.83,.61];
+
+/* state: tx[class,label,sub], dur, text, checks, notice[level,text], alert, chips, sw, rows, wave flags */
+const base={tx:['','IDLE','Hold RIGHT to talk'],dur:'',text:'',partial:0,db:-52,notice:null,alert:['ok','Ready'],mic:['OK','ok'],ptt:['STAND-IN','caution'],
+  R:0,L:0,wave:0,rows:[],chk:null,sttst:'Waiting'};
+const done=o=>({...base,dur:'',text:TEXT,wave:1,sttst:'Final',chk:{},rows:[['RIGHT','up','held 4.10 s'],['RIGHT','down','TX 14 open']],...o});
+const S={
+ idle:{n:'Idle',...base},
+ tx:{n:'Transmitting',...base,tx:['open','TX','Transmitting'],dur:'03.4',text:'eagle four two one taxi via alpha',partial:1,db:-13,R:1,sttst:'Live',rows:[['RIGHT','down','TX 14 open']]},
+ recog:{n:'Recognising',...base,tx:['busy','WAIT','Recognising TX 14'],text:'eagle four two one taxi via alpha three',partial:1,wave:1,sttst:'Finishing',rows:[['RIGHT','up','held 4.10 s'],['RIGHT','down','TX 14 open']]},
+ good:{n:'Result, good',...done({})},
+ clipped:{n:'Too loud',...done({chk:{level:['fault','Too loud','peak 0.0 dBFS']},loud:1,db:-1,notice:['fault','Microphone too loud. Speech is distorted; lower the headset volume and repeat.'],alert:['caution','TX 14 not usable for the benchmark: overload']})},
+ early:{n:'Released early',...done({chk:{end:['caution','Released early','speech at cut end']},cut:1,notice:['caution','Pedal released while still speaking. The end of the message may be lost.'],alert:['caution','TX 14: released early']})},
+ before:{n:'Spoke before keying',...done({chk:{start:['caution','Spoke before keying','speech at key-down'],delay:['caution','Not measured','began before key-down']},pre:1,notice:['caution','Speech began before the pedal was pressed.'],alert:['caution','TX 14: spoke before keying']})},
+ empty:{n:'No speech',...done({text:'',sttst:'Not run',chk:{start:['caution','No speech',''],end:['caution','No speech',''],level:['caution','Low','peak -46 dBFS'],delay:['caution','Not measured','']},flat:1,notice:['caution','Nothing was said during the transmission.'],alert:['caution','TX 14: empty']})},
+ tap:{n:'Short tap',...base,tx:['','IDLE','Last press cancelled'],notice:['caution','Press was shorter than 250 ms. Not recorded.'],alert:['caution','Short tap cancelled'],rows:[['TX 14','cancel','short tap'],['RIGHT','up','held 0.14 s'],['RIGHT','down','TX 14 open']]},
+ other:{n:'Second source ignored',...base,tx:['open','TX','Transmitting'],dur:'02.1',R:1,db:-14,text:'eagle four two one',partial:1,sttst:'Live',notice:['caution','Screen PTT ignored: RIGHT is already transmitting.'],rows:[['SCREEN','ignored','RIGHT owns TX'],['RIGHT','down','TX 14 open']]},
+ stuck:{n:'Stuck (30 s)',...base,tx:['bad','STUCK','Release the pedal to reset'],dur:'30.0',R:1,wave:1,end:'30 s LIMIT',len:'30.30',notice:['fault','Transmission closed at 30 s. Lift your foot to transmit again.'],alert:['fault','PTT stuck: closed at maximum duration'],rows:[['TX 14','stuck','at 30 s limit'],['RIGHT','down','TX 14 open']]},
+ lost:{n:'PTT unplugged',...base,tx:['bad','NO PTT','Transmission ended'],ptt:['LOST','fault'],wave:1,end:'LOST',notice:['fault','PTT device disconnected. Reconnect it, or use Screen PTT.'],alert:['fault','PTT device lost during TX 14'],rows:[['RIGHT','lost','unplugged'],['RIGHT','down','TX 14 open']]},
+ pulse:{n:'Pulse-type pedal',...base,tx:['bad','NO HOLD','Pulse-type pedal suspected'],ptt:['PULSE','fault'],notice:['fault','Press lasted 1 ms: pulse-type pedal suspected. Hold-to-talk needs a hold-type pedal (D-01).'],alert:['fault','Pulse-type device suspected'],rows:[['TX 14','cancel','short tap'],['RIGHT','up','held 1 ms'],['RIGHT','pulse','held 1 ms'],['RIGHT','down','TX 14 open']]},
+ muted:{n:'Mic muted',...base,db:-120,mic:['NO SIGNAL','fault'],notice:['fault','Microphone sends pure silence. Check the mute key on the headset.'],alert:['fault','Mic: no signal (headset mute?)']},
+};
+let cur='idle',hold=null;
+
+const RECS=[['14','10:42:07','4.6 s',TEXT,''],['13','10:41:31','4.1 s','hawk six seven four runway two seven cleared to land','ok'],
+['12','10:40:58','0.9 s','(no speech)','caution:Empty'],['11','10:40:12','4.3 s','cobra eight nine zero taxi via alpha nine runway one eight','ok'],
+['10','10:39:40','5.2 s','falcon three one eight contact tower one two one decimal nine','caution:Released early'],['9','10:39:02','3.4 s','the runway lights look fine today','ok'],
+['8','10:38:20','3.0 s','falcon seven three two climb flight level one zero zero','fault:Too loud'],['7','10:37:51','3.7 s','eagle five zero nine turn right heading three six zero','ok'],
+['6','10:37:10','3.1 s','hawk one five six runway two three cleared for takeoff','ok'],['5','10:36:40','3.0 s','cobra two zero five runway one eight cleared to land','ok']];
+
+function waveSvg(s){
+ // x axis: 0.30 s pre-roll | keyed 4.10 s | 0.20 s tail
+ const lim=s.len,W=600,H=150,x=t=>t/(lim?30.3:4.6)*W,k=x(.3),r=lim?W-1:x(4.4);let p='',seed=7;const rnd=()=>(seed=(seed*16807)%2147483647)/2147483647;
+ const a0=s.pre?0:.62,a1=s.cut?4.6:4.1;
+ for(let i=0;i<300;i++){const t=i/300*4.6,sp=!s.flat&&t>a0&&t<a1;
+  let h=sp?(.25+.6*Math.abs(Math.sin(t*5.3)*Math.cos(t*2.1+1)))*(.6+.4*rnd()):.02+.02*rnd(); if(s.loud&&sp)h=Math.min(1,h*2.1);
+  p+=`M${(i*2+1)} ${(H/2-h*H*.42).toFixed(1)}V${(H/2+h*H*.42).toFixed(1)}`;}
+ return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Waveform with press and release markers">
+ <rect width="${k}" height="${H}" fill="var(--raised)"/><rect x="${r}" width="${W-r}" height="${H}" fill="var(--raised)"/>
+ ${s.loud?`<path d="M0 ${H*.08}H${W}M0 ${H*.92}H${W}" stroke="var(--fault)" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>`:''}
+ <path d="${p}" stroke="var(--t2)" stroke-width="1.3"/>
+ <path d="M${k} 0V${H}" stroke="var(--tx)" stroke-width="2" vector-effect="non-scaling-stroke"/>
+ <path d="M${r} 0V${H}" stroke="var(--tx)" stroke-width="2" stroke-dasharray="5 4" vector-effect="non-scaling-stroke"/></svg>
+ <span class="cap" style="position:absolute;left:calc(${k/W*100}% + 4px);top:2px;color:var(--tx)">PRESS</span>
+ <span class="cap" style="position:absolute;right:calc(${(1-r/W)*100}% + 4px);top:2px;color:var(--tx)">${s.end||'RELEASE'}</span>
+ <span class="cap t3" style="position:absolute;left:2px;bottom:2px">pre-roll</span><span class="cap t3" style="position:absolute;right:2px;bottom:2px">${lim?'no tail':'tail'}</span>`;
+}
+
+function render(){
+ const s=hold||S[cur];
+ $('chips').innerHTML=chip('Mic',...s.mic)+chip('Speaker','OK','ok')+chip('PTT',...s.ptt)+chip('STT','NOT CHOSEN','caution')+chip('TTS','NOT BUILT','caution');
+ $('src').textContent=s.ptt[0]=='LOST'?'no device':s.ptt[0]=='PULSE'?'04d8:0055':'mouse stand-in (event5)';
+ for(const b of['R','L']){const d=s[b];$('sw'+b).classList.toggle('down',!!d);$('sw'+b+'t').textContent=d?'DOWN':'UP';}
+ const old=[['LEFT','up','reported only'],['LEFT','down','reported only'],['RIGHT','up','held 3.60 s'],['RIGHT','down','TX 13 open'],['RIGHT','up','held 0.40 s'],['RIGHT','down','TX 12 open'],
+  ['RIGHT','up','held 3.82 s'],['RIGHT','down','TX 11 open'],['RIGHT','up','held 4.70 s'],['RIGHT','down','TX 10 open'],['RIGHT','up','held 2.91 s'],['RIGHT','down','TX 9 open'],['RIGHT','up','held 2.50 s'],['RIGHT','down','TX 8 open'],['RIGHT','up','held 3.20 s']];
+ const rows=[...s.rows,...old];
+ $('rows').innerHTML=rows.map((r,i)=>{const bad=/ignored|lost|pulse|stuck|cancel/.test(r[1]);const t=127.31-i*3.137;
+  return `<div class="row m"><span class="t2">${t.toFixed(3)}</span><span>${r[0]}</span><span class="${bad?'caution':''}">${r[1]}</span><span class="${bad?'caution':''}">${r[2]}</span></div>`}).join('');
+ const f=$('final');f.className='m'+(s.partial?' partial':'');f.textContent=s.text||(s.sttst=='Not run'?'(not sent to speech recognition)':'');
+ $('txtstate').textContent=s.sttst;
+ $('sttmeta').innerHTML=s.sttst=='Final'?'<span>Release to text <b class="m">0.34 s</b> (mock)</span><span class="ph">PLACEHOLDER</span>':'<span>No engine chosen (P-04)</span>';
+ $('words').innerHTML=s.sttst=='Final'?TEXT.split(' ').map((w,i)=>`<div class="w ${CONF[i]<.7?'low':''}"><span>${w}</span><i><u style="width:${CONF[i]*100}%"></u></i></div>`).join(''):'<span class="t3 cap">Shown after the final text</span>';
+ $('recid').textContent=s.wave?`TX 14   ${s.len||'4.60'} s   16 kHz mono`:'';
+ $('wave').innerHTML=s.wave?waveSvg(s):'<p class="t3 cap" style="padding:12px">The last recording appears here after release.</p>';
+ const d={start:['ok','Start clean','nothing cut'],end:['ok','End clean','nothing cut'],level:['ok','Level good','peak -9 dBFS'],delay:['ok','0.32 s','key to speech']},c={...d,...(s.chk||{})};
+ const bad0=s.wave&&!s.chk;
+ $('checks').innerHTML=Object.values(c).map(([l,a,b])=>!s.chk?`<div class="ck t3"><b>-</b>${bad0?'not checked':''}</div>`:`<div class="ck"><b class="${l}">${I[l].replace('<svg','<svg width="12" height="12"')} ${a}</b><span class="t2">${b}</span></div>`).join('');
+ $('play').innerHTML=`<button class="b pri" ${s.wave?'':'disabled'}>Play</button><button class="b" ${s.wave?'':'disabled'}>Keyed part only</button><span class="cap t2" style="margin-left:auto;text-align:right">Playback never<br>adds radio effect</span>`;
+ const recs=s.chk||s.wave?RECS:RECS.slice(1);const mark=s.chk?(Object.values(s.chk).find(v=>v[0]!='ok')||0):0;
+ $('count').textContent=(recs.length)+' shown';
+ $('items').innerHTML=recs.map((r,i)=>{let m=r[4];if(r[0]=='14')m=!s.chk?'caution:Not checked':mark?mark[0]+':'+mark[1]:'ok';
+  const [l,t]=m.split(':');return `<button class="it ${i==0&&s.wave?'sel':''}"><div class="m"><span>TX ${r[0]}  ${r[1]}</span><span class="t2">${r[0]=='14'&&s.len?'30.3 s':r[2]}</span></div><p>${r[0]=='14'&&!s.text?'(no text)':r[3]}</p><div><span class="${l}">${I[l]}${l=='ok'?'Clean':t}</span></div></button>`}).join('');
+ $('tx').className='ind '+s.tx[0];$('txT').textContent=s.tx[1];$('txD').textContent=s.dur?s.dur+' s':'';$('txS').textContent=s.tx[2];
+ meter(s.db);
+ $('notice').innerHTML=s.notice?`<span class="${s.notice[0]}" style="display:flex">${I[s.notice[0]]}</span><span>${s.notice[1]}</span>`:'<span class="t3">No notices</span>';
+ $('alert').innerHTML=`<span class="${s.alert[0]}" style="display:flex">${I[s.alert[0]]}</span>${s.alert[1]}`;
+ document.querySelectorAll('#cS button').forEach(b=>b.classList.toggle('on',b.dataset.k==cur));
+}
+function meter(db){$('db').textContent=db<=-100?'silent':db.toFixed(0)+' dBFS';$('fill').style.width=Math.max(0,(db+60)/60*100)+'%';$('fill').className=db>-3?'hot':'';}
+function clock(){const d=new Date(),z=n=>String(n).padStart(2,'0');$('utc').textContent=`${z(d.getUTCHours())}:${z(d.getUTCMinutes())}:${z(d.getUTCSeconds())}Z  ${z(d.getHours())}:${z(d.getMinutes())} L`;}
+
+/* hold-to-talk simulation: same order and limits as TransmissionController defaults */
+let t0=0,timer=0,src='';
+function press(from){
+ if(hold&&(hold.tx[0]=='open'))return;
+ clearTimeout(timer);src=from;t0=performance.now();$('ptt').classList.toggle('down',from=='SCREEN');
+ hold={...S.tx,dur:'00.0',text:'',R:from=='RIGHT'?1:0,rows:[[from,'down','TX 14 open']]};render();loop();
+}
+function loop(){
+ if(!hold||hold.tx[0]!='open')return;const el=(performance.now()-t0)/1000;
+ if(el>=30){hold=null;cur='stuck';$('ptt').classList.remove('down');render();return;}
+ $('txD').textContent=el.toFixed(1).padStart(4,'0')+' s';meter(-22+12*Math.abs(Math.sin(el*6))*Math.random());
+ $('final').textContent=TEXT.split(' ').slice(0,Math.floor(el*2.6)).join(' ');setTimeout(loop,40); // 25 Hz
+}
+function release(){
+ $('ptt').classList.remove('down');if(!hold||hold.tx[0]!='open')return;const el=(performance.now()-t0)/1000;
+ const up=[src,'up',`held ${el.toFixed(2)} s`],dn=[src,'down','TX 14 open'];
+ if(el<.25){hold={...S.tap,rows:[['TX 14','cancel','short tap'],[src,'up',`held ${el.toFixed(2)} s`],dn]};render();return;}
+ hold={...S.recog,tx:['busy','TAIL','Closing transmission'],wave:0,rows:[up,dn]};render();
+ timer=setTimeout(()=>{hold={...hold,tx:['busy','WAIT','Recognising TX 14'],wave:1};render();
+  timer=setTimeout(()=>{hold={...S.good,rows:[up,dn]};render();},340);},200);
+}
+$('ptt').addEventListener('pointerdown',e=>{e.preventDefault();$('ptt').setPointerCapture(e.pointerId);press('SCREEN')});
+for(const ev of['pointerup','pointercancel'])$('ptt').addEventListener(ev,release);
+addEventListener('contextmenu',e=>e.preventDefault());
+addEventListener('keydown',e=>{if(e.code=='Space'){e.preventDefault();if(!e.repeat)press('SPACE')}else if(e.key.toLowerCase()=='m')toggleCtl()});
+addEventListener('keyup',e=>{if(e.code=='Space'){e.preventDefault();release()}});
+addEventListener('blur',release);
+
+function toggleCtl(){$('ctl').classList.toggle('show')}
+function setState(k){clearTimeout(timer);hold=null;cur=S[k]?k:'idle';render()}
+function pick(id,list,get,set){const draw=()=>$(id).querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.k==get()));
+ $(id).innerHTML=list.map(([k,n])=>`<button data-k="${k}">${n}</button>`).join('');$(id).onclick=e=>{const k=e.target.dataset.k;if(k){set(k);draw();e.target.blur()}};draw()}
+const R=document.documentElement,q=new URLSearchParams(location.hash.slice(1));
+if(['dark','night','hc'].includes(q.get('theme')))R.dataset.theme=q.get('theme');
+if(q.get('size')=='full')R.dataset.size='full';
+pick('cS',Object.entries(S).map(([k,v])=>[k,v.n]),()=>cur,setState);
+pick('cT',[['dark','Dark'],['night','Night'],['hc','High contrast']],()=>R.dataset.theme,k=>R.dataset.theme=k);
+pick('cZ',[['panel','1280 x 800'],['full','1920 x 1080']],()=>R.dataset.size,k=>R.dataset.size=k);
+setState(q.get('state')||'idle');clock();setInterval(clock,1000);
+</script>
+</body>
+</html>

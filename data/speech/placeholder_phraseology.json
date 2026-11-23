@@ -1,0 +1,28 @@
+{
+  "status": "PLACEHOLDER - NOT APPROVED PHRASEOLOGY. Validate against approved SOP (D-07, P-11).",
+  "rule": "Speech data is built from ALL pool values and from any digits, never from the current scenario.",
+  "pools": {
+    "callsign": ["EAGLE-421", "FALCON-732", "HAWK-156", "COBRA-890", "EAGLE-509", "FALCON-318", "HAWK-674", "COBRA-205"],
+    "runway": ["09", "27", "18", "36", "05", "23", "09L", "27R"],
+    "taxiway": ["A3", "B2", "C1", "D4", "E5", "A9", "B6", "C7"],
+    "frequency": ["118.1", "121.9", "124.5"]
+  },
+  "open": { "heading": "3 digits", "level": "3 digits", "altitude": "thousands and hundreds", "frequency": "3 digits decimal 1 to 3 digits" },
+  "intents": [
+    { "id": "TAXI", "atc": ["{callsign} taxi via {taxiway} hold short runway {runway}", "{callsign} taxi via {taxiway} runway {runway}"] },
+    { "id": "TAKEOFF", "atc": ["{callsign} runway {runway} cleared for takeoff"] },
+    { "id": "LAND", "atc": ["{callsign} runway {runway} cleared to land"] },
+    { "id": "HEADING", "atc": ["{callsign} turn left heading {heading}", "{callsign} turn right heading {heading}"] },
+    { "id": "ALTITUDE", "atc": ["{callsign} climb {altitude} feet", "{callsign} descend {altitude} feet"] },
+    { "id": "LEVEL", "atc": ["{callsign} climb flight level {level}", "{callsign} descend flight level {level}"] },
+    { "id": "CONTACT", "atc": ["{callsign} contact tower {frequency}"] }
+  ],
+  "spokenVariants": {
+    "comment": "Other accepted ways to say a word.",
+    "words": { "nine": ["niner"], "three": ["tree"], "five": ["fife"], "four": ["fower"], "eight": ["ait"], "alpha": ["alfa"] }
+  },
+  "voskPronunciations": {
+    "comment": "The Vosk model has a fixed pronunciation list and cannot learn new words, so a missing variant is heard as a similar-sounding word that is never used in ATC. Output is mapped back; the raw text is kept. Candidates, tuned only on the dev set (s1).",
+    "words": { "nine": ["nina"], "zero": ["gyro"], "hawk": ["hoc"] }
+  }
+}

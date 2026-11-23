@@ -1,0 +1,12 @@
+{
+  "theme": "dark",
+  "reduceMotion": false,
+  "micTargetDbfs": -12,
+  "micTargetLowDbfs": -20,
+  "micTargetHighDbfs": -6,
+  "pilotCutNoticeMs": 2000,
+  "sideTone": true,
+  "sideToneMs": 20,
+  "sideToneHz": 1000,
+  "sideToneDbfs": -18
+}

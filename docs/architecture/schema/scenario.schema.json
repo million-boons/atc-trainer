@@ -1,0 +1,149 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ATC trainer scenario (draft v0.1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "name", "category", "validation", "airfield", "initialState", "generators", "initialStep", "steps", "pttRules", "completion"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[A-Z0-9-]+$" },
+    "name": { "type": "string" },
+    "category": { "enum": ["departure", "arrival", "ground", "landing", "go-around", "emergency", "rcf", "abnormal"] },
+    "objectives": { "type": "array", "items": { "type": "string" } },
+    "difficulty": { "enum": ["basic", "intermediate", "advanced"] },
+    "validation": { "$ref": "#/definitions/validation" },
+    "airfield": { "type": "string", "description": "id of an airfield file" },
+    "initialState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase"],
+      "properties": { "phase": { "type": "string" }, "parameters": { "type": "object" } }
+    },
+    "generators": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pool"],
+        "properties": {
+          "pool": { "enum": ["callsigns", "aircraftTypes", "runways", "taxiways"] },
+          "mustServe": { "type": "string", "description": "name of another generated parameter, e.g. runway" }
+        }
+      }
+    },
+    "initialStep": { "type": "string" },
+    "steps": { "type": "array", "minItems": 1, "items": { "$ref": "#/definitions/step" } },
+    "unexpectedEvents": { "type": "array", "items": { "$ref": "#/definitions/unexpectedEvent" } },
+    "pttRules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pressDuringPilot"],
+      "properties": {
+        "pressDuringPilot": { "enum": ["interrupt", "block", "queue"] },
+        "interruptedReply": { "enum": ["repeat", "discard"] }
+      }
+    },
+    "completion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["finalSteps"],
+      "properties": {
+        "finalSteps": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+        "maxDurationSeconds": { "type": "integer", "minimum": 1 }
+      }
+    }
+  },
+  "definitions": {
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": {
+        "status": { "enum": ["placeholder", "validated"] },
+        "sopRef": { "type": "string" },
+        "validatedBy": { "type": "string" }
+      },
+      "if": { "properties": { "status": { "const": "validated" } } },
+      "then": { "required": ["status", "sopRef", "validatedBy"] }
+    },
+    "outcome": { "enum": ["CORRECT", "MISSING_INFO", "AMBIGUOUS", "UNINTELLIGIBLE", "WRONG_CALLSIGN", "UNSAFE", "CONFLICT", "UNEXPECTED", "INCORRECT", "TIMEOUT"] },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action"],
+      "properties": {
+        "action": { "enum": ["say", "silent"] },
+        "template": { "type": "string" },
+        "validation": { "$ref": "#/definitions/validation" }
+      },
+      "if": { "properties": { "action": { "const": "say" } } },
+      "then": { "required": ["action", "template", "validation"] }
+    },
+    "guard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left", "op", "right"],
+      "properties": {
+        "left": { "type": "string" },
+        "op": { "enum": ["eq", "ne", "lt", "le", "gt", "ge"] },
+        "right": { "type": ["string", "number", "boolean"] }
+      }
+    },
+    "expectation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["intent", "required"],
+      "properties": {
+        "intent": { "type": "string" },
+        "required": { "type": "array", "items": { "type": "string" } },
+        "mustMatch": { "type": "object", "additionalProperties": { "type": "string" }, "description": "field -> {parameter} it must equal" }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "phase", "expects", "responses", "transitions"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "phase": { "type": "string" },
+        "expects": { "type": "array", "items": { "$ref": "#/definitions/expectation" } },
+        "safetyRules": { "type": "array", "items": { "type": "string" } },
+        "timeoutSeconds": { "type": "integer", "minimum": 1 },
+        "maxPilotCalls": { "type": "integer", "minimum": 0 },
+        "maxSayAgain": { "type": "integer", "minimum": 1 },
+        "responses": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/definitions/outcome" },
+          "additionalProperties": { "$ref": "#/definitions/response" }
+        },
+        "transitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["on", "to"],
+            "properties": {
+              "on": { "$ref": "#/definitions/outcome" },
+              "to": { "type": "string" },
+              "errorBranch": { "type": "boolean", "description": "must be true when 'on' is not CORRECT (semantic check)" },
+              "guard": { "$ref": "#/definitions/guard" }
+            }
+          }
+        }
+      }
+    },
+    "unexpectedEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "atStep", "say", "to"],
+      "properties": {
+        "id": { "type": "string" },
+        "atStep": { "type": "string" },
+        "probability": { "type": "number", "minimum": 0, "maximum": 1 },
+        "say": { "$ref": "#/definitions/response" },
+        "to": { "type": "string" }
+      }
+    }
+  }
+}

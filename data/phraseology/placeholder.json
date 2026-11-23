@@ -1,0 +1,239 @@
+{
+ "schemaVersion": 1,
+ "validation": {
+  "status": "placeholder"
+ },
+ "comment": "PLACEHOLDER - NOT APPROVED PHRASEOLOGY (D-07, P-11). Single source for speech data (D-45). Trainee (ATC) wording only, never pilot replies. Digits and letters are always complete: pools never limit a critical value (D-48). Contents are unclassified and invented.",
+ "digits": {
+  "0": [
+   "zero"
+  ],
+  "1": [
+   "one"
+  ],
+  "2": [
+   "two"
+  ],
+  "3": [
+   "three",
+   "tree"
+  ],
+  "4": [
+   "four"
+  ],
+  "5": [
+   "five",
+   "fife"
+  ],
+  "6": [
+   "six"
+  ],
+  "7": [
+   "seven"
+  ],
+  "8": [
+   "eight"
+  ],
+  "9": [
+   "nine",
+   "niner"
+  ]
+ },
+ "letters": {
+  "A": [
+   "alpha"
+  ],
+  "B": [
+   "bravo"
+  ],
+  "C": [
+   "charlie"
+  ],
+  "D": [
+   "delta"
+  ],
+  "E": [
+   "echo"
+  ],
+  "F": [
+   "foxtrot"
+  ],
+  "G": [
+   "golf"
+  ],
+  "H": [
+   "hotel"
+  ],
+  "I": [
+   "india"
+  ],
+  "J": [
+   "juliet"
+  ],
+  "K": [
+   "kilo"
+  ],
+  "L": [
+   "lima"
+  ],
+  "M": [
+   "mike"
+  ],
+  "N": [
+   "november"
+  ],
+  "O": [
+   "oscar"
+  ],
+  "P": [
+   "papa"
+  ],
+  "Q": [
+   "quebec"
+  ],
+  "R": [
+   "romeo"
+  ],
+  "S": [
+   "sierra"
+  ],
+  "T": [
+   "tango"
+  ],
+  "U": [
+   "uniform"
+  ],
+  "V": [
+   "victor"
+  ],
+  "W": [
+   "whiskey"
+  ],
+  "X": [
+   "x-ray",
+   "x ray"
+  ],
+  "Y": [
+   "yankee"
+  ],
+  "Z": [
+   "zulu"
+  ]
+ },
+ "pools": {
+  "callsignName": [
+   {
+    "id": "EAGLE",
+    "spoken": [
+     "eagle"
+    ]
+   },
+   {
+    "id": "FALCON",
+    "spoken": [
+     "falcon"
+    ]
+   },
+   {
+    "id": "HAWK",
+    "spoken": [
+     "hawk"
+    ]
+   },
+   {
+    "id": "COBRA",
+    "spoken": [
+     "cobra"
+    ]
+   }
+  ],
+  "side": [
+   {
+    "id": "L",
+    "spoken": [
+     "left"
+    ]
+   },
+   {
+    "id": "R",
+    "spoken": [
+     "right"
+    ]
+   },
+   {
+    "id": "C",
+    "spoken": [
+     "center"
+    ]
+   }
+  ]
+ },
+ "slots": {
+  "callsign": [
+   "{callsignName} {digit} {digit} {digit}"
+  ],
+  "runway": [
+   "{digit} {digit}",
+   "{digit} {digit} {side}"
+  ],
+  "taxiway": [
+   "{letter} {digit}"
+  ],
+  "heading": [
+   "{digit} {digit} {digit}"
+  ],
+  "level": [
+   "{digit} {digit} {digit}"
+  ],
+  "altitude": [
+   "{digit} thousand feet",
+   "{digit} thousand {digit} hundred feet"
+  ],
+  "frequency": [
+   "{digit} {digit} {digit} decimal {digit}"
+  ]
+ },
+ "intents": [
+  {
+   "id": "TAXI_INSTRUCTION",
+   "examples": [
+    "{callsign} taxi via {taxiway} runway {runway}",
+    "{callsign} taxi via {taxiway} hold short runway {runway}"
+   ]
+  },
+  {
+   "id": "TAKEOFF_CLEARANCE",
+   "examples": [
+    "{callsign} runway {runway} cleared for takeoff"
+   ]
+  },
+  {
+   "id": "LANDING_CLEARANCE",
+   "examples": [
+    "{callsign} runway {runway} cleared to land"
+   ]
+  },
+  {
+   "id": "TURN",
+   "examples": [
+    "{callsign} turn left heading {heading}",
+    "{callsign} turn right heading {heading}"
+   ]
+  },
+  {
+   "id": "CLIMB_DESCEND",
+   "examples": [
+    "{callsign} climb flight level {level}",
+    "{callsign} descend flight level {level}",
+    "{callsign} climb {altitude}",
+    "{callsign} descend {altitude}"
+   ]
+  },
+  {
+   "id": "CONTACT",
+   "examples": [
+    "{callsign} contact tower {frequency}"
+   ]
+  }
+ ]
+}

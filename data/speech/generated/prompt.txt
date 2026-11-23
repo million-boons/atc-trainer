@@ -1,0 +1,1 @@
+Air traffic control radio. Callsigns Cobra, Eagle, Falcon, Hawk. Taxiways Alpha, Bravo, Charlie, Delta, Echo. Words: taxi via hold short runway; taxi via runway; runway cleared for takeoff; runway cleared to land; turn left heading; turn right heading; climb feet; descend feet; climb flight level; descend flight level; contact tower; decimal; left; right; center; niner.

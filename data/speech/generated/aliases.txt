@@ -1,0 +1,10 @@
+# heard = meant. Raw text is kept in every log.
+alfa alpha
+ait eight
+fife five
+fower four
+hoc hawk
+niner nine
+nina nine
+tree three
+gyro zero

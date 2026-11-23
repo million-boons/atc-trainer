@@ -1,0 +1,1 @@
+Air traffic control radio. Callsigns Eagle, Falcon, Hawk, Cobra. Words: taxi via Alpha, Bravo, Charlie, Delta, Echo; hold short runway; cleared for takeoff; cleared to land; turn left heading; turn right heading; climb; descend; flight level; feet; contact tower; decimal.

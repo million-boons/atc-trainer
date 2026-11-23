@@ -1,0 +1,54 @@
+# PLACEHOLDER - NOT APPROVED PHRASEOLOGY. Validate against approved SOP (D-07, P-11).
+# Made up only to exercise the benchmark. Callsigns, runways, taxiways, frequencies are invented.
+# Format: text | field=value ...      or   text | negative
+# 40 scripted + 10 negative per speaker. With 4 speakers: 160 scripted, 40 negative.
+Falcon Three One Eight taxi via Alpha Nine hold short runway Two Three | callsign=FALCON-318 taxiway=A9 runway=23 hold_short=yes
+Falcon Seven Three Two climb flight level One Zero Zero | callsign=FALCON-732 level=FL100
+Cobra Two Zero Five taxi via Bravo Two runway Zero Nine Left | callsign=COBRA-205 taxiway=B2 runway=09L
+Hawk Six Seven Four runway Two Seven cleared for takeoff | callsign=HAWK-674 runway=27
+Please tell the technician to check the printer | negative
+Hawk One Five Six runway Two Three cleared for takeoff | callsign=HAWK-156 runway=23
+Falcon Three One Eight taxi via Charlie Seven runway Zero Five | callsign=FALCON-318 taxiway=C7 runway=05
+Hawk Six Seven Four climb Two Thousand feet | callsign=HAWK-674 altitude=2000
+Hawk Six Seven Four runway Two Seven cleared to land | callsign=HAWK-674 runway=27
+What time is the briefing tomorrow morning | negative
+Cobra Eight Nine Zero taxi via Alpha Nine runway One Eight | callsign=COBRA-890 taxiway=A9 runway=18
+Hawk Six Seven Four taxi via Alpha Three runway Two Three | callsign=HAWK-674 taxiway=A3 runway=23
+Hawk Six Seven Four contact tower One Two Four decimal Five | callsign=HAWK-674 frequency=124.5
+Eagle Four Two One taxi via Alpha Three hold short runway Zero Nine | callsign=EAGLE-421 taxiway=A3 runway=09 hold_short=yes
+The runway lights look fine today | negative
+Falcon Three One Eight turn left heading One Three Five | callsign=FALCON-318 heading=135
+Falcon Seven Three Two runway Zero Five cleared for takeoff | callsign=FALCON-732 runway=05
+Falcon Three One Eight contact tower One Two One decimal Nine | callsign=FALCON-318 frequency=121.9
+Falcon Three One Eight runway Zero Nine cleared for takeoff | callsign=FALCON-318 runway=09
+I will be back after lunch | negative
+Cobra Two Zero Five runway One Eight cleared to land | callsign=COBRA-205 runway=18
+Cobra Two Zero Five descend Five Thousand feet | callsign=COBRA-205 altitude=5000
+Eagle Five Zero Nine turn right heading Three Six Zero | callsign=EAGLE-509 heading=360
+Falcon Seven Three Two runway Zero Five cleared to land | callsign=FALCON-732 runway=05
+Eagle is a very large bird | negative
+Eagle Five Zero Nine runway Two Seven Right cleared for takeoff | callsign=EAGLE-509 runway=27R
+Eagle Four Two One climb Three Thousand Five Hundred feet | callsign=EAGLE-421 altitude=3500
+Cobra Two Zero Five taxi via Charlie Seven hold short runway Two Seven Right | callsign=COBRA-205 taxiway=C7 runway=27R hold_short=yes
+Cobra Eight Nine Zero turn left heading Two Seven Five | callsign=COBRA-890 heading=275
+Can somebody close the window please | negative
+Eagle Five Zero Nine contact tower One One Eight decimal One | callsign=EAGLE-509 frequency=118.1
+Eagle Four Two One taxi via Charlie One runway Two Seven Right | callsign=EAGLE-421 taxiway=C1 runway=27R
+Hawk One Five Six taxi via Charlie One hold short runway One Eight | callsign=HAWK-156 taxiway=C1 runway=18 hold_short=yes
+Falcon Seven Three Two taxi via Bravo Two hold short runway Two Seven | callsign=FALCON-732 taxiway=B2 runway=27 hold_short=yes
+We have four new trainees this week | negative
+Falcon Seven Three Two descend Eight Thousand feet | callsign=FALCON-732 altitude=8000
+Cobra Eight Nine Zero runway Zero Nine Left cleared for takeoff | callsign=COBRA-890 runway=09L
+Hawk Six Seven Four turn right heading Zero Four Zero | callsign=HAWK-674 heading=040
+Hawk One Five Six climb flight level One Nine Five | callsign=HAWK-156 level=FL195
+Hold on a moment I am writing it down | negative
+Eagle Four Two One runway Three Six cleared to land | callsign=EAGLE-421 runway=36
+Hawk Six Seven Four taxi via Bravo Six hold short runway Zero Nine Left | callsign=HAWK-674 taxiway=B6 runway=09L hold_short=yes
+Eagle Four Two One climb flight level Zero Eight Zero | callsign=EAGLE-421 level=FL080
+Eagle Five Zero Nine taxi via Echo Five hold short runway Zero Five | callsign=EAGLE-509 taxiway=E5 runway=05 hold_short=yes
+The taxi to the station was late again | negative
+Cobra Eight Nine Zero taxi via Delta Four hold short runway Three Six | callsign=COBRA-890 taxiway=D4 runway=36 hold_short=yes
+Hawk One Five Six turn right heading Zero Nine Zero | callsign=HAWK-156 heading=090
+Eagle Five Zero Nine taxi via Bravo Six runway Three Six | callsign=EAGLE-509 taxiway=B6 runway=36
+Falcon Three One Eight runway Zero Nine cleared to land | callsign=FALCON-318 runway=09
+Nine people are waiting outside the office | negative

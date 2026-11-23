@@ -1,0 +1,10 @@
+[Unit]
+Description=ATC trainer: H540 microphone settings
+After=pulseaudio.service pulseaudio.socket
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/atc-h540-setup
+
+[Install]
+WantedBy=default.target

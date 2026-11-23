@@ -1,0 +1,19 @@
+# No audio or model files in git (D-31, D-44).
+# Leading / = project root only: "bench/" alone would also hide src/bench and data/bench.
+/build/
+/models/
+/recordings/
+/bench/
+/scratch/
+*.wav
+*.flac
+*.bin
+*.gguf
+*.fst
+*.mdl
+# Engines and models; rebuilt by tools/fetch_stt.sh from pinned checksums.
+/third_party/
+# Local to one machine
+.claude/settings.local.json
+__pycache__/
+*.part

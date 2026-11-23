@@ -1,0 +1,16 @@
+# Lets members of group "atcptt" READ the PTT device without root, surviving replug and reboot.
+# Gives a stable name, since the event number changes. Must sort before 73-seat-late.rules.
+# Never matches a keyboard: reading a keyboard would expose everything that is typed.
+ACTION=="remove", GOTO="atc_ptt_end"
+SUBSYSTEM!="input", GOTO="atc_ptt_end"
+KERNEL!="event*", GOTO="atc_ptt_end"
+ENV{ID_INPUT_KEYBOARD}=="1", GOTO="atc_ptt_end"
+
+# Current pedal (FAILS hold-to-talk, D-02/P-13). Replace the numbers when the new pedal arrives.
+# LIBINPUT_IGNORE_DEVICE stops a mouse-type pedal from clicking the desktop.
+ATTRS{idVendor}=="04d8", ATTRS{idProduct}=="0055", GROUP="atcptt", MODE="0640", SYMLINK+="input/atc-pedal", ENV{LIBINPUT_IGNORE_DEVICE}="1"
+
+# Stand-in mouse for development only; remove on the panel. Stays a normal mouse.
+ATTRS{idVendor}=="04ca", ATTRS{idProduct}=="00bd", ENV{ID_INPUT_MOUSE}=="1", GROUP="atcptt", MODE="0640", SYMLINK+="input/atc-ptt-mouse"
+
+LABEL="atc_ptt_end"

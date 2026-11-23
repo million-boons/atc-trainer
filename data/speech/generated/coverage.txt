@@ -1,0 +1,3 @@
+sentences 11202
+pool values 27
+missing 0

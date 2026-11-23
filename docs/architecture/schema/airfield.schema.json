@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Airfield and instructor-approved pools (draft v0.1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "validation", "runways", "taxiways", "aircraftTypes", "callsigns"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string" },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status"],
+      "properties": { "status": { "enum": ["placeholder", "validated"] }, "sopRef": { "type": "string" }, "validatedBy": { "type": "string" } }
+    },
+    "runways": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^(0[1-9]|[12][0-9]|3[0-6])[LRC]?$" } },
+    "taxiways": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["id", "serves"],
+        "properties": { "id": { "type": "string" }, "serves": { "type": "array", "minItems": 1, "items": { "type": "string" } } }
+      }
+    },
+    "aircraftTypes": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["id"],
+        "properties": { "id": { "type": "string" }, "categories": { "type": "array", "items": { "type": "string" } } }
+      }
+    },
+    "callsigns": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["id", "spoken"],
+        "properties": { "id": { "type": "string" }, "spoken": { "type": "string" }, "types": { "type": "array", "items": { "type": "string" } } }
+      }
+    }
+  }
+}

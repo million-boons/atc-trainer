@@ -1,0 +1,14 @@
+# generated: an instruction, or any other words
+root ::= " " (instr | free)
+free ::= [a-z]+ (" " [a-z]+)*
+digit ::= "zero" | "one" | "two" | "three" | "four" | "five" | "six" | "seven" | "eight" | "nine" | "niner" | "tree" | "fife"
+name ::= "cobra" | "eagle" | "falcon" | "hawk"
+callsign ::= (name | other) " " digit " " digit " " digit
+other ::= [a-z]+
+runway ::= digit " " digit (" left" | " right" | " center")?
+taxiway ::= ("alpha" | "bravo" | "charlie" | "delta" | "echo" | "foxtrot" | "golf" | "hotel" | "india" | "juliet" | "kilo" | "lima" | "mike" | "november" | "oscar" | "papa" | "quebec" | "romeo" | "sierra" | "tango" | "uniform" | "victor" | "whiskey" | "x-ray" | "yankee" | "zulu") " " digit (" " digit)?
+heading ::= digit " " digit " " digit
+level ::= digit " " digit " " digit
+altitude ::= digit (" " digit)? " thousand" (" " digit " hundred")?
+frequency ::= digit " " digit " " digit " decimal " digit (" " digit)? (" " digit)?
+instr ::= callsign " taxi via " taxiway " hold short runway " runway | callsign " taxi via " taxiway " runway " runway | callsign " runway " runway " cleared for takeoff" | callsign " runway " runway " cleared to land" | callsign " turn left heading " heading | callsign " turn right heading " heading | callsign " climb " altitude " feet" | callsign " descend " altitude " feet" | callsign " climb flight level " level | callsign " descend flight level " level | callsign " contact tower " frequency
