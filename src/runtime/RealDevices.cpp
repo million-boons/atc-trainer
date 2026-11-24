@@ -31,7 +31,7 @@ RadioDevices realDevices(const RealDeviceConfig& cfg) {
   };
   d.player = [cfg](PlayerCallbacks cb) { return std::make_unique<PulsePlayer>(std::move(cb), cfg.pulseServer); };
   if (cfg.pttDevice.empty()) return d;
-  EvdevConfig e{cfg.pttDevice, cfg.pttCode, cfg.pttGrab};
+  EvdevConfig e{cfg.pttDevice, cfg.pttCode, cfg.pttGrab, cfg.pttVidPid};
   d.ptt = [e](PttCallbacks cb) { return std::make_unique<Ptt>(e, std::move(cb)); };
   if (!cfg.pttGrab && cfg.pttCode == 0x111) {  // a grabbed device has only one reader
     e.code = 0x110;  // BTN_LEFT

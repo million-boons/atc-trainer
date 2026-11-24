@@ -113,6 +113,7 @@ int main(int argc, char** argv) {
     lc.pttName = cfg["pttName"].toString("PTT device");
     lc.devices.pttDevice = ptt.toStdString();
     lc.devices.pttGrab = cfg["pttGrab"].toBool(false);
+    lc.devices.pttVidPid = cfg["pttVidPid"].toString().toStdString();
     lc.devices.pttCode = cfg["pttCode"].toInt(lc.devices.pttCode);
     lc.devices.micSource = cfg["micSource"].toString().toStdString();
     lc.devices.pulseServer = cli.value(pulseOpt).toStdString();

@@ -31,6 +31,7 @@ add_library(atc_logic STATIC
   src/audio/UtteranceChecks.cpp
   src/audio/WavFile.cpp
   src/audio/SideTone.cpp
+  src/audio/RadioAudioProcessor.cpp
   src/bench/PhraseFile.cpp
   src/bench/Scoring.cpp
   src/stt/SttService.cpp)
@@ -40,7 +41,7 @@ target_include_directories(atc_logic PUBLIC src)
 find_path(EVDEV_INCLUDE libevdev/libevdev.h PATH_SUFFIXES libevdev-1.0)
 find_library(EVDEV_LIB evdev)
 if(EVDEV_INCLUDE AND EVDEV_LIB)
-  add_library(atc_evdev STATIC src/ptt/EvdevPttSource.cpp)
+  add_library(atc_evdev STATIC src/ptt/EvdevPttSource.cpp src/ptt/PttDeviceCheck.cpp)
   target_include_directories(atc_evdev PUBLIC src PRIVATE ${EVDEV_INCLUDE})
   target_link_libraries(atc_evdev PUBLIC ${EVDEV_LIB} Threads::Threads)
   add_executable(ptt_monitor tools/ptt_monitor.cpp)
@@ -132,6 +133,14 @@ add_subdirectory(src/scenario)
 add_subdirectory(src/engine)
 add_subdirectory(src/voice)
 add_subdirectory(src/runtime)
+if(TARGET voice_tool)  # needs the voice bank code
+  add_executable(radio_ab tools/radio_ab.cpp)
+  target_link_libraries(radio_ab PRIVATE atc_voice atc_logic)
+  if(TARGET atc_pulse)
+    target_link_libraries(radio_ab PRIVATE atc_pulse)
+    target_compile_definitions(radio_ab PRIVATE ATC_HAVE_PULSE)
+  endif()
+endif()
 
 # Qt UI (needs qt6-base-dev, qt6-declarative-dev and the qml6-module-qtquick* packages).
 option(ATC_BUILD_UI "Build the Qt UI if Qt 6 is installed" ON)
@@ -151,12 +160,18 @@ if(ATC_BUILD_TESTS)
   add_executable(logic_tests
     tests/test_ptt.cpp tests/test_tx.cpp tests/test_tx_display.cpp tests/test_ring.cpp tests/test_checks.cpp
     tests/test_audio_files.cpp tests/test_bench.cpp tests/test_sidetone.cpp tests/test_paths.cpp tests/test_readiness.cpp
-    tests/test_access.cpp)
+    tests/test_access.cpp tests/test_radio_effect.cpp)
   target_link_libraries(logic_tests PRIVATE atc_logic GTest::gtest_main Threads::Threads)
   include(GoogleTest)
   gtest_discover_tests(logic_tests)
   add_subdirectory(tests/contracts)
   add_subdirectory(tests/scenario)
+  if(TARGET atc_evdev)
+    add_executable(ptt_device_tests tests/test_ptt_device.cpp)
+    target_include_directories(ptt_device_tests PRIVATE ${EVDEV_INCLUDE})
+    target_link_libraries(ptt_device_tests PRIVATE atc_evdev GTest::gtest_main ${EVDEV_LIB} Threads::Threads)
+    gtest_discover_tests(ptt_device_tests)
+  endif()
   add_subdirectory(tests/engine)
   add_subdirectory(tests/voice)
   add_subdirectory(tests/runtime)
@@ -184,7 +199,7 @@ if(ATC_BUILD_TESTS)
 endif()
 
 # cmake --install build --prefix DIR --strip. Models and audio are copied by rsync, never from here (D-31).
-foreach(T atc_trainer ptt_monitor audio_probe ptt_record ptt_text stt_bench phrase_gen script_gen set_instructor_pin
+foreach(T atc_trainer ptt_monitor audio_probe ptt_record ptt_text stt_bench phrase_gen script_gen set_instructor_pin radio_ab
         logic_tests runtime_tests player_tests contract_tests storage_tests parser_tests stt_tests)
   if(TARGET ${T})
     install(TARGETS ${T} RUNTIME DESTINATION bin)

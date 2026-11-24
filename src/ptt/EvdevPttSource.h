@@ -12,6 +12,7 @@ struct EvdevConfig {
   std::string path;    // /dev/input/eventN; matching by VID:PID/name is done by the caller
   int code = 0x111;    // BTN_RIGHT (D-01)
   bool grab = false;   // true for a pedal; false for a desk mouse used as a stand-in
+  std::string vidPid;  // "04d8:0055": the only device accepted; required for a keyboard-type one (D-310)
 };
 
 // Reads one key/button on its own thread. Callbacks run on that thread; the caller
@@ -32,7 +33,7 @@ class EvdevPttSource {
 
  private:
   void run();
-  bool session();  // false if the device could not be opened
+  bool session(std::string& error);  // false, with the reason, if the device could not be used
 
   EvdevConfig cfg_;
   Callbacks cb_;
