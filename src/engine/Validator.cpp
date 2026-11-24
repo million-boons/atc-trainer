@@ -34,9 +34,16 @@ Verdict validate(const ScenarioStep& step, const ScenarioContext& ctx, const Par
   if (!clipped.empty() && rules.clippedIsUnintelligible) return {Outcome::Unintelligible, clipped, false};
   const bool stt = clipped.empty();  // with clean audio, the recogniser is the suspect
   if (p.cls == RecognitionClass::Unrecognized || p.intent.empty()) return {Outcome::Unintelligible, p.reasons, stt};
+  // Released early: the value the transmission ends with fails its shape rules (D-422). Say again, and
+  // it is the trainee's release, not the recogniser.
+  const bool early = facts.closed && facts.report.releasedEarly;
   std::vector<std::string> uncertain;
-  for (const auto& [name, f] : p.fields)
-    if (f.uncertain) uncertain.push_back(name);
+  for (const auto& [name, f] : p.fields) {
+    if (!f.uncertain) continue;
+    if (early && !f.heard.empty() && (p.normalisedText.ends_with(f.heard) || p.rawText.ends_with(f.heard)))
+      return {Outcome::Unintelligible, {"clipped end", name}, false};
+    uncertain.push_back(name);
+  }
   if (p.cls == RecognitionClass::Ambiguous || !uncertain.empty())
     return {Outcome::Ambiguous, uncertain.empty() ? p.reasons : uncertain, stt};
   if (step.expects.empty()) return {Outcome::Unexpected, {p.intent}, false};
@@ -73,6 +80,10 @@ Verdict validate(const ScenarioStep& step, const ScenarioContext& ctx, const Par
       if (valueOf(p, f).empty()) missing.push_back(f);
   } else {
     missing = p.missing;
+  }
+  if (!missing.empty() && early) {  // D-422: the cut may have taken it
+    missing.insert(missing.begin(), "clipped end");
+    return {Outcome::Unintelligible, missing, false};
   }
   if (!missing.empty()) return {Outcome::MissingInfo, missing, false};
 

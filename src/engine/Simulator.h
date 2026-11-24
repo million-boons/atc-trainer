@@ -24,6 +24,7 @@ class Simulator {
   void transmit(ParsedInstruction p, const UtteranceReport& report = goodReport(), TxEnd end = TxEnd::Normal,
                 const std::string& sttFault = {});
   void stop();
+  void resume();  // the instructor continues after missed responses
   void waitForPilot();  // until nothing is being or about to be said
 
   bool ended() const { return reason_.has_value(); }

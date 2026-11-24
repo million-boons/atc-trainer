@@ -69,6 +69,9 @@ struct PttPresence {  // lost: timers pause until it is seen released
   bool present = true;
 };
 struct InstructorStop { static constexpr std::string_view kName = "instructor_stop"; };
+struct InstructorContinue {  // answer to an alert that asks for a choice: the pilot calls again
+  static constexpr std::string_view kName = "instructor_continue";
+};
 
 }  // namespace in
 
@@ -86,6 +89,7 @@ struct Judged {  // the validator's verdict on one transmission, or on a missing
   std::vector<std::string> problems;  // field names or rule ids, for the result screen
   bool advanced = false;        // true only with Outcome::Correct
   bool suspectedStt = false;    // shown apart, not counted against the trainee
+  Ns waited = 0;                // Timeout: silence since the channel was free
 };
 struct PilotRequested {
   static constexpr std::string_view kName = "pilot_requested";
@@ -108,6 +112,7 @@ struct TimerCancelled {
 struct InstructorAlert {  // e.g. too many "say again" in one step
   static constexpr std::string_view kName = "instructor_alert";
   std::string why;
+  bool choice = false;  // the instructor decides: in::InstructorContinue or in::InstructorStop (D-424)
 };
 enum class EndReason { Completed, InstructorStop, TimeLimit };
 struct Ended {
@@ -119,7 +124,7 @@ struct Ended {
 
 using EngineInput = std::variant<in::Started, in::TxOpened, in::TxClosed, in::TxCancelled, in::PressNotOpened,
                                  in::Recognised, in::PilotStarted, in::PilotEnded, in::TimerFired, in::PttPresence,
-                                 in::InstructorStop>;
+                                 in::InstructorStop, in::InstructorContinue>;
 using EngineOutput = std::variant<out::StepEntered, out::Judged, out::PilotRequested, out::NoReply, out::TimerSet,
                                   out::TimerCancelled, out::InstructorAlert, out::Ended>;
 

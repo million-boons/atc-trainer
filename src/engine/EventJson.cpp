@@ -63,11 +63,12 @@ json j(const in::PilotEnded& x) { return {{"utterance", x.utterance}, {"end", na
 json j(const in::TimerFired& x) { return {{"timer", name(x.timer)}, {"generation", x.generation}}; }
 json j(const in::PttPresence& x) { return json{{"present", x.present}}; }
 json j(const in::InstructorStop&) { return json::object(); }
+json j(const in::InstructorContinue&) { return json::object(); }
 json j(const out::StepEntered& x) { return json{{"step", x.step}}; }
 json j(const out::Judged& x) {
   return {{"step", x.step},         {"tx", x.tx},
           {"outcome", str(toString(x.outcome))}, {"problems", x.problems},
-          {"advanced", x.advanced}, {"suspectedStt", x.suspectedStt}};
+          {"advanced", x.advanced}, {"suspectedStt", x.suspectedStt}, {"waited", x.waited}};
 }
 json j(const out::PilotRequested& x) {
   const PilotUtterance& u = x.utterance;
@@ -78,7 +79,7 @@ json j(const out::PilotRequested& x) {
 json j(const out::NoReply& x) { return json{{"tx", x.tx}}; }
 json j(const out::TimerSet& x) { return {{"timer", name(x.timer)}, {"generation", x.generation}, {"delay", x.delay}}; }
 json j(const out::TimerCancelled& x) { return json{{"timer", name(x.timer)}}; }
-json j(const out::InstructorAlert& x) { return json{{"why", x.why}}; }
+json j(const out::InstructorAlert& x) { return json{{"why", x.why}, {"choice", x.choice}}; }
 json j(const out::Ended& x) { return json{{"reason", name(x.reason)}}; }
 
 // Recognised text may hold bytes that are not UTF-8: replaced, never an exception.

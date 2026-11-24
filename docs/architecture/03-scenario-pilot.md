@@ -60,12 +60,13 @@ Safety precedes order so an unsafe instruction is never reported merely as "unex
 |---|---|
 | CORRECT | Readback |
 | MISSING_INFO | Request the missing item |
-| AMBIGUOUS, UNINTELLIGIBLE, clipped | "Say again" |
+| AMBIGUOUS, UNINTELLIGIBLE | "Say again" |
+| Clipped (spoke before keying, or released early) | Judged normally (D-422). Exception: speech present at release **and** the final critical value is incomplete or fails its shape rules → PARTIAL → "say again" (logged as UNINTELLIGIBLE, "clipped end" and the field). Always counted under PTT discipline. Setting; strict mode gives "say again" to every clipped transmission |
 | CONFLICT | Challenge |
 | WRONG_CALLSIGN | No reply (configurable) |
 | UNSAFE | Configured safety response |
 | UNEXPECTED, INCORRECT | Per scenario |
-| Timeout | Pilot calls again, up to `maxCalls` |
+| Timeout | Pilot calls again, up to `maxCalls`; each missed response is logged with its timing and counts in the response time. Then the instructor chooses continue or end; never auto-advance, so a transition on TIMEOUT is refused (D-424) |
 
 - Templates: `{callsign}`, `{runway}` with spoken-form formatters (`|digits`, `|phonetic`). Unknown variable is a load error, never spoken as blank.
 - Optional injected pilot readback errors, for the trainee to catch, are off by default and set per scenario with a seeded probability.

@@ -9,7 +9,7 @@ struct Paths {
   std::string config;    // root/config
   std::string data;      // root/data
   std::string models;    // root, unless the config file names another folder
-  std::string voices;    // root/voices, unless the config file names another folder
+  std::string voices;    // the voice bank itself (holds manifest.json, D-420): root/voices, unless the config file names another
   std::string engines;   // <prefix>/lib/ggml: the whisper CPU variants, always beside the executable
   std::string writable;  // logs, results, recordings; never inside root
 };

@@ -132,7 +132,7 @@
             "properties": {
               "on": { "$ref": "#/definitions/outcome" },
               "to": { "type": "string" },
-              "errorBranch": { "type": "boolean", "description": "must be true when 'on' is not CORRECT (semantic check)" },
+              "errorBranch": { "type": "boolean", "description": "must be true when 'on' is not CORRECT; 'on' is never TIMEOUT (semantic checks)" },
               "guard": { "$ref": "#/definitions/guard" }
             }
           }
