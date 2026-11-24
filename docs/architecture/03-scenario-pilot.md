@@ -112,7 +112,7 @@ Weights and pass mark in `scoring.json`, set by the instructor; none are propose
 | transmission | session, start, end, wav_path, flags |
 | recognition | transmission, stt_model_id, stt_model_config JSON (settings and file hashes), raw, normalised, class, confidence JSON |
 | instruction | recognition, intent, fields JSON, outcome, step |
-| pilot_tx | session, text, start, end, interrupted |
+| pilot_tx | session, reply_id, clip_ids JSON (D-427), text, start, end, interrupted |
 | engine_event | session, seq, type, payload JSON |
 | snapshot | session, seq, state JSON |
 | assessment_item | session, category, value, adjusted_by, note, stt_model_id, stt_model_config |
