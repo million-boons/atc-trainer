@@ -97,6 +97,7 @@ endif()
 
 if(ATC_BUILD_TESTS)
   enable_testing()
+  add_test(NAME setup_panel COMMAND bash ${CMAKE_SOURCE_DIR}/tests/test_setup_panel.sh)
   find_package(GTest REQUIRED)
   add_executable(logic_tests
     tests/test_ptt.cpp tests/test_tx.cpp tests/test_tx_display.cpp tests/test_ring.cpp tests/test_checks.cpp

@@ -1,0 +1,10 @@
+[Unit]
+Description=ATC trainer: USB headset microphone settings
+After=pulseaudio.service pulseaudio.socket
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/atc-audio-setup
+
+[Install]
+WantedBy=default.target
