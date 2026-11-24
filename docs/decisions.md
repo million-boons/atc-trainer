@@ -65,6 +65,10 @@
 | D-103 | 2026-11-24 | Dashboard wireframe approved with fixes: the ready count is computed from the tiles; the Speech model tile has "Load exercise model" (loads the configured default, locked at Start); every tile shows whether it blocks Start or only warns. Voice bank missing and model not loaded block; speaker not checked warns. | User |
 | D-104 | 2026-11-24 | Exercise and Result mockups (2g) are drafted now, without a build. | User |
 | D-105 | 2026-11-24 | Commits: the ui session commits only its own files and works in its worktree (confirms D-31 and D-304). Session b2 edits `MockBackend.cpp` and `LiveBackend.cpp` when its TransmissionController changes merge; the ui session then checks the screens and reports. | User |
+| D-106 | 2026-11-24 | Dashboard tile rules in `04-ui.md` §5a confirmed, including the PTT rule (block or warn by configuration). Completes D-103. | User |
+| D-107 | 2026-11-24 | Exercise modes: Practice shows the live verdict; Assessed hides it until debrief. Completes D-104. What else Assessed hides, and choosing the mode in a Start dialog, are proposals shown in the 2g mockup (A-7), not decided. | User |
+| D-108 | 2026-11-24 | Exercise audio is stored locally under the Lab recording rules (D-101, D-102). Trainee consent is given once and kept in the trainee record. Which package owns that record is open (A-5); until then no exercise audio is saved. | User |
+| D-109 | 2026-11-24 | Speakers: 8 (4 dev, 4 test, as D-42), consent required, only the instructor role may add one. How the role is enforced is open (A-4); until then Add and Delete stay disabled. | User |
 
 ## Check results
 
