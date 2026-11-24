@@ -1,6 +1,6 @@
 # 06 Vertical slice: departure (taxi, line up, takeoff)
 
-Status: **APPROVED with changes, 2026-11-23** (D-400 to D-409); amended 2026-11-24 (D-410 to D-425, package 1c). §4.1 is approved; A-3 is closed (D-308). "A-n" are the open questions in `docs/status/briefs-2026-11-24.md` (branch `audit`). All phraseology is PLACEHOLDER. Hours are estimates.
+Status: **APPROVED with changes, 2026-11-23** (D-400 to D-409); amended 2026-11-24 (D-410 to D-428, package 1c). §4.1 is approved; A-3 is closed (D-308). "A-n" are the open questions in `docs/status/briefs-2026-11-24.md` (branch `audit`). All phraseology is PLACEHOLDER. Hours are estimates.
 
 Goal: one departure scenario working end to end on real components, after the Speech Lab and Dashboard run on real backends.
 
@@ -120,7 +120,7 @@ Not affected: the udev rules and H540 service, which use fixed system paths by d
 3. Wrong runway or skipped step never advances; wrong callsign gets silence; unclear speech gets "say again"; no call makes the pilot call again.
 4. Removing any one required clip makes the scenario fail at load, naming the clip.
 5. A press during pilot speech silences the pilot before TX opens: tested with fakes, then measured on the H540.
-6. The model is locked; its id and configuration are in every result (D-39).
+6. The model is locked; its id and configuration are in every result (D-39). The log holds the header, every recognition, each pilot reply (reply id, clip IDs played) and each PTT/transmission event (D-427).
 7. Result screen: steps, attempts, response time, PTT discipline, suspected STT errors shown separately, no pass mark.
 8. Release-to-reply time, RAM and CPU measured on the idle panel and reported.
 
