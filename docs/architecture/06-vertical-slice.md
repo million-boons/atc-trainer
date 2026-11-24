@@ -1,6 +1,6 @@
 # 06 Vertical slice: departure (taxi, line up, takeoff)
 
-Status: **APPROVED with changes, 2026-11-23** (D-400 to D-409); amended 2026-11-24 (D-410 to D-413). §4.1 is a proposal, not yet approved. All phraseology is PLACEHOLDER. Hours are estimates.
+Status: **APPROVED with changes, 2026-11-23** (D-400 to D-409); amended 2026-11-24 (D-410 to D-414, package 1c). §4.1 is approved in part; what still waits for A-3 is marked there. "A-n" are the open questions in `docs/status/briefs-2026-11-24.md` (branch `audit`). All phraseology is PLACEHOLDER. Hours are estimates.
 
 Goal: one departure scenario working end to end on real components, after the Speech Lab and Dashboard run on real backends.
 
@@ -22,9 +22,10 @@ Sessions: b2 = `runtime`, 93 = `stt`, 31 = `ui`, 8d = `engine`.
 | 0a | Finish D-300 tests; adapt `MockBackend` and `LiveBackend` to the new TransmissionController callbacks; merge to `main`; repo sync (§4) | b2 | – | 3–5, sync extra |
 | 0b | Commit current STT and phraseology work; b2 merges | 93 | 0a | 1 |
 | 0c | Contracts and CMake stubs; b2 merges | 8d | 0a | 2 |
-| 0d | Location-independent paths (D-410, §4.1): resolver, relative library paths, tests; b2 merges | b2 | 0a; §4.1 approved; before the first PC-built binary goes to the panel | 2–4 |
+| 0d | Location-independent paths (D-410, §4.1): resolver, relative library paths, tests; b2 merges | b2 | 0a, 0b; §4.1 (core approved, A-3 for the rest); before the first PC-built binary goes to the panel | 2–4 |
 | 1a | `RadioCore`, `PulsePlayer`, Lab playback, speaker check, `StatusController`. Export stays off (D-407) | b2 | 0a, 0c | 7–9 |
 | 1b | Dashboard wireframe, user OK, QML; remaining Lab controls. Start disabled until 3b | 31 | 0c; 1a to connect | 4–5 |
+| 1c | Recordings: speaker ID and consent required before saving, saving wired to RadioCore, off switch in Settings, list, instructor-only logged delete, low-space warning (D-101, D-102, 04 §5b). Speakers are added by the instructor role only. | 31 | 1a; role mechanism (A-4) | to be estimated by 31 |
 | **G1** | User tests Lab and Dashboard on the panel with the H540 | user | 1a, 1b | – |
 | 2a | Loader (hand-written checks, D-408), generator, `scenario_check`, departure JSON | 8d | 0c | 4–5 |
 | 2b | Context, validator, sequence engine, pilot behaviour, result metrics, `sim_cli` | 8d | 2a | 8–10 |
@@ -38,8 +39,8 @@ Sessions: b2 = `runtime`, 93 = `stt`, 31 = `ui`, 8d = `engine`.
 | T | Clean STT timing run on the idle panel (D-406) | 93 | before 3c demo | 1 |
 | 3c | Acceptance run, fixes, panel measurements | all, b2 leads | 3a, 3b, T | 6–10 |
 
-Order: `0a → 0b, 0c, 0d → 1a → G1 → 3a → 3b → 3c`. Wave 2 runs beside Wave 1 from 0c.
-Estimate before the move to the PC: 67–88 session-hours (before 0d, which adds 2–4), likely 5–6 working days, range 4–8. Not yet re-estimated for the PC: builds get faster, the move itself (§4) is extra.
+Order: `0a → 0b, 0c, 0d → 1a → G1 → 3a → 3b → 3c`. Wave 2 runs beside Wave 1 from 0c. 1c follows 1a. **G1 does not wait for 1c (proposed, not confirmed by the user):** G1's needs stay as approved in D-409 (1a, 1b), and 1c is held by A-4.
+Estimate before the move to the PC: 67–88 session-hours (before 0d, which adds 2–4, and before 1c, not yet estimated), likely 5–6 working days, range 4–8. Not yet re-estimated for the PC: builds get faster, the move itself (§4) is extra.
 
 ## 3. Where work happens (D-400)
 
@@ -72,16 +73,18 @@ Conditions for PC-built binaries to run on the panel:
 
 Panel measurement rule: no Claude session, browser, build or sync running; record load, free memory and governor with each result; network off for the 3c acceptance run.
 
-### 4.1 Location-independent paths (task 0d, PROPOSED)
+### 4.1 Location-independent paths (task 0d, APPROVED IN PART)
+
+Approved per Q-3 (ruling 2026-11-24) as: install prefix + config file / executable-relative paths, with **no compiled-in absolute paths**. Parts marked *waiting for A-3* go beyond that wording and are not built until the user answers. b2 records the approval as D-305.
 
 Found 2026-11-24 in the code: `ATC_ROOT` in `src/app/main.cpp`, `tools/ptt_text.cpp`, `tests/test_stt.cpp`, `tests/test_phraseology.cpp`; `ATC_GGML_DIR` in `src/app/main.cpp`, `tools/ptt_text.cpp`, `tools/stt_bench.cpp`; absolute RUNPATH to `third_party/vosk` and `third_party/whisper-install/lib` in `atc_trainer`, `ptt_text`, `stt_bench`, `stt_tests`. Model paths in `config/stt_models.json` are already relative.
 
 1. One Qt-free `PathResolver` (`src/core/`) gives the config, data, models, voices and engine folders. Nothing else builds a path from a compiled-in constant.
-2. Root, first match wins: `--root` option; `ATC_ROOT` environment variable; `root=` in the config file (`~/.config/atc-trainer/paths.conf`, then `/etc/atc-trainer/paths.conf`); relative to the executable (`/proc/self/exe`): `<prefix>/bin` → `<prefix>/share/atc-trainer`, or the project folder above a build folder. The config file may also set the models and voices folders separately.
+2. Root, first match wins: `--root` option (*waiting for A-3*); `ATC_ROOT` environment variable (*waiting for A-3*); `root=` in the config file (`~/.config/atc-trainer/paths.conf`, then `/etc/atc-trainer/paths.conf`); relative to the executable (`/proc/self/exe`): `<prefix>/bin` → `<prefix>/share/atc-trainer`, or the project folder above a build folder (developer fallback, *waiting for A-3*). The config file may also set the models and voices folders separately.
 3. A location that was set explicitly but is missing is an error that names it. It never falls through to the next one. If nothing matches, the error lists every place tried.
 4. Vosk, whisper and ggml libraries: `$ORIGIN`-relative RUNPATH, and the ggml plugin folder found from the engine folder. `cmake --install` gives `bin/`, `lib/`, `share/atc-trainer/`.
 5. Files the program writes (logs, results, recordings) go to a separate writable folder, never under the prefix.
-6. Tests use the same resolver. Done when: an installed tree copied to a different path, with the source tree out of reach, passes all tests and starts `atc_trainer`, on the PC and then on the panel; and `readelf -d` and `strings` show no build path used at run time.
+6. Tests use the same resolver. Done when: an installed tree copied to a different path, with the source tree out of reach, passes all tests and starts `atc_trainer`, on the PC and then on the panel; and `readelf -d` and `strings` show no compiled-in absolute build or source path in an installed binary. `/etc/atc-trainer` is allowed: it is the config file's fixed place.
 
 Not affected: the udev rules and H540 service, which use fixed system paths by design.
 
@@ -110,10 +113,12 @@ Not affected: the udev rules and H540 service, which use fixed system paths by d
 
 Out of scope: Phraseology Studio, real recordings, SQLite and resume, injected events, assessed mode, packaging, pedal gate (D-03).
 
+Modes (ruling 2026-11-24): Practice shows the live verdict; Assessed hides it until debrief. The slice runs Practice only; P-11 refuses Assessed while any text is placeholder. Exercise audio is stored only with the trainee's consent on record; until A-5 is answered none is saved. (ui records these as D-107 and D-108.)
+
 ## 7. Known limits of the demo
 
 - Speech: best result so far is 25 of 40 instructions fully correct (whisper tiny, generated prompt, shape rules, one speaker, placeholder phrases). Frequent "say again" is expected.
-- Delay: median 2.0 s, maximum 4.9 s release to text, measured with the older prompt on a busy machine; D-406 re-measures it.
+- Delay: median 2.0 s, maximum 4.9 s release to text, measured with the older prompt on a busy machine; the timing run T (D-406, D-414) re-measures it.
 - "0.9" for "zero nine" is classed AMBIGUOUS, never corrected.
 
 ## 8. Open items
@@ -121,7 +126,7 @@ Out of scope: Phraseology Studio, real recordings, SQLite and resume, injected e
 | ID | Item | State |
 |---|---|---|
 | O-1 | Pilot readback of a wrong value that **exists in the airfield pools** should become possible, so readback errors can be trained. Values outside the pools: challenge or say again. | Later; not in the slice (D-409) |
-| O-2 | Approved line-up wording | User supplies it if unclassified (D-403) |
+| O-2 | Approved line-up wording | Placeholder "line up runway {runway}" confirmed 2026-11-24 until the user supplies wording, if unclassified (D-403) |
 | Q-1 | May voice recordings be copied to the PC? | **Closed:** yes, LAN only, one-way (D-412) |
 | Q-2 | PC operating system, LAN address, user name, GPU. SSH server is installed; the user name no longer has to match the panel (D-410). | **Open:** values left blank in the answer; needed before the first push to the PC and to know whether the container is needed |
-| Q-3 | Approve §4.1 (0d design) | User |
+| Q-3 | Approve §4.1 (0d design) | **Closed 2026-11-24:** approved as install prefix + config file / executable-relative, no compiled-in absolute paths. The extra lookups in §4.1 point 2 wait for A-3 |

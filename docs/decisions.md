@@ -65,7 +65,7 @@
 | D-403 | 2026-11-23 | S-4: line-up wording is "line up runway {runway}", marked PLACEHOLDER. The user supplies approved wording later if unclassified. | User |
 | D-404 | 2026-11-23 | S-5: Piper runs on the GPU PC; only clips are copied. Licences are checked first (result: `06-vertical-slice.md` §5). | User |
 | D-405 | 2026-11-23 | S-6: pilot clips are WAV for now. | User |
-| D-406 | 2026-11-23 | S-7: the slice uses `whisper-tiny-prompt`, locked per exercise; 93 pauses accuracy work for about one day for 2e. Before the demo, 93 does one clean timing run on the idle panel. | User |
+| D-406 | 2026-11-23 | S-7: the slice uses `whisper-tiny-prompt`, locked per exercise; 93 pauses accuracy work for about one day for 2e. Before the demo, 93 does one clean timing run on the idle panel. **Corrected 2026-11-24 by D-414** (model id). | User |
 | D-407 | 2026-11-23 | S-8: Speech Lab export stays off. | User |
 | D-408 | 2026-11-23 | S-9: scenario files are checked by hand-written loader checks with file and path in each error; no vendored JSON-schema validator. `01-system.md` §7 updated. | User |
 | D-409 | 2026-11-23 | Vertical slice plan approved with the changes above (`docs/architecture/06-vertical-slice.md`). Open item, not in slice scope: pilot readback of a wrong value that exists in the airfield pools should become possible so readback errors can be trained; values outside pools lead to challenge or say again. | User |
@@ -73,6 +73,7 @@
 | D-411 | 2026-11-24 | The PC has an SSH server. If its OS is not Ubuntu 22.04, builds run in an Ubuntu 22.04 + Qt 6.2.4 container there. OS, LAN address, user name and GPU are **not yet recorded**: the fields were left blank in the answer (Q-2 stays open). | User |
 | D-412 | 2026-11-24 | Q-1: voice recordings may be copied panel → PC over the LAN only: rsync over ssh, one-way, logged. On the PC they live in one folder outside git, with no cloud sync on it and local access only. Amends D-44. | User |
 | D-413 | 2026-11-24 | `en_US-norman-medium` approved as the placeholder pilot voice. Piper and the voice model are PC-only tools and are not shipped. Completes D-404. | User |
+| D-414 | 2026-11-24 | Corrects D-406: the slice model is Whisper tiny with the **generated** prompt, id `whisper-tiny-genprompt` (added by package 0b), not `whisper-tiny-prompt`. The rest of D-406 stays: locked per exercise (D-39), one clean timing run on the idle panel before the demo. | User (ruling, `docs/status/briefs-2026-11-24.md` on branch `audit`) |
 
 ## Check results
 

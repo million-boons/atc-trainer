@@ -123,7 +123,6 @@ An interrupted pilot reply stays outstanding; per scenario it is repeated or dis
 ```mermaid
 classDiagram
   class ISpeechRecognizer { <<interface>> begin(uttId) feed(pcm) finish() cancel(uttId) }
-  class ITextToSpeech { <<interface>> synthesize(text) Pcm }
   class IAudioSource { <<interface>> extract(tStart, tEnd) Pcm }
   class IAudioSink { <<interface>> play(Pcm) stop() }
   class IPttSource { <<interface>> onEdge(callback) }
@@ -153,7 +152,6 @@ classDiagram
   SequenceEngine --> ScenarioContext
   ConversationManager --> SequenceEngine
   SequenceEngine --> PilotBehaviourEngine
-  PilotBehaviourEngine ..> ITextToSpeech : via TransmissionController
   AssessmentEngine --> IEventLog
 ```
 
@@ -185,7 +183,7 @@ sequenceDiagram
   V->>V: validate; advance only if correct
   V->>L: Outcome
   L->>X: pilot text
-  X->>V2: synthesise while waiting
+  X->>V2: assemble the reply from clips (D-27)
   Note over X: random delay; starts only if pedal up
   X->>O: play radio audio
   O-->>X: playback done, Idle
