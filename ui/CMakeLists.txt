@@ -22,7 +22,7 @@ qt_add_qml_module(atc_trainer
     components/ModelSelector.qml
     components/DangerButton.qml components/StatusTile.qml components/ConfirmDialog.qml
     components/RadioBar.qml components/ModalPanel.qml components/OptionButton.qml components/ParamChip.qml
-    components/TextEntry.qml components/ChoiceButton.qml components/SwitchRow.qml components/LoginDialog.qml
+    components/TextEntry.qml components/KeyPad.qml components/ChoiceButton.qml components/SwitchRow.qml components/LoginDialog.qml
     components/PersonDialog.qml components/RecordingsCard.qml
     components/TranscriptEntry.qml components/StepRow.qml components/SectionHeader.qml
     screens/SpeechLab.qml screens/Dashboard.qml screens/Exercise.qml screens/Result.qml screens/Settings.qml

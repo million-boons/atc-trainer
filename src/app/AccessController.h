@@ -1,6 +1,7 @@
 #pragma once
 #include <QObject>
 #include <QPointer>
+#include <QTimer>
 #include <QVariantList>
 #include <QtQml/qqmlregistration.h>
 #include <functional>
@@ -58,6 +59,12 @@ class AccessController : public QObject {
   QString today() const;
   QString consentText() const;
 
+  // An instructor without input for this long is logged out (D-120). Input is any key, touch or mouse event of
+  // the application (install this object as its event filter) and any transmission.
+  void setIdleLimit(atc::Ns limit) { idleLimit_ = limit; }
+  void checkIdle();  // also every 5 s
+  bool eventFilter(QObject* o, QEvent* e) override;
+
   Q_INVOKABLE bool loginTrainee(const QString& id);
   Q_INVOKABLE void loginInstructor(const QString& pin);  // answer: changed(), loggedIn()
   Q_INVOKABLE bool logout();
@@ -72,6 +79,7 @@ class AccessController : public QObject {
 
  private:
   bool refuse(const QString& why);
+  bool onAir() const { return lab_ && (lab_->txTone() == LabController::Active || lab_->txTone() == LabController::Busy); }
   bool transmitting();  // true: refused, with the reason
   bool done(const std::string& why);
   void pinChecked(bool ok);
@@ -82,6 +90,8 @@ class AccessController : public QObject {
   atc::Role role_ = atc::Role::None;
   QString id_, message_, loadError_;
   bool busy_ = false;
+  atc::Ns idleLimit_ = atc::ms(600'000), lastInput_ = 0;
+  QTimer idleTimer_;
   atc::LoginGuard guard_;
   std::thread worker_;
 };

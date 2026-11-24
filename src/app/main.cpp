@@ -11,6 +11,7 @@
 #include <QQuickItemGrabResult>
 #include <QQuickWindow>
 #include <QTimer>
+#include <algorithm>
 #include <memory>
 
 #include "app/AccessBackends.h"
@@ -104,6 +105,8 @@ int main(int argc, char** argv) {
   // Login, trainee records, settings and recordings (1c). Before the backends, which use them.
   AccessController access(useMock ? mockAccess() : realAccess(paths.writable));
   access.setLab(&lab);
+  access.setIdleLimit(atc::ms(60'000) * std::max(1, cfg["instructorIdleMinutes"].toInt(10)));
+  app.installEventFilter(&access);
   SettingsController settings(&access, useMock ? QString() : at(paths.writable) + "/settings.json");
   RecordingsController recordings(&lab, &access, &settings);
   recordings.setBackend(useMock ? mockRecordings(recordings)

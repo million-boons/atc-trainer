@@ -1,6 +1,7 @@
 #include "app/AccessController.h"
 
 #include <QDate>
+#include <QEvent>
 #include <QMetaObject>
 #include <algorithm>
 #include <utility>
@@ -11,6 +12,9 @@ AccessController::AccessController(AccessBackend b, std::function<Ns()> clock, Q
     : QObject(parent), b_(std::move(b)), clock_(std::move(clock)) {
   if (b_.load) loadError_ = QString::fromStdString(b_.load());
   message_ = loadError_;
+  idleTimer_.setInterval(5000);
+  connect(&idleTimer_, &QTimer::timeout, this, &AccessController::checkIdle);
+  idleTimer_.start();
 }
 
 AccessController::~AccessController() {
@@ -52,7 +56,7 @@ bool AccessController::refuse(const QString& why) {
 }
 
 bool AccessController::transmitting() {
-  if (!lab_ || (lab_->txTone() != LabController::Active && lab_->txTone() != LabController::Busy)) return false;
+  if (!onAir()) return false;
   refuse(tr("Finish the transmission first."));
   return true;
 }
@@ -60,6 +64,29 @@ bool AccessController::transmitting() {
 void AccessController::clearMessage() {
   message_ = loadError_;
   emit changed();
+}
+
+void AccessController::checkIdle() {
+  if (!instructor()) return;
+  const Ns now = clock_();
+  if (onAir()) lastInput_ = now;
+  if (now - lastInput_ < idleLimit_) return;
+  role_ = Role::None;
+  message_ = tr("The instructor was logged out: no input for %1 min.").arg(idleLimit_ / ms(60'000));
+  emit changed();
+}
+
+bool AccessController::eventFilter(QObject* o, QEvent* e) {
+  switch (e->type()) {
+    case QEvent::KeyPress:
+    case QEvent::MouseButtonPress:
+    case QEvent::MouseMove:
+    case QEvent::Wheel:
+    case QEvent::TouchBegin:
+    case QEvent::TouchUpdate: lastInput_ = clock_(); break;
+    default: break;
+  }
+  return QObject::eventFilter(o, e);
 }
 
 bool AccessController::loginTrainee(const QString& id) {
@@ -107,6 +134,7 @@ void AccessController::pinChecked(bool ok) {
   guard_.succeeded();
   if (transmitting()) return;  // a press during the check
   role_ = Role::Instructor;
+  lastInput_ = clock_();
   id_.clear();
   message_.clear();
   emit changed();

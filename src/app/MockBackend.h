@@ -40,6 +40,7 @@ class MockBackend : public QObject {
     access_ = a;
     recordings_ = r;
     r->setConnected();
+    r->setPlayer([this](std::vector<std::int16_t>, int) { lab_->setNotice(LabController::Caution, tr("Mock backend: no audio playback.")); });
   }
   void setAssessed(bool on);
   void setConsent(bool on);

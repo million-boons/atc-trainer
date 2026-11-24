@@ -70,6 +70,7 @@ RecordingBackend realRecordings([[maybe_unused]] const std::string& writable, [[
   b.save = [store](StoredRecording r, std::vector<std::int16_t> a) { store->save(std::move(r), std::move(a)); };
   b.addResult = [store](const std::string& key, StoredResult r) { store->addResult(key, std::move(r)); };
   b.list = [store](std::size_t max, std::function<void(std::vector<StoredRecording>, int)> done) { store->list(max, std::move(done)); };
+  b.loadAudio = [store](const std::string& key, std::function<void(std::optional<std::vector<std::int16_t>>)> done) { store->loadAudio(key, std::move(done)); };
   b.remove = [store](const std::string& key, const std::string& role, std::function<void(const std::string&)> done) { store->remove(key, role, std::move(done)); };
 #endif
   return b;
@@ -92,6 +93,7 @@ RecordingBackend mockRecordings(RecordingsController& c) {
   b.list = [all](std::size_t max, std::function<void(std::vector<StoredRecording>, int)> done) {
     done({all->begin(), all->begin() + std::ptrdiff_t(std::min(max, all->size()))}, 0);
   };
+  b.loadAudio = [](const std::string&, std::function<void(std::optional<std::vector<std::int16_t>>)> done) { done(std::vector<std::int16_t>(16000)); };
   b.remove = [all](const std::string& key, const std::string&, std::function<void(const std::string&)> done) {
     std::erase_if(*all, [&](const StoredRecording& r) { return r.key == key; });
     done("");

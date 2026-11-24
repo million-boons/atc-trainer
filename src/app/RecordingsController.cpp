@@ -107,6 +107,20 @@ void RecordingsController::refreshStored() {
   });
 }
 
+void RecordingsController::playStored(int row) {
+  if (!canPlay() || row < 0 || row >= stored_.rowCount()) return;
+  message_.clear();
+  emit changed();
+  b_.loadAudio(stored_.row(row)[0].toString().toStdString(), [this](std::optional<std::vector<std::int16_t>> a) {
+    QMetaObject::invokeMethod(this, [this, a = std::move(a)] {
+      if (!canPlay()) return;  // logged out meanwhile
+      if (a && !a->empty()) return play_(*a, 16000);
+      message_ = tr("Not played: the sound cannot be read");
+      emit changed();
+    }, Qt::QueuedConnection);
+  });
+}
+
 void RecordingsController::deleteStored(int row) {
   if (!canDelete() || !b_.remove || row < 0 || row >= stored_.rowCount()) return;
   const std::string key = stored_.row(row)[0].toString().toStdString();

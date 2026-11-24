@@ -2,7 +2,8 @@ import QtQuick
 import Atc
 
 // chips: list of {name, value, level}. scenario: active scenario name; it is shortened when the chips
-// need the space. mock: show MOCK. login: who is logged in, short; loginAsked(): its button.
+// need the space. mock: show MOCK. login: who is logged in, short; loginAsked(): its button;
+// loggedIn: show Log out; logoutAsked(). The app name gives way last, so that nothing overlaps.
 Rectangle {
     id: bar
     property var chips: []
@@ -11,7 +12,11 @@ Rectangle {
     property string login
     property string loginLong
     property bool loginEnabled: true
+    property bool loggedIn: false
     signal loginAsked()
+    signal logoutAsked()
+    // Width the right part needs without the scenario name.
+    readonly property int fixedW: clock.width + loginBtn.width + (loggedIn ? logoutBtn.width + Theme.s8 : 0) + (mock ? mockTag.width + Theme.s8 : 0) + 2 * Theme.s8
     color: Theme.surface
     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: Theme.line; color: Theme.border }
 
@@ -19,6 +24,7 @@ Rectangle {
         id: name
         x: Theme.s12
         height: parent.height
+        width: Math.max(Theme.px(80), Math.min(implicitWidth, bar.width - chipRow.width - bar.fixedW - 3 * Theme.s12))
         text: qsTr("MILITARY ATC TRAINING SIMULATOR")
         font { pixelSize: Theme.small; weight: Font.DemiBold }
     }
@@ -36,8 +42,7 @@ Rectangle {
         spacing: Theme.s8
         Tag { id: mockTag; visible: bar.mock; text: qsTr("MOCK"); anchors.verticalCenter: parent.verticalCenter }
         Label { text: bar.scenario; color: Theme.textSecondary; font.pixelSize: Theme.caption
-                width: Math.max(0, Math.min(implicitWidth, bar.width - chipRow.x - chipRow.width - clock.width
-                       - (bar.mock ? mockTag.width + Theme.s8 : 0) - loginBtn.width - Theme.s12 - 3 * Theme.s8))
+                width: Math.max(0, Math.min(implicitWidth, bar.width - chipRow.x - chipRow.width - bar.fixedW - 2 * Theme.s12))
                 anchors.verticalCenter: parent.verticalCenter }
         BaseButton {
             id: loginBtn
@@ -49,6 +54,17 @@ Rectangle {
             contentItem: Label { id: loginText; text: bar.login; color: bar.loginEnabled ? Theme.textPrimary : Theme.textMuted; horizontalAlignment: Text.AlignHCenter
                                  font { pixelSize: Theme.caption; weight: Font.DemiBold } }
         }
+        BaseButton {
+            id: logoutBtn
+            visible: bar.loggedIn
+            width: logoutText.implicitWidth + 2 * Theme.s8
+            enabled: bar.loginEnabled
+            focusPolicy: Qt.NoFocus
+            onClicked: bar.logoutAsked()
+            Accessible.name: qsTr("Log out")
+            contentItem: Label { id: logoutText; text: qsTr("Log out"); color: bar.loginEnabled ? Theme.textPrimary : Theme.textMuted
+                                 horizontalAlignment: Text.AlignHCenter; font.pixelSize: Theme.caption }
+        }
         Label {
             id: clock
             mono: true
@@ -57,7 +73,7 @@ Rectangle {
             function refresh() {
                 var d = new Date()
                 function z(n) { return String(n).padStart(2, "0") }
-                text = z(d.getUTCHours()) + ":" + z(d.getUTCMinutes()) + ":" + z(d.getUTCSeconds()) + "Z "
+                text = z(d.getUTCHours()) + ":" + z(d.getUTCMinutes()) + ":" + z(d.getUTCSeconds()) + "Z\n"
                      + z(d.getHours()) + ":" + z(d.getMinutes()) + "L"
             }
             Component.onCompleted: refresh()

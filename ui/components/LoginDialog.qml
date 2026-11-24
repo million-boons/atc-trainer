@@ -1,7 +1,7 @@
 import QtQuick
 import Atc
 
-// Login (04 section 5b). closed(): the dialog is to be removed. PTT keeps working behind it.
+// Login (04 section 5b). Opens with the last message, e.g. why somebody was logged out. closed(): the dialog is to be removed. PTT keeps working behind it.
 ModalPanel {
     id: d
     property AccessController access
@@ -9,7 +9,6 @@ ModalPanel {
     property string chosen: access.personId
     signal closed()
     title: qsTr("Log in")
-    Component.onCompleted: access.clearMessage()
     Connections { target: d.access; function onLoggedIn() { d.closed() } }
     function go() {
         if (instructor) { access.loginInstructor(pin.text); pin.text = "" }
@@ -24,7 +23,7 @@ ModalPanel {
                    onClicked: { d.instructor = true; pin.take() } }
     // Fixed height: the dialog does not change size with the choice.
     Item {
-        width: parent.width; height: Theme.px(116)
+        width: parent.width; height: pad.fullH
         Flickable {
             anchors.fill: parent
             visible: !d.instructor
@@ -42,7 +41,16 @@ ModalPanel {
                 Label { visible: d.access.people.length === 0; text: qsTr("No trainee records yet. The instructor adds them in Settings."); color: Theme.textSecondary }
             }
         }
-        TextEntry { id: pin; width: parent.width; visible: d.instructor; label: qsTr("PIN"); secret: true; maximumLength: 12
+        KeyPad {
+            id: pad
+            anchors.right: parent.right
+            visible: d.instructor
+            enabled: !d.access.busy
+            onKey: (digit) => { if (pin.text.length < 12) pin.text += digit }
+            onErase: pin.text = pin.text.slice(0, -1)
+            onClear: pin.text = ""
+        }
+        TextEntry { id: pin; width: parent.width - pad.fullW - Theme.s16; visible: d.instructor; label: qsTr("PIN (6 to 12 digits)"); secret: true; maximumLength: 12
                     validator: RegularExpressionValidator { regularExpression: /[0-9]*/ }
                     onAccepted: if (!d.access.busy) d.go() }
     }

@@ -13,7 +13,8 @@ Card {
     headerItems: Label { anchors.fill: parent; horizontalAlignment: Text.AlignRight; font.pixelSize: Theme.caption
                          text: c.storedView ? qsTr("%1 stored").arg(storedList.count) : qsTr("%1 shown").arg(recList.count) }
     Label { x: Theme.s12; y: Theme.s4; width: parent.width - 2 * x; height: Theme.px(24); font { pixelSize: Theme.small; weight: Font.DemiBold }
-            text: !c.storedView ? c.recs.speakerText : c.recs.message || (c.recs.canDelete ? qsTr("Stored recordings") : qsTr("Stored. Delete: instructor only")) }
+            text: !c.storedView ? c.recs.speakerText : c.recs.message || (!c.recs.playerReady ? qsTr("Playback after merge") : c.recs.canDelete ? qsTr("Stored recordings")
+                                                                                             : qsTr("Play and delete: instructor only")) }
     StateIcon { id: li; x: Theme.s12; y: Theme.px(36); level: c.recs.lineLevel }
     Label { x: Theme.px(32); y: Theme.px(30); width: parent.width - x - Theme.s12; height: Theme.px(24); text: c.recs.lineText; font.pixelSize: Theme.small }
     Rectangle { y: Theme.px(58); width: parent.width; height: Theme.line; color: Theme.divider }
@@ -90,19 +91,30 @@ Card {
     Row {
         x: Theme.s12; y: parent.height - Theme.px(57)
         spacing: Theme.s8
-        readonly property int half: (parent.width - 2 * Theme.s12 - Theme.s8) / 2
+        readonly property int third: (parent.width - 2 * Theme.s12 - 2 * Theme.s8) / 3
         SecondaryButton {
-            width: parent.half
+            width: parent.third
+            font.pixelSize: Theme.small
             focusPolicy: Qt.NoFocus
-            text: c.storedView ? qsTr("This session") : recList.atYEnd ? qsTr("Stored") : qsTr("Older")
+            text: c.storedView ? qsTr("Session") : recList.atYEnd ? qsTr("Stored") : qsTr("Older")
             onClicked: {
                 if (!c.storedView && !recList.atYEnd)
                     recList.contentY = Math.min(recList.contentY + recList.height, Math.max(0, recList.contentHeight - recList.height))
                 else { c.storedView = !c.storedView; if (c.storedView) c.recs.refreshStored() }
             }
         }
+        SecondaryButton {
+            width: parent.third
+            font.pixelSize: Theme.small
+            focusPolicy: Qt.NoFocus
+            text: qsTr("Play")
+            enabled: c.storedView && c.recs.canPlay && c.storedRow >= 0
+            Accessible.description: qsTr("Stored recordings, instructor only")
+            onClicked: c.recs.playStored(c.storedRow)
+        }
         DangerButton {
-            width: parent.half
+            width: parent.third
+            font.pixelSize: Theme.small
             focusPolicy: Qt.NoFocus
             text: qsTr("Delete")
             enabled: c.storedView && c.recs.canDelete && c.storedRow >= 0

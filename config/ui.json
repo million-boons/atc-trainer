@@ -9,6 +9,7 @@
   "pttName": "mouse stand-in",
   "pttGrab": false,
   "micSource": "",
+  "instructorIdleMinutes": 10,
   "sideTone": true,
   "sideToneMs": 20,
   "sideToneHz": 1000,

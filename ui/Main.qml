@@ -16,7 +16,7 @@ Window {
     required property bool reduceMotion
     property string screen_: "lab"
     property bool loginOpen: false
-    onLoginOpenChanged: { lab.releaseRequested("SPACE"); if (!loginOpen) shell.forceActiveFocus() }
+    onLoginOpenChanged: { lab.releaseRequested("SPACE"); if (!loginOpen) { access.clearMessage(); shell.forceActiveFocus() } }
     // Package 3b connects the live one. Until then a live build has no Exercise and no Result screen.
     readonly property ExerciseController ex: mock ? mock.exercise : null
     readonly property bool exActive: ex !== null && ex.active
@@ -82,7 +82,9 @@ Window {
             mock: root.mock !== null
             login: root.access.shortText; loginLong: root.access.longText
             loginEnabled: !root.exActive   // the trainee of an exercise does not change during it
+            loggedIn: root.access.trainee || root.access.instructor
             onLoginAsked: root.loginOpen = true
+            onLogoutAsked: if (!root.access.logout()) root.loginOpen = true   // the dialog says why
         }
         NavRail {
             id: nav

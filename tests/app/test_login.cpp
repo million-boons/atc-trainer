@@ -2,6 +2,7 @@
 
 #include <QCoreApplication>
 #include <QElapsedTimer>
+#include <QEvent>
 #include <QFile>
 #include <QTemporaryDir>
 #include <memory>
@@ -23,6 +24,8 @@ struct Login : testing::Test {
   std::vector<StoredRecording> saved;
   std::vector<std::pair<std::string, std::string>> results, removals;
   std::string removeAnswer;
+  std::vector<std::pair<std::size_t, int>> plays;
+  bool soundThere = true;
 
   void SetUp() override {
     AccessBackend b;
@@ -45,12 +48,17 @@ struct Login : testing::Test {
     rb.save = [this](StoredRecording x, std::vector<std::int16_t>) { saved.push_back(std::move(x)); };
     rb.addResult = [this](const std::string& k, StoredResult x) { results.emplace_back(k, x.text); };
     rb.list = [this](std::size_t, std::function<void(std::vector<StoredRecording>, int)> done) { done(saved, 0); };
+    rb.loadAudio = [this](const std::string&, std::function<void(std::optional<std::vector<std::int16_t>>)> done) {
+      if (soundThere) done(std::vector<std::int16_t>(5));
+      else done(std::nullopt);
+    };
     rb.remove = [this](const std::string& k, const std::string& role, std::function<void(const std::string&)> done) {
       removals.emplace_back(k, role);
       done(removeAnswer);
     };
     r->setBackend(rb);
     r->setConnected();
+    r->setPlayer([this](std::vector<std::int16_t> a, int rate) { plays.emplace_back(a.size(), rate); });
   }
   void TearDown() override {
     r.reset();
@@ -131,6 +139,62 @@ TEST_F(Login, OnlyListedTraineesAndOnlyTheInstructorManages) {
   EXPECT_TRUE(a->people()[0].toMap().contains("name"));
   EXPECT_TRUE(a->addPerson(" S03 ", "", "", true, "2026-11-24"));
   EXPECT_EQ(people.back().id, "S03");
+}
+
+TEST_F(Login, IdleInstructorIsLoggedOut) {  // D-120
+  a->setIdleLimit(ms(600'000));
+  pin("482913");
+  now += ms(599'000);
+  a->checkIdle();
+  EXPECT_TRUE(a->instructor());
+  QEvent key(QEvent::KeyPress);
+  a->eventFilter(&lab, &key);
+  now += ms(599'000);
+  a->checkIdle();
+  EXPECT_TRUE(a->instructor());
+  lab.setTx(TxDisplay::Tx, 1);  // never during a transmission, which counts as input
+  now += ms(599'000);
+  a->checkIdle();
+  EXPECT_TRUE(a->instructor());
+  lab.setTx(TxDisplay::Idle, 1);
+  now += ms(600'000);
+  a->checkIdle();
+  EXPECT_EQ(a->role(), Role::None);
+  EXPECT_TRUE(a->message().contains("10 min"));
+}
+
+TEST_F(Login, ATraineeIsNotLoggedOutByTime) {
+  a->loginTrainee("S01");
+  now += ms(7'200'000);
+  a->checkIdle();
+  EXPECT_TRUE(a->trainee());
+}
+
+TEST_F(Login, StoredSoundIsForTheInstructorAndDeleteNeedsThePlayer) {  // D-120
+  a->loginTrainee("S01");
+  offer(1);
+  r->refreshStored();
+  drain();
+  r->playStored(0);
+  drain();
+  EXPECT_TRUE(plays.empty());
+  pin("482913");
+  r->playStored(0);
+  drain();
+  ASSERT_EQ(plays.size(), 1u);
+  EXPECT_EQ(plays[0].second, 16000);
+  soundThere = false;
+  r->playStored(0);
+  drain();
+  EXPECT_EQ(plays.size(), 1u);
+  EXPECT_TRUE(r->message().contains("Not played"));
+  EXPECT_TRUE(r->canDelete());
+  r->setPlayer({});
+  EXPECT_FALSE(r->playerReady());
+  EXPECT_FALSE(r->canDelete());
+  r->deleteStored(0);
+  drain();
+  EXPECT_TRUE(removals.empty());
 }
 
 TEST_F(Login, ConsentTextNamesTheLocalNetworkAndNoCloud) {  // D-114
