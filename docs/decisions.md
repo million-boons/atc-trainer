@@ -80,6 +80,8 @@
 | D-412 | 2026-11-24 | Q-1: voice recordings may be copied panel → PC over the LAN only: rsync over ssh, one-way, logged. On the PC they live in one folder outside git, with no cloud sync on it and local access only. Amends D-44. | User |
 | D-413 | 2026-11-24 | `en_US-norman-medium` approved as the placeholder pilot voice. Piper and the voice model are PC-only tools and are not shipped. Completes D-404. | User |
 | D-414 | 2026-11-24 | Corrects D-406: the slice model is Whisper tiny with the **generated** prompt, id `whisper-tiny-genprompt` (added by package 0b), not `whisper-tiny-prompt`. The rest of D-406 stays: locked per exercise (D-39), one clean timing run on the idle panel before the demo. | User (ruling, `docs/status/briefs-2026-11-24.md` on branch `audit`) |
+| D-415 | 2026-11-24 | G1 does not wait for package 1c. G1 needs only 1a and 1b. | User |
+| D-416 | 2026-11-24 | The 0c event log header carries the exercise mode (Practice/Assessed) and a trainee ID code (not a name; empty until A-5 is answered), alongside the speech model id and configuration (D-39). | User |
 
 ## Check results
 
