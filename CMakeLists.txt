@@ -115,6 +115,12 @@ else()
   message(STATUS "speech engines not found: run tools/fetch_stt.sh to build stt_bench")
 endif()
 
+add_subdirectory(src/parser)
+add_subdirectory(src/scenario)
+add_subdirectory(src/engine)
+add_subdirectory(src/voice)
+add_subdirectory(src/runtime)
+
 # Qt UI (needs qt6-base-dev, qt6-declarative-dev and the qml6-module-qtquick* packages).
 option(ATC_BUILD_UI "Build the Qt UI if Qt 6 is installed" ON)
 if(ATC_BUILD_UI)
@@ -136,6 +142,7 @@ if(ATC_BUILD_TESTS)
   target_link_libraries(logic_tests PRIVATE atc_logic GTest::gtest_main Threads::Threads)
   include(GoogleTest)
   gtest_discover_tests(logic_tests)
+  add_subdirectory(tests/contracts)
   if(TARGET atc_storage)
     add_executable(storage_tests tests/test_storage.cpp)
     target_link_libraries(storage_tests PRIVATE atc_storage GTest::gtest_main)
@@ -150,7 +157,7 @@ endif()
 
 # cmake --install build --prefix DIR --strip. Models and audio are copied by rsync, never from here (D-31).
 foreach(T atc_trainer ptt_monitor audio_probe ptt_record ptt_text stt_bench phrase_gen script_gen
-        logic_tests storage_tests stt_tests)
+        logic_tests contract_tests storage_tests stt_tests)
   if(TARGET ${T})
     install(TARGETS ${T} RUNTIME DESTINATION bin)
   endif()
