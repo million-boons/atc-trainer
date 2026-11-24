@@ -30,7 +30,7 @@ class FakeEngine : public ISpeechRecognizer {
     return r;
   }
 };
-const char* const kScriptModel = "whisper-tiny-prompt";
+const char* const kScriptModel = "whisper-tiny-genprompt";
 }  // namespace
 
 std::unique_ptr<ISpeechRecognizer> MockBackend::fakeEngine(const SttModel&, std::string&) {
@@ -54,6 +54,42 @@ MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs,
             if (tx >> 32 != epoch_) return;
             showFinal(tx & 0xffffffffu, text, words, conf, tr("%1  %2 s").arg(model).arg(sec, 0, 'f', 2), config);
           });
+  connect(&status_, &StatusFeed::micTestRequested, this, [this] {
+    micTestTicks_ = 50;  // 5 s
+    statusTimer_.start();
+    statusTick();
+  });
+  connect(&status_, &StatusFeed::toneRequested, this, [this] {
+    StatusInputs s = status_.inputs();
+    s.speaker = SpeakerReady::Ok;
+    s.speakerNote = tr("mock: no sound played");
+    status_.set(std::move(s));
+    lab_->setChip(LabController::Speaker, tr("OK"), LabController::Ok);
+  });
+  connect(&status_, &StatusFeed::pttTestRequested, this, [this] {
+    pttTestTicks_ = 100;  // 10 s to press
+    testHold_.invalidate();
+    StatusInputs s = status_.inputs();
+    s.pttTesting = true;
+    s.pttNote = tr("Hold for 2 s (Space in the mock)");
+    status_.set(std::move(s));
+    statusTimer_.start();
+  });
+  connect(&status_, &StatusFeed::cancelTestsRequested, this, [this] {
+    micTestTicks_ = 0;
+    if (status_.inputs().pttTesting) endPttTest({});
+    statusTick();
+  });
+  connect(&status_, &StatusFeed::stopExerciseRequested, this, [this] {
+    StatusInputs s = status_.inputs();
+    s.running = false;
+    status_.set(std::move(s));
+    SttStatus st = stt_->status();
+    st.locked = false;
+    stt_->showScripted(st);
+  });
+  statusTimer_.setInterval(100);
+  connect(&statusTimer_, &QTimer::timeout, this, &MockBackend::statusTick);
   timer_.setTimerType(Qt::PreciseTimer);
   timer_.setInterval(20);
   connect(&timer_, &QTimer::timeout, this, [this] {
@@ -74,7 +110,9 @@ QVariantList MockBackend::scripts() const {
       {"cut", "PILOT CUT (interrupt)"}, {"blocked", "BLOCKED (rule block)"},
       {"queued", "WAIT (rule queue)"}, {"queueopen", "Queued, then TX"}, {"queuedrop", "Queued, dropped"}, {"queuetalk", "Queued, talked too soon"}, {"ptimeout", "Pilot voice timeout"},
       {"mloading", "Model LOADING"}, {"mfailed", "Model FAILED"}, {"mother", "Other model selected"}, {"mlocked", "Model locked"},
-      {"vloaded", "Bank loaded"}, {"vok", "Bank coverage OK"}, {"vmissing", "Bank missing clips"}, {"vfailed", "Bank failed"}};
+      {"vloaded", "Bank loaded"}, {"vok", "Bank coverage OK"}, {"vmissing", "Bank missing clips"}, {"vfailed", "Bank failed"},
+      {"dash", "Dashboard: not ready"}, {"dashready", "Dashboard: all ready"}, {"dashrun", "Dashboard: running"},
+      {"dashfault", "Dashboard: faults"}};
   QVariantList l;
   for (auto [id, name] : all) l.append(QVariantMap{{"id", id}, {"name", name}});
   return l;
@@ -209,7 +247,7 @@ void MockBackend::restart() {
     LabRecording rec;
     rec.id = id;
     rec.text = text;
-    if (*text) rec.resultInfo = tr("Whisper tiny + prompt  0.34 s");
+    if (*text) rec.resultInfo = tr("Whisper tiny + generated prompt  0.34 s");
     rec.audio = synth(p - kCfg.preRoll, r + kCfg.tail, p, r);
     rec.checks = checksFor(rec.audio, int(kCfg.preRoll * kRate / 1'000'000'000), TxEnd::Normal).list;
     const double total = held + .5;
@@ -234,17 +272,14 @@ void MockBackend::run(const QString& id) {
   SttStatus st;
   st.state = SttState::Ready;
   st.modelId = kScriptModel;
-  if (id == "idle") st = SttStatus{};
+  if (id == "idle" || id == "dash") st = SttStatus{};
   if (id == "recog") st.state = SttState::Busy;
   if (id == "mloading") st.state = SttState::Loading;
-  if (id == "mfailed") { st.state = SttState::Failed; st.message = "not enough memory: 210 MB free, 325 MB needed"; }
+  if (id == "mfailed" || id == "dashfault") { st.state = SttState::Failed; st.message = "not enough memory: 210 MB free, 325 MB needed"; }
   if (id == "mother") st.modelId = "vosk-grammar";
-  if (id == "mlocked") st.locked = true;
+  if (id == "mlocked" || id == "dashrun") st.locked = true;
   stt_->showScripted(st);
-  if (id == "vloaded") lab_->setVoiceBank(LabController::Bank::Loaded);
-  if (id == "vok") lab_->setVoiceBank(LabController::Bank::CoverageOk);
-  if (id == "vmissing") lab_->setVoiceBank(LabController::Bank::MissingClips, 12);
-  if (id == "vfailed") lab_->setVoiceBank(LabController::Bank::Failed);
+  setStatusCase(id);
   double freeze = 200;
   const auto talk = [&](double release) {
     at(1000, [this] { edge(1000, "RIGHT", true); });
@@ -279,6 +314,7 @@ void MockBackend::run(const QString& id) {
     lab_->setNotice(LabController::Fault, tr("Microphone sends pure silence. Check the mute key on the headset."));
     lab_->setAlert(LabController::Fault, tr("Mic: no signal (headset mute?)"));
   }
+  else if (id == "dashfault") { muted_ = true; present_ = false; }
   else if (id == "rx") { pilot(); freeze = 1500; }
   else if (id == "ptimeout") { pilotHangs_ = true; pilot(); freeze = 21000; }
   else if (id == "cut") {
@@ -322,7 +358,83 @@ void MockBackend::livePilot(const QString& rule) {
   publish();
 }
 
+void MockBackend::setStatusCase(const QString& id) {
+  micTestTicks_ = pttTestTicks_ = 0;
+  statusTimer_.stop();
+  testHold_.invalidate();
+  const bool ready = id == "dashready" || id == "dashrun", fault = id == "dashfault";
+  StatusInputs s;
+  s.mic = id == "muted" || fault ? MicReady::Muted : MicReady::Ok;
+  s.micName = tr("H540 (simulated)");
+  s.micDbfs = s.mic == MicReady::Muted ? -120 : -12;
+  s.speaker = ready ? SpeakerReady::Ok : SpeakerReady::NotChecked;
+  s.speakerName = tr("H540 (simulated)");
+  s.ptt = id == "lost" || fault ? PttReady::Missing : id == "pulse" ? PttReady::NoHold : ready ? PttReady::Ok : PttReady::StandIn;
+  s.pttName = s.ptt == PttReady::Missing ? tr("no device") : ready ? tr("Foot pedal (simulated)") : tr("Dell mouse (simulated)");
+  s.bank = id == "vloaded" ? BankReady::Loaded
+           : id == "vok" || ready ? BankReady::CoverageOk
+           : id == "vmissing" || id == "dash" ? BankReady::MissingClips
+           : id == "vfailed" || fault ? BankReady::Failed : BankReady::NotLoaded;
+  if (s.bank == BankReady::MissingClips)
+    for (int i = 1; i <= 12; ++i) s.missingClips << tr("PLACEHOLDER_CLIP_%1").arg(i, 2, 10, QChar('0'));
+  s.storage = fault ? StorageReady::Low : StorageReady::Ok;
+  s.storageFree = fault ? tr("0.8 GB free") : tr("94 GB free");
+  s.running = id == "dashrun";
+  s.scenario = QVariantMap{{"name", tr("Departure 01")}, {"summary", tr("Taxi, line up, takeoff")}, {"callsign", "EAGLE-421"},
+                {"type", "C295"}, {"runway", "09"}, {"taxiway", "A3"}, {"rule", tr("interrupt")}, {"steps", 3},
+                {"sop", QString()}, {"placeholder", true}};
+  switch (s.bank) {
+    case BankReady::Loaded: lab_->setVoiceBank(LabController::Bank::Loaded); break;
+    case BankReady::CoverageOk: lab_->setVoiceBank(LabController::Bank::CoverageOk); break;
+    case BankReady::MissingClips: lab_->setVoiceBank(LabController::Bank::MissingClips, int(s.missingClips.size())); break;
+    case BankReady::Failed: lab_->setVoiceBank(LabController::Bank::Failed); break;
+    case BankReady::NotLoaded: lab_->setVoiceBank(LabController::Bank::NotLoaded); break;
+  }
+  if (id.startsWith("dash") && s.speaker == SpeakerReady::NotChecked)
+    lab_->setChip(LabController::Speaker, tr("NOT CHECKED"), LabController::Caution);
+  status_.set(std::move(s));
+}
+
+void MockBackend::statusTick() {
+  StatusInputs s = status_.inputs();
+  if (micTestTicks_ > 0) --micTestTicks_;
+  s.micTestLeft = (micTestTicks_ + 9) / 10;
+  if (s.mic == MicReady::Ok) s.micDbfs = micTestTicks_ > 0 ? -12 + 4 * std::sin(micTestTicks_ * 0.7) : -12;
+  const bool expired = s.pttTesting && !testHold_.isValid() && --pttTestTicks_ <= 0;
+  status_.set(std::move(s));
+  if (expired) endPttTest(tr("No press seen"));
+  if (micTestTicks_ == 0 && !status_.inputs().pttTesting) statusTimer_.stop();
+}
+
+// PTT test on the Dashboard: measures the hold, never opens a transmission.
+void MockBackend::testEdge(bool down) {
+  if (down) {
+    if (testHold_.isValid()) return;
+    testHold_.start();
+    StatusInputs s = status_.inputs();
+    s.pttDown = true;
+    s.pttNote = tr("RIGHT: DOWN, keep holding");
+    status_.set(std::move(s));
+  } else if (testHold_.isValid()) {
+    const double held = double(testHold_.elapsed()) / 1000;
+    endPttTest(held >= 2 ? tr("Held %1 s: OK").arg(held, 0, 'f', 2) : tr("Held %1 s: too short").arg(held, 0, 'f', 2));
+  }
+}
+
+void MockBackend::endPttTest(const QString& note) {
+  testHold_.invalidate();
+  pttTestTicks_ = 0;
+  StatusInputs s = status_.inputs();
+  s.pttTesting = s.pttDown = false;
+  s.pttNote = note;
+  status_.set(std::move(s));
+}
+
 void MockBackend::userEdge(const QString& src, bool down) {
+  if (status_.inputs().pttTesting) {
+    testEdge(down);
+    return;
+  }
   if (frozen_) {
     if (!down) return;
     run("idle");

@@ -10,6 +10,7 @@
 
 #include "app/LabChecks.h"
 #include "app/LabController.h"
+#include "app/StatusFeed.h"
 #include "app/SttController.h"
 #include "ptt/PttInputManager.h"
 
@@ -21,10 +22,12 @@ class MockBackend : public QObject {
   QML_UNCREATABLE("created in C++")
   Q_PROPERTY(QVariantList scripts READ scripts CONSTANT)
   Q_PROPERTY(QString current READ current NOTIFY currentChanged)
+  Q_PROPERTY(StatusFeed* status READ status CONSTANT)
  public:
   MockBackend(LabController* lab, SttController* stt, int pilotCutMs, QObject* parent = nullptr);
   QVariantList scripts() const;
   QString current() const { return current_; }
+  StatusFeed* status() { return &status_; }
   // Fast-forwards a scripted case and freezes it there until the next press.
   Q_INVOKABLE void run(const QString& id);
   // Live: the mock pilot starts speaking now under this rule (interrupt, block, queue).
@@ -37,6 +40,10 @@ class MockBackend : public QObject {
   void currentChanged();
 
  private:
+  void setStatusCase(const QString& id);  // Dashboard values for a scripted case
+  void statusTick();                      // 100 ms, running tests only
+  void testEdge(bool down);
+  void endPttTest(const QString& note);
   struct Speech { double startMs = 320, endBeforeReleaseMs = 350, gain = 0.292  /* about -12 dBFS */; };
   void goLive();
   void restart();
@@ -59,6 +66,10 @@ class MockBackend : public QObject {
   bool sttOpen_ = false;      // the service accepted this transmission
   int pilotCutMs_;
   QTimer timer_;
+  StatusFeed status_;
+  QTimer statusTimer_;
+  QElapsedTimer testHold_;
+  int micTestTicks_ = 0, pttTestTicks_ = 0;
   QElapsedTimer wall_;
   atc::Ns wallBase_ = 0, now_ = 0, lastMeter_ = 0;
   bool frozen_ = false;

@@ -20,11 +20,13 @@ qt_add_qml_module(atc_trainer
     components/TxRxIndicator.qml components/LevelMeter.qml components/ConfidenceBar.qml
     components/Waveform.qml components/CheckCell.qml components/PttButtonTile.qml
     components/ModelSelector.qml
-    screens/SpeechLab.qml
+    components/DangerButton.qml components/StatusTile.qml components/ConfirmDialog.qml
+    screens/SpeechLab.qml screens/Dashboard.qml
     mock/MockPanel.qml
   SOURCES
     ${APP}/RowModel.h ${APP}/LabController.h ${APP}/LabController.cpp
     ${APP}/SttController.h ${APP}/SttController.cpp
+    ${APP}/StatusFeed.h ${APP}/DashboardController.h ${APP}/DashboardController.cpp
     ${APP}/LabChecks.h ${APP}/LabChecks.cpp
     ${APP}/Painted.h ${APP}/Painted.cpp ${APP}/MockBackend.h ${APP}/MockBackend.cpp)
 
