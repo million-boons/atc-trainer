@@ -94,5 +94,5 @@ class DashboardController : public QObject {
   QStringList reasons_;
   bool startEnabled_ = false, fallback_ = false;
   int readyLevel_ = 0, alertLevel_ = 0;
-  QString readyAlert_, alert_;
+  QString readyAlert_, readyShort_, alert_;  // readyShort_: beside another alert
 };

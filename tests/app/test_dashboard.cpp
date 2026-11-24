@@ -166,6 +166,7 @@ TEST_F(Dash, ExerciseAlertJoinsTheFooter) {
   EXPECT_EQ(d.alertLevel(), int(LabController::Fault));
   EXPECT_TRUE(d.alert().startsWith("Line up: attempt 1 INCORRECT"));
   EXPECT_TRUE(d.alert().contains("PTT missing"));
+  EXPECT_FALSE(d.alert().contains("Exercise running"));  // it may be paused
 }
 
 TEST_F(Dash, LevelMeterDoesNotRedrawTheChips) {

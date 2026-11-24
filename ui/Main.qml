@@ -95,15 +95,15 @@ Window {
             current: root.screen_
             onActivated: (id) => root.screen_ = id
             entries: [
-                { id: "dash", name: qsTr("Dashboard"), enabled: !root.exActive, why: nav.busy, icon: "M 3 3 L 9 3 L 9 9 L 3 9 Z M 11 3 L 17 3 L 17 9 L 11 9 Z M 3 11 L 9 11 L 9 17 L 3 17 Z M 11 11 L 17 11 L 17 17 L 11 17 Z" },
+                { id: "dash", name: qsTr("Dashboard"), enabled: !root.exActive, off: true, why: nav.busy, icon: "M 3 3 L 9 3 L 9 9 L 3 9 Z M 11 3 L 17 3 L 17 9 L 11 9 Z M 3 11 L 9 11 L 9 17 L 3 17 Z M 11 11 L 17 11 L 17 17 L 11 17 Z" },
                 { id: "scen", name: qsTr("Scenarios"), enabled: false, why: qsTr("Not part of the first exercise. No package is planned for this screen yet."),
                   icon: "M 4 5 L 16 5 M 4 10 L 16 10 M 4 15 L 16 15" },
-                { id: "ex", name: qsTr("Exercise"), enabled: root.exActive, why: root.ex ? qsTr("No exercise is running. Mock: press M and choose an Exercise case.") : qsTr("Available after the first exercise works (package 3b)."),
+                { id: "ex", name: qsTr("Exercise"), enabled: root.exActive, off: root.ex !== null, why: root.ex ? qsTr("No exercise is running. Mock: press M and choose an Exercise case.") : qsTr("Available after the first exercise works (package 3b)."),
                   icon: "M 6 4 L 16 10 L 6 16 Z" },
-                { id: "lab", name: qsTr("Speech Lab"), enabled: !root.exActive, why: nav.busy, icon: "M 7 3 L 13 3 L 13 11 L 7 11 Z M 4 9 L 4 14 L 16 14 L 16 9 M 10 14 L 10 18" },
-                { id: "ass", name: qsTr("Assessment"), enabled: root.exResult, why: root.exActive ? nav.busy : root.ex ? qsTr("No result yet. Mock: press M and choose a RESULT case.") : qsTr("Available after the first exercise works (package 3b)."),
+                { id: "lab", name: qsTr("Speech Lab"), enabled: !root.exActive, off: true, why: nav.busy, icon: "M 7 3 L 13 3 L 13 11 L 7 11 Z M 4 9 L 4 14 L 16 14 L 16 9 M 10 14 L 10 18" },
+                { id: "ass", name: qsTr("Assessment"), enabled: root.exResult, off: root.ex !== null, why: root.exActive ? nav.busy : root.ex ? qsTr("No result yet. Mock: press M and choose a RESULT case.") : qsTr("Available after the first exercise works (package 3b)."),
                   icon: "M 4 16 L 4 10 M 10 16 L 10 4 M 16 16 L 16 8" },
-                { id: "set", name: qsTr("Settings"), enabled: !root.exActive, why: nav.busy,
+                { id: "set", name: qsTr("Settings"), enabled: !root.exActive, off: true, why: nav.busy,
                   icon: "M 3 6 L 17 6 M 13 4 L 13 8 M 3 14 L 17 14 M 7 12 L 7 16" }
             ]
         }
@@ -115,7 +115,7 @@ Window {
         Loader {
             anchors { top: status.bottom; bottom: alert.top; left: nav.right; right: parent.right }
             active: root.screen_ === "dash"
-            sourceComponent: Component { Dashboard { dash: dashCtl } }
+            sourceComponent: Component { Dashboard { dash: dashCtl; onSettingsAsked: root.screen_ = "set" } }
         }
         Loader {
             anchors { top: status.bottom; bottom: alert.top; left: nav.right; right: parent.right }

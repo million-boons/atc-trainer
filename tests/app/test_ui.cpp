@@ -173,6 +173,21 @@ TEST_F(Ui, DashboardIsReachableAndDisabledEntriesSayWhy) {
   EXPECT_TRUE(allText().contains("No package is planned"));
 }
 
+TEST_F(Ui, NoNavigationNameIsCutOff) {
+  load();
+  for (const char* id : {"idle", "exwait", "exresult"}) {
+    run(id);
+    for (const char* n : {"Dashboard", "Scenarios", "Exercise", "Assessment", "Settings"}) {
+      QQuickItem* i = nullptr;
+      walk(win->contentItem(), [&](QQuickItem* x) {
+        if (!i && isText(x) && x->property("text").toString() == n) i = x;
+      });
+      ASSERT_TRUE(i) << id << ": " << n;
+      EXPECT_FALSE(i->property("truncated").toBool()) << id << ": " << n;
+    }
+  }
+}
+
 TEST_F(Ui, NavigationIsOffDuringAnExercise) {
   load();
   run("exwait");

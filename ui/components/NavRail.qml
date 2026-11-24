@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Templates as T
 import Atc
 
-// entries: list of {id, name, icon, enabled, why}. current: id. activated(id).
+// entries: list of {id, name, icon, enabled, why, off}. off: a built screen that is not available now. current: id. activated(id).
 // why: for a disabled entry, the reason and when it unlocks. Shown while the pointer is over the entry,
 // and for 5 s after a tap, because a touch panel has no pointer.
 Rectangle {
@@ -56,8 +56,10 @@ Rectangle {
                         Label {
                             width: parent.width
                             text: modelData.name
-                            wrapMode: nb.enabled ? Text.WordWrap : Text.NoWrap
-                            leftPadding: nb.enabled ? Theme.s4 : 0; rightPadding: leftPadding
+                            // Only a name of two words may wrap; a long single word needs the whole width.
+                            readonly property bool two: nb.enabled && modelData.name.indexOf(" ") > 0
+                            wrapMode: two ? Text.WordWrap : Text.NoWrap
+                            leftPadding: two ? Theme.s4 : 0; rightPadding: leftPadding
                             font.pixelSize: Theme.caption
                             horizontalAlignment: Text.AlignHCenter
                             color: nb.on ? Theme.textPrimary : nb.enabled ? Theme.textSecondary : Theme.textMuted
@@ -65,7 +67,7 @@ Rectangle {
                         Label {
                             width: parent.width
                             visible: !nb.enabled
-                            text: qsTr("not yet")
+                            text: modelData.off ? qsTr("off") : qsTr("not yet")
                             font.pixelSize: Theme.caption
                             horizontalAlignment: Text.AlignHCenter
                             color: Theme.textMuted

@@ -91,6 +91,7 @@ void DashboardController::refresh() {
   startEnabled_ = false;
   readyLevel_ = LabController::None;
   readyAlert_.clear();
+  readyShort_.clear();
   if (!feed_) {
     chips_.clear();
     emit changed();
@@ -165,6 +166,7 @@ void DashboardController::refresh() {
   const int blocks = r.count(StartEffect::Blocks), warns = r.count(StartEffect::Warns);
   readyLevel_ = status_words::level(blocks ? StartEffect::Blocks : warns ? StartEffect::Warns : StartEffect::Ready);
   const QString more = warns ? tr("; %1 warn").arg(warns) : QString();
+  readyShort_ = in.running && blocks ? blockers.join(", ") + more : in.running && warns ? tr("%1 warn").arg(warns) : QString();
   if (in.running)
     readyAlert_ = blocks ? tr("Exercise running: %1%2").arg(blockers.join(", "), more)
                   : warns ? tr("Exercise running; %1 warn").arg(warns) : tr("Exercise running");
@@ -189,7 +191,8 @@ void DashboardController::refreshAlert() {
   if (lab_) add(lab_->alertLevel(), lab_->alert());
   const bool exercise = exercise_ && exercise_->phase() != ExerciseController::Idle;
   if (exercise) add(exercise_->alertLevel(), exercise_->alert());
-  if (readyLevel_ >= LabController::Caution) parts.append(readyAlert_);
+  // Beside an alert of the exercise (it may be paused) "Exercise running" would be wrong.
+  if (readyLevel_ >= LabController::Caution) parts.append(parts.isEmpty() || readyShort_.isEmpty() ? readyAlert_ : readyShort_);
   const QString text = !parts.isEmpty() ? parts.join("  |  ") : exercise ? exercise_->alert() : readyAlert_;
   if (level == alertLevel_ && text == alert_) return;
   alertLevel_ = level;
