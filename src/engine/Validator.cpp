@@ -1,5 +1,7 @@
 #include "engine/Validator.h"
 
+#include <algorithm>
+
 namespace atc {
 namespace {
 
@@ -74,8 +76,14 @@ Verdict validate(const ScenarioStep& step, const ScenarioContext& ctx, const Par
   }
   if (!missing.empty()) return {Outcome::MissingInfo, missing, false};
 
-  // 6. Expected in this step?
+  // 6. Expected in this step? A value the step does not list is never accepted (D-417): the pilot
+  // would read back less than was said, e.g. without "hold short".
   if (!x) return {Outcome::Unexpected, {p.intent}, false};
+  std::vector<std::string> unlisted;
+  for (const auto& [name, f] : p.fields)
+    if (!f.value.empty() && !x->mustMatch.count(name) && std::find(x->required.begin(), x->required.end(), name) == x->required.end())
+      unlisted.push_back(name);
+  if (!unlisted.empty()) return {Outcome::Unexpected, unlisted, false};
 
   // 7. Values.
   std::vector<std::string> wrong;

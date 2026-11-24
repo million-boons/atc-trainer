@@ -30,7 +30,7 @@ Sessions: b2 = `runtime`, 93 = `stt`, 31 = `ui`, 8d = `engine`.
 | 2a | Loader (hand-written checks, D-408), generator, `scenario_check`, departure JSON | 8d | 0c | 4–5 |
 | 2b | Context, validator, sequence engine, pilot behaviour, result metrics, `sim_cli` | 8d | 2a | 8–10 |
 | 2c | Template parser, voice bank, coverage, `PhraseAssembler` | 8d | 2a | 4–5 |
-| 2d | Clip list, Piper clips on the PC, trim and normalise tool; WAV (D-405) | 8d | 2c | 3 |
+| 2d | Clip list, Piper clips on the panel as an offline step (D-418), trim and normalise tool; WAV (D-405) | 8d | 2c | 3 |
 | 2e | `LINE_UP` data, parser for 3 intents, 4 classes, `parse_cli`, Lab intent data | 93 | 0b, 0c | 6–8 |
 | 2f | `RadioAudioProcessor`, `radio_ab` | b2 | 1a | 2–3 |
 | 2g | Exercise and Result mockups, user OK, QML on a mock controller | 31 | 1b | 7–9 |
@@ -63,7 +63,7 @@ Found 2026-11-23: no git remote; `.git` 2.7 MB; `third_party` 335 MB, not in git
 | Panel checkout | `main` or a tag only, detached, never edited. Measurement results go on branch `panel` and are pushed back. |
 | Engines, models | `tools/fetch_stt.sh` on the PC (pinned checksums). Then copied to the panel with rsync. |
 | Binaries | Built on the PC, copied with rsync with commit hash and SHA-256 list. |
-| Pilot clips | rsync PC to panel. Audio is never in git (D-31); `manifest.json` with SHA-256 is. |
+| Pilot clips | Made on the panel (D-418), in the voice-bank folder. Audio is never in git (D-31); `manifest.json` with SHA-256 is. |
 | Voice recordings | Panel → PC only, over the LAN: rsync over ssh, one-way, logged (D-412). On the PC: one folder outside every git working copy, no cloud sync, local access only. Never PC → panel, never in the bare repository or a bundle. |
 
 Conditions for PC-built binaries to run on the panel:
@@ -92,9 +92,9 @@ Not affected: the udev rules and H540 service, which use fixed system paths by d
 
 | Item | Licence | Use |
 |---|---|---|
-| OHF-Voice/piper1-gpl (maintained) | GPL-3 | Tool on the PC only; not linked into or shipped with the trainer |
+| OHF-Voice/piper1-gpl (maintained) | GPL-3 | Offline tool (D-418); not linked into or shipped with the trainer |
 | rhasspy/piper (archived) | MIT | Same use; alternative |
-| Voice `en_US-norman-medium` | Dataset public domain (LibriVox); trained from scratch; US English male | **Approved placeholder voice** (D-413), PC only, not shipped |
+| Voice `en_US-norman-medium` | Dataset public domain (LibriVox); trained from scratch; US English male | **Approved placeholder voice** (D-413), offline step on the panel (D-418), not shipped |
 | Voice `en_US-ljspeech-*`, `en_GB-cori-high` | Dataset public domain; trained from scratch; female | Alternatives |
 | Voice `en_US-libritts-high` | CC BY 4.0; trained from scratch | Alternative, attribution needed |
 | Voice `en_US-ryan-high` | CC BY-NC-SA 4.0 | Not used |
@@ -128,5 +128,5 @@ Modes (ruling 2026-11-24): Practice shows the live verdict; Assessed hides it un
 | O-1 | Pilot readback of a wrong value that **exists in the airfield pools** should become possible, so readback errors can be trained. Values outside the pools: challenge or say again. | Later; not in the slice (D-409) |
 | O-2 | Approved line-up wording | Placeholder "line up runway {runway}" confirmed 2026-11-24 until the user supplies wording, if unclassified (D-403) |
 | Q-1 | May voice recordings be copied to the PC? | **Closed:** yes, LAN only, one-way (D-412) |
-| Q-2 | PC operating system, LAN address, user name, GPU. SSH server is installed; the user name no longer has to match the panel (D-410). | **Open:** values left blank in the answer; needed before the first push to the PC and to know whether the container is needed |
+| Q-2 | PC operating system, LAN address, user name, GPU. SSH server is installed; the user name no longer has to match the panel (D-410). | **Closed 2026-11-24** (D-418): Piper runs on the panel, offline. The PC values stay blank |
 | Q-3 | Approve §4.1 (0d design) | **Closed 2026-11-24:** approved as install prefix + config file / executable-relative, no compiled-in absolute paths. The extra lookups in §4.1 point 2 wait for A-3 |

@@ -48,7 +48,7 @@ stateDiagram-v2
 | 3 | Safety rule (configured) | UNSAFE |
 | 4 | Conflict with issued clearance | CONFLICT |
 | 5 | Required parameter missing | MISSING_INFO |
-| 6 | Intent not expected in this step | UNEXPECTED |
+| 6 | Intent not expected in this step, or a value the step does not list (D-417) | UNEXPECTED |
 | 7 | Value invalid or not matching the configured expectation | INCORRECT |
 | – | All pass | CORRECT |
 
