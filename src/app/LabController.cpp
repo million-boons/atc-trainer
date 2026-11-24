@@ -6,9 +6,6 @@ using atc::TxDisplay;
 
 namespace {
 constexpr int kMaxRecordings = 50;
-QVariantMap chip(const QString& name, const QString& value, int level) {
-  return {{"name", name}, {"value", value}, {"level", level}};
-}
 }  // namespace
 
 LabController::LabController(QObject* parent)
@@ -16,8 +13,6 @@ LabController::LabController(QObject* parent)
       events_({"time", "source", "edge", "detail", "warn"}, 200, this),
       words_({"word", "conf", "low"}, 200, this),
       recModel_({"recId", "time", "duration", "text", "level", "status", "result"}, kMaxRecordings, this) {
-  chips_ = {chip("Mic", "-", Caution), chip("Speaker", "-", Caution), chip("PTT", "-", Caution),
-            chip("STT", "-", Caution), chip("VOICE BANK", "-", Caution)};
   alert_ = tr("Ready");
 }
 
@@ -97,15 +92,6 @@ void LabController::setMic(double dbfs) {
   emit micChanged();
 }
 
-void LabController::setChip(int i, const QString& value, Level l) {
-  QVariantMap m = chips_[i].toMap();
-  if (m["value"] == value && m["level"].toInt() == l) return;
-  m["value"] = value;
-  m["level"] = int(l);
-  chips_[i] = m;
-  emit chipsChanged();
-}
-
 void LabController::setMicOpen(bool open) {
   if (open == micOpen_) return;
   micOpen_ = open;
@@ -115,7 +101,7 @@ void LabController::setMicOpen(bool open) {
 void LabController::setPttSource(const QString& s) {
   if (s == pttSource_) return;
   pttSource_ = s;
-  emit chipsChanged();
+  emit pttSourceChanged();
 }
 
 void LabController::setButtons(bool right, bool left) {
@@ -189,16 +175,6 @@ void LabController::setResult(int id, const QString& text, const QString& result
     recModel_.set(i, 3, text.isEmpty() ? tr("(no text)") : text);
     recModel_.set(i, 6, resultInfo);
     return;
-  }
-}
-
-void LabController::setVoiceBank(Bank b, int missing) {
-  switch (b) {
-    case Bank::NotLoaded: return setChip(VoiceBank, tr("NOT LOADED"), Caution);
-    case Bank::Loaded: return setChip(VoiceBank, tr("LOADED"), Ok);
-    case Bank::CoverageOk: return setChip(VoiceBank, tr("COVERAGE OK"), Ok);
-    case Bank::MissingClips: return setChip(VoiceBank, tr("MISSING CLIPS (%1)").arg(missing), Fault);
-    case Bank::Failed: return setChip(VoiceBank, tr("FAILED"), Fault);
   }
 }
 

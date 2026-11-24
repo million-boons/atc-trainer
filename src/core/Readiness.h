@@ -10,7 +10,7 @@ enum class MicReady { Ok, NotTested, OutsideBand, NoSignal, Muted, Lost };
 enum class SpeakerReady { Ok, NotChecked };
 enum class PttReady { Ok, StandIn, NoHold, Missing };
 enum class ModelReady { Ready, NotLoaded, Loading, Failed, OtherLoaded };
-enum class BankReady { CoverageOk, Loaded, NotLoaded, MissingClips, Failed };
+enum class BankReady { CoverageOk, Loaded, Checking, NotLoaded, MissingClips, Failed };  // Loaded: coverage not checked
 enum class StorageReady { Ok, Low };
 
 enum class StartEffect { Ready, Warns, Blocks };
@@ -40,10 +40,8 @@ constexpr StartEffect effect(PttReady s, bool missingBlocks) {
   return missingBlocks ? StartEffect::Blocks : StartEffect::Warns;
 }
 constexpr StartEffect effect(ModelReady s) { return s == ModelReady::Ready ? StartEffect::Ready : StartEffect::Blocks; }
-// Loaded = coverage not checked yet: warns (proposed; not in the confirmed table).
-constexpr StartEffect effect(BankReady s) {
-  return s == BankReady::CoverageOk ? StartEffect::Ready : s == BankReady::Loaded ? StartEffect::Warns : StartEffect::Blocks;
-}
+// Only a checked bank may start; Start waits while the check runs (D-115).
+constexpr StartEffect effect(BankReady s) { return s == BankReady::CoverageOk ? StartEffect::Ready : StartEffect::Blocks; }
 constexpr StartEffect effect(StorageReady s) { return s == StorageReady::Ok ? StartEffect::Ready : StartEffect::Warns; }
 
 enum class ReadyTile { Mic, Speaker, Ptt, Model, Bank, Storage };

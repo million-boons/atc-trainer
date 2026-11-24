@@ -39,9 +39,9 @@ TEST(Readiness, EveryModelStateExceptReadyBlocks) {
   EXPECT_EQ(effect(ModelReady::Ready), E::Ready);
 }
 
-TEST(Readiness, BankBlocksUnlessLoadedOrCovered) {
-  for (const auto s : {BankReady::NotLoaded, BankReady::MissingClips, BankReady::Failed}) EXPECT_EQ(effect(s), E::Blocks);
-  EXPECT_EQ(effect(BankReady::Loaded), E::Warns);
+TEST(Readiness, BankBlocksUnlessCoverageWasChecked) {  // D-115
+  for (const auto s : {BankReady::Loaded, BankReady::Checking, BankReady::NotLoaded, BankReady::MissingClips, BankReady::Failed})
+    EXPECT_EQ(effect(s), E::Blocks);
   EXPECT_EQ(effect(BankReady::CoverageOk), E::Ready);
 }
 
