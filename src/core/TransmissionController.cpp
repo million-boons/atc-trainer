@@ -118,6 +118,22 @@ void TransmissionController::requestPilot(Reply reply, Ns now) {
   maybeStartPilot(now);
 }
 
+bool TransmissionController::setRules(PressRule pressDuringPilot, bool repeatInterruptedReply) {
+  if (state() != State::Idle || pedalDown_) return false;
+  cfg_.pressDuringPilot = pressDuringPilot;
+  cfg_.repeatInterruptedReply = repeatInterruptedReply;
+  return true;
+}
+
+void TransmissionController::dropPilot(Ns now) {
+  replies_.clear();
+  for (auto& [id, processed] : open_)
+    if (processed) processed->reset();  // answered, but waiting for an earlier one
+  if (!speaking_) return;
+  stopPilot(PilotStop::Withdrawn, now);
+  pilotEnded(now);
+}
+
 void TransmissionController::onPlaybackDone(PlaybackId id, Ns now) {
   advance(now);
   if (!speaking_ || id != playback_) return;

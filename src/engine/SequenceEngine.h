@@ -52,6 +52,7 @@ class SequenceEngine {
   void on(Ns t, const in::PilotEnded&, Outputs& o);
   void on(Ns t, const in::TimerFired&, Outputs& o);
   void on(Ns t, const in::PttPresence&, Outputs& o);
+  void on(Ns t, const in::FallbackPttUsed&, Outputs& o);
   void on(Ns t, const in::InstructorStop&, Outputs& o);
   void on(Ns t, const in::InstructorContinue&, Outputs& o);
 

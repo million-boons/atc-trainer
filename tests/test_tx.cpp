@@ -676,3 +676,51 @@ TEST(TxReply, IdSurvivesInterruptAndRepeat) {
   EXPECT_EQ(started[1].first, 42u);                // the same utterance
   EXPECT_NE(started[1].second, started[0].second);  // a new playback
 }
+
+// Exercise start and stop (3a).
+TEST_F(Tx, RulesChangeOnlyWhileNothingIsGoingOn) {
+  auto c = make();
+  EXPECT_TRUE(c.setRules(PressRule::Block, false));
+  c.onPress(ms(1000));
+  EXPECT_FALSE(c.setRules(PressRule::Queue, true));
+  c.onRelease(ms(2000), ReleaseReason::Normal);
+  EXPECT_FALSE(c.setRules(PressRule::Queue, true));  // tail
+  c.tick(ms(2300));
+  EXPECT_FALSE(c.setRules(PressRule::Queue, true));  // recognising
+  c.onProcessed(1, Reply{.text = "a"}, ms(2400));
+  EXPECT_FALSE(c.setRules(PressRule::Queue, true));  // speaking
+  c.onPress(ms(2500));
+  EXPECT_EQ(log.back(), "blocked@2500");
+  c.onRelease(ms(2600), ReleaseReason::Normal);
+  c.onPlaybackDone(pid, ms(2700));
+  EXPECT_TRUE(c.setRules(PressRule::Queue, true));
+}
+TEST_F(Tx, DropPilotSilencesAndForgetsButLeavesTransmissionsAlone) {
+  auto c = make();
+  c.requestPilot({.text = "a"}, ms(1000));
+  c.requestPilot({.text = "b"}, ms(1000));
+  EXPECT_TRUE(playing);
+  c.dropPilot(ms(1500));
+  EXPECT_FALSE(playing);
+  EXPECT_EQ(log.back(), "withdrawn a");
+  EXPECT_EQ(c.state(), S::Idle);
+  c.tick(ms(60'000));
+  EXPECT_FALSE(playing);
+  c.onPlaybackDone(pid, ms(60'000));  // late report of the silenced one
+  c.onPress(ms(61'000));
+  c.dropPilot(ms(61'500));
+  EXPECT_EQ(c.state(), S::TxOpen);
+  c.onRelease(ms(62'000), ReleaseReason::Normal);
+  c.tick(ms(62'300));
+  c.onProcessed(1, Reply{.text = "c"}, ms(62'400));
+  EXPECT_EQ(log.back(), "pilot c");  // only what was asked for before is forgotten
+}
+TEST_F(Tx, DropPilotLetsAQueuedPressOpen) {
+  cfg.pressDuringPilot = PressRule::Queue;
+  auto c = make();
+  c.requestPilot({.text = "a"}, ms(1000));
+  c.onPress(ms(1200));
+  c.dropPilot(ms(1500));
+  c.tick(ms(1600));
+  EXPECT_EQ(c.state(), S::TxOpen);
+}

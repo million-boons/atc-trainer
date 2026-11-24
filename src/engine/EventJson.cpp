@@ -62,6 +62,7 @@ json j(const in::PilotStarted& x) { return json{{"utterance", x.utterance}}; }
 json j(const in::PilotEnded& x) { return {{"utterance", x.utterance}, {"end", name(x.end)}}; }
 json j(const in::TimerFired& x) { return {{"timer", name(x.timer)}, {"generation", x.generation}}; }
 json j(const in::PttPresence& x) { return json{{"present", x.present}}; }
+json j(const in::FallbackPttUsed& x) { return {{"tx", x.tx}, {"source", x.source}}; }
 json j(const in::InstructorStop&) { return json::object(); }
 json j(const in::InstructorContinue&) { return json::object(); }
 json j(const out::StepEntered& x) { return json{{"step", x.step}}; }

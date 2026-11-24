@@ -28,6 +28,7 @@ struct StepResult {
 struct PttResult {
   int transmissions = 0, spokeBeforeKeying = 0, releasedEarly = 0, shortTaps = 0, noSpeech = 0, keyedOverPilot = 0,
       stuck = 0, deviceLost = 0, overload = 0;
+  int fallback = 0;  // transmissions keyed without the missing PTT device (D-311)
   std::optional<int> keyToSpeechMs;  // median
 };
 
@@ -49,6 +50,7 @@ struct ExerciseResult {
   std::vector<SuspectedStt> suspectedStt;
   int pilotFaults = 0;                // watchdog stops (D-301)
   std::vector<std::string> alerts;
+  bool fallbackPttUsed() const { return ptt.fallback > 0; }
 };
 
 // Built from the log alone, so it can be rebuilt at debrief.

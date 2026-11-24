@@ -10,6 +10,7 @@
 #include <thread>
 #include <vector>
 
+#include "core/EngineEvent.h"
 #include "core/TransmissionController.h"
 #include "core/TxDisplay.h"
 #include "ptt/PttInputManager.h"
@@ -104,6 +105,7 @@ class RadioCore {
     std::function<void(RadioTx&&)> txClosed;
     std::function<void(std::uint64_t id, bool pulse)> txCancelled;
     std::function<void()> sideTone;  // a queued press opened (D-24)
+    std::function<void(in::PressResult, Ns)> pressNotOpened;  // a press during pilot speech that opens nothing yet
     std::function<void(const Reply&)> pilotStarted;
     std::function<void(const Reply&, bool heardToEnd)> pilotEnded;  // not called when stopped
     std::function<void(const Reply&, PilotStop)> pilotStopped;
@@ -112,6 +114,7 @@ class RadioCore {
     std::function<void(const PttTest&)> pttTest;
     std::function<void(const OutputStatus&)> output;
     std::function<PilotSound(const Reply&)> pilotSound;  // from memory, at once
+    std::function<void(Ns now)> tick;  // every step, after what was queued
   };
 
   RadioCore(RadioConfig cfg, RadioDevices dev, Events ev, std::function<Ns()> clock = monotonicNow);
@@ -132,6 +135,19 @@ class RadioCore {
   void stopLocal();
   // While on, a press is measured and reported and never opens a transmission.
   void setPttTest(bool on);
+
+  // Runs f on the core thread, in order with everything else that is queued.
+  void call(std::function<void()> f) { post(std::move(f)); }
+
+  // Core thread only (inside an event or call()).
+  Ns now() const { return clock_(); }
+  int rate() const { return cfg_.rate; }
+  const std::string& pttSource() const { return cfg_.pttSource; }
+  PttLink pttLink() const { return link_; }
+  bool free() const { return idle() && !testing_; }  // nothing open, held, waiting or speaking; no PTT test
+  // Both also end Lab playback.
+  bool setRules(PressRule pressDuringPilot, bool repeatInterruptedReply);
+  void dropPilot();
 
   // For tests: open the devices without a thread, then run the core by hand.
   bool open();
@@ -179,6 +195,7 @@ class RadioCore {
   bool held_ = false, stuck_ = false, pulse_ = false, other_ = false;
   PttLink link_ = PttLink::NotSet;
   bool testing_ = false;
+  bool heldAtOpen_ = false;        // the device was opened with its key down: ready when it is seen released
   bool swallowed_ = false;         // the held press belongs to a test
   std::vector<Reply> deferred_;    // pilot calls asked for during a test
   std::uint64_t curId_ = 0;

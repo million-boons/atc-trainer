@@ -50,7 +50,8 @@ using PlaybackId = std::uint64_t;
 enum class PilotStop {
   Interrupted,     // rule Interrupt
   PressCameFirst,  // the press was made before the speech began; the reply is kept
-  Timeout          // no end reported in time: a fault, to be logged and shown
+  Timeout,         // no end reported in time: a fault, to be logged and shown
+  Withdrawn        // dropPilot(): the exercise was stopped
 };
 
 // Half-duplex arbitration. Pure logic: time is passed in, output through callbacks.
@@ -81,6 +82,10 @@ class TransmissionController {
   void onProcessed(std::uint64_t id, std::optional<Reply> reply, Ns now);
   // Pilot speech not caused by a transmission, e.g. the pilot calling again.
   void requestPilot(Reply reply, Ns now);
+  // Scenario rules. Only while nothing is open, waiting or speaking; otherwise false and unchanged.
+  bool setRules(PressRule pressDuringPilot, bool repeatInterruptedReply);
+  // The pilot is silenced and says nothing that was asked for so far. Transmissions are untouched. Not from a callback.
+  void dropPilot(Ns now);
   // Only the current playback counts: late, repeated or unknown ids are ignored.
   // May be called from inside pilotStart.
   void onPlaybackDone(PlaybackId id, Ns now);

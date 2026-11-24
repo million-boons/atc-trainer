@@ -58,18 +58,25 @@ bool RadioCore::open() {
   if (dev_.ptt) {
     post([this] { link_ = PttLink::Opening; });
     const std::string src = cfg_.pttSource;
-    pttDev_ = dev_.ptt({[this, src](Ns t, bool d) { post([=, this] { ptt_->rawEdge(t, src, d); }); },
+    pttDev_ = dev_.ptt({[this, src](Ns t, bool d) {
+                          post([=, this] {
+                            ptt_->rawEdge(t, src, d);
+                            if (!d && std::exchange(heldAtOpen_, false)) note({.kind = K::Ready, .t = t, .source = src});
+                          });
+                        },
                         [this, src](bool d) {
                           post([=, this] {
                             ptt_->setInitialState(src, d);
                             link_ = PttLink::Ok;
                             pttError_.clear();
+                            heldAtOpen_ = d;
                             note({.kind = d ? K::HeldAtOpen : K::Ready, .t = clock_(), .source = src});
                           });
                         },
                         [this, src](Ns t) {
                           post([=, this] {
                             link_ = PttLink::Lost;
+                            heldAtOpen_ = false;
                             ptt_->deviceLost(t, src);
                             note({.kind = K::Lost, .t = t, .source = src});
                           });
@@ -143,6 +150,17 @@ void RadioCore::playLocal(LocalSound what, std::vector<std::int16_t> samples, in
 
 void RadioCore::stopLocal() {
   post([this] { endLocal(LocalEnd::Interrupted); });
+}
+
+bool RadioCore::setRules(PressRule pressDuringPilot, bool repeatInterruptedReply) {
+  endLocal(LocalEnd::Interrupted);
+  return free() && tx_->setRules(pressDuringPilot, repeatInterruptedReply);
+}
+
+void RadioCore::dropPilot() {
+  endLocal(LocalEnd::Interrupted);
+  deferred_.clear();
+  tx_->dropPilot(clock_());
 }
 
 void RadioCore::silence() {
@@ -264,6 +282,9 @@ void RadioCore::build() {
     if (why == PilotStop::Interrupted) cutUntil_ = clock_() + cfg_.pilotCutNotice;
     if (ev_.pilotStopped) ev_.pilotStopped(r, why);
   };
+  cb.pressBlocked = [this](Ns t) { if (ev_.pressNotOpened) ev_.pressNotOpened(in::PressResult::Blocked, t); };
+  cb.pressQueued = [this](Ns t) { if (ev_.pressNotOpened) ev_.pressNotOpened(in::PressResult::Queued, t); };
+  cb.queuedDropped = [this](Ns t) { if (ev_.pressNotOpened) ev_.pressNotOpened(in::PressResult::QueueDropped, t); };
   cb.queuedOpened = [this](Ns) { if (ev_.sideTone) ev_.sideTone(); };
   tx_.emplace(cfg_.tx, std::move(cb));
 }
@@ -290,6 +311,7 @@ void RadioCore::step() {
     micIndex_ = i;
     micAt_ = now;
   }
+  if (ev_.tick) ev_.tick(now);  // after the presses, before anything else that is due (D-303)
   ptt_->tick(now);
   tx_->tick(now);
   if (closing_ && (ring_.newestIndex() >= closing_->endIndex || now > closing_->deadline)) closeNow();

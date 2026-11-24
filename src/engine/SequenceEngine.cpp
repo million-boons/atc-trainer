@@ -140,6 +140,8 @@ void SequenceEngine::on(Ns t, const in::PttPresence& x, Outputs& o) {
   }
 }
 
+void SequenceEngine::on(Ns, const in::FallbackPttUsed&, Outputs&) {}  // in the log for the result only
+
 void SequenceEngine::on(Ns, const in::InstructorStop&, Outputs& o) {
   if (running()) finish(out::EndReason::InstructorStop, o);
 }

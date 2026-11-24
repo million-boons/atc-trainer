@@ -55,6 +55,7 @@ struct Builder {
   }
   void on(const in::TimerFired&) {}
   void on(const in::PttPresence&) {}
+  void on(const in::FallbackPttUsed&) { ++r.ptt.fallback; }
   void on(const in::InstructorStop&) {}
   void on(const in::InstructorContinue&) {}
 

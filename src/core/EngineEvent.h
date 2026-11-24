@@ -68,6 +68,11 @@ struct PttPresence {  // lost: timers pause until it is seen released
   static constexpr std::string_view kName = "ptt_presence";
   bool present = true;
 };
+struct FallbackPttUsed {  // D-311: this transmission was keyed on screen or keyboard because the PTT device is missing
+  static constexpr std::string_view kName = "fallback_ptt_used";
+  std::uint64_t tx = 0;
+  std::string source;  // SCREEN or SPACE
+};
 struct InstructorStop { static constexpr std::string_view kName = "instructor_stop"; };
 struct InstructorContinue {  // answer to an alert that asks for a choice: the pilot calls again
   static constexpr std::string_view kName = "instructor_continue";
@@ -124,7 +129,7 @@ struct Ended {
 
 using EngineInput = std::variant<in::Started, in::TxOpened, in::TxClosed, in::TxCancelled, in::PressNotOpened,
                                  in::Recognised, in::PilotStarted, in::PilotEnded, in::TimerFired, in::PttPresence,
-                                 in::InstructorStop, in::InstructorContinue>;
+                                 in::InstructorStop, in::InstructorContinue, in::FallbackPttUsed>;
 using EngineOutput = std::variant<out::StepEntered, out::Judged, out::PilotRequested, out::NoReply, out::TimerSet,
                                   out::TimerCancelled, out::InstructorAlert, out::Ended>;
 
