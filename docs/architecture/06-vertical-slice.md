@@ -1,6 +1,6 @@
 # 06 Vertical slice: departure (taxi, line up, takeoff)
 
-Status: **APPROVED with changes, 2026-11-23** (D-400 to D-409); amended 2026-11-24 (D-410 to D-414, package 1c). §4.1 is approved in part; what still waits for A-3 is marked there. "A-n" are the open questions in `docs/status/briefs-2026-11-24.md` (branch `audit`). All phraseology is PLACEHOLDER. Hours are estimates.
+Status: **APPROVED with changes, 2026-11-23** (D-400 to D-409); amended 2026-11-24 (D-410 to D-416, package 1c). §4.1 is approved in part; what still waits for A-3 is marked there. "A-n" are the open questions in `docs/status/briefs-2026-11-24.md` (branch `audit`). All phraseology is PLACEHOLDER. Hours are estimates.
 
 Goal: one departure scenario working end to end on real components, after the Speech Lab and Dashboard run on real backends.
 
@@ -21,7 +21,7 @@ Sessions: b2 = `runtime`, 93 = `stt`, 31 = `ui`, 8d = `engine`.
 |---|---|---|---|---|
 | 0a | Finish D-300 tests; adapt `MockBackend` and `LiveBackend` to the new TransmissionController callbacks; merge to `main`; repo sync (§4) | b2 | – | 3–5, sync extra |
 | 0b | Commit current STT and phraseology work; b2 merges | 93 | 0a | 1 |
-| 0c | Contracts and CMake stubs; b2 merges | 8d | 0a | 2 |
+| 0c | Contracts and CMake stubs; event log header with exercise mode, trainee ID code, model id and configuration (D-416, D-39); b2 merges | 8d | 0a | 2 |
 | 0d | Location-independent paths (D-410, §4.1): resolver, relative library paths, tests; b2 merges | b2 | 0a, 0b; §4.1 (core approved, A-3 for the rest); before the first PC-built binary goes to the panel | 2–4 |
 | 1a | `RadioCore`, `PulsePlayer`, Lab playback, speaker check, `StatusController`. Export stays off (D-407) | b2 | 0a, 0c | 7–9 |
 | 1b | Dashboard wireframe, user OK, QML; remaining Lab controls. Start disabled until 3b | 31 | 0c; 1a to connect | 4–5 |
@@ -39,7 +39,7 @@ Sessions: b2 = `runtime`, 93 = `stt`, 31 = `ui`, 8d = `engine`.
 | T | Clean STT timing run on the idle panel (D-406) | 93 | before 3c demo | 1 |
 | 3c | Acceptance run, fixes, panel measurements | all, b2 leads | 3a, 3b, T | 6–10 |
 
-Order: `0a → 0b, 0c, 0d → 1a → G1 → 3a → 3b → 3c`. Wave 2 runs beside Wave 1 from 0c. 1c follows 1a. **G1 does not wait for 1c (proposed, not confirmed by the user):** G1's needs stay as approved in D-409 (1a, 1b), and 1c is held by A-4.
+Order: `0a → 0b, 0c, 0d → 1a → G1 → 3a → 3b → 3c`. Wave 2 runs beside Wave 1 from 0c. 1c follows 1a. G1 does not wait for 1c; it needs only 1a and 1b (D-415).
 Estimate before the move to the PC: 67–88 session-hours (before 0d, which adds 2–4, and before 1c, not yet estimated), likely 5–6 working days, range 4–8. Not yet re-estimated for the PC: builds get faster, the move itself (§4) is extra.
 
 ## 3. Where work happens (D-400)
