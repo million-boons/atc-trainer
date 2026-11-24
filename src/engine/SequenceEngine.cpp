@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "voice/PhraseTemplate.h"
+
 namespace atc {
 
 std::string fillSlots(const std::string& text, const ParamValues& values) {
@@ -184,7 +186,11 @@ void SequenceEngine::say(const std::string& replyId, Outcome cause, std::uint64_
   u.id = nextUtterance_++;
   u.replyId = replyId;
   const auto it = exercise_->replies.find(replyId);
-  if (it != exercise_->replies.end()) u.text = fillSlots(it->second.text, ctx_.params);
+  if (it != exercise_->replies.end()) {
+    std::string error;  // cannot occur once checkCoverage has passed
+    u.text = fillSlots(it->second.text, ctx_.params);
+    u.clipIds = clipSequence(it->second.text, exercise_->scenario, ctx_.params, error);
+  }
   if (!unprompted) {
     const auto span = static_cast<std::uint64_t>(std::max<Ns>(0, cfg_.replyDelayMax - cfg_.replyDelayMin) / ms(1)) + 1;
     u.delay = cfg_.replyDelayMin + ms(static_cast<std::int64_t>(rng_() % span));

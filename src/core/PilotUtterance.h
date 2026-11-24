@@ -14,7 +14,7 @@ struct PilotUtterance {
   std::uint64_t id = 0;              // unique in the exercise, from 1
   std::string replyId;               // data/phraseology/replies id (D-402)
   std::string text;                  // transcript, slots filled
-  std::vector<std::string> clipIds;  // in order, derived from the reply text, never hand-written
+  std::vector<std::string> clipIds;  // in order, "," for a pause; derived from the reply text, never hand-written
   Ns delay = 0;                      // from the seeded RNG, so a replay gives the same
   bool unprompted = false;           // onEnter call, or the pilot calling again
   Outcome cause = Outcome::Correct;  // what it answers; Timeout when calling again; unused for onEnter

@@ -2,7 +2,7 @@
 if(EXISTS ${TP}/json/nlohmann/json.hpp)
   add_library(atc_engine STATIC Validator.cpp SequenceEngine.cpp ExerciseResult.cpp EventJson.cpp Simulator.cpp)
   target_include_directories(atc_engine SYSTEM PRIVATE ${TP}/json)
-  target_link_libraries(atc_engine PUBLIC atc_scenario)
+  target_link_libraries(atc_engine PUBLIC atc_scenario atc_voice)
   add_executable(sim_cli ${CMAKE_SOURCE_DIR}/tools/sim_cli.cpp)
   target_link_libraries(sim_cli PRIVATE atc_engine)
   install(TARGETS sim_cli RUNTIME DESTINATION bin)
