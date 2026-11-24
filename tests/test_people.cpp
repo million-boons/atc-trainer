@@ -1,0 +1,90 @@
+#include <gtest/gtest.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+
+#include "storage/PeopleStore.h"
+using namespace atc;
+namespace fs = std::filesystem;
+
+namespace {
+constexpr const char* kToday = "2026-11-24";
+struct People : ::testing::Test {
+  fs::path dir = fs::temp_directory_path() / ("atc_people_" + std::to_string(::getpid()) + "_" +
+                                              ::testing::UnitTest::GetInstance()->current_test_info()->name());
+  std::string file = (dir / "state" / "people.json").string();
+  void TearDown() override { fs::remove_all(dir); }
+  std::string text() const {
+    std::ifstream i(file);
+    return {std::istreambuf_iterator<char>(i), {}};
+  }
+};
+}  // namespace
+
+TEST_F(People, RoundTripAndOwnerOnly) {
+  PeopleStore s(file);
+  ASSERT_EQ(s.load(), "");  // no file yet
+  EXPECT_EQ(s.add({"S01", "Name One", "Rank", true, kToday}, kToday), "");
+  EXPECT_EQ(s.add({"S02", "", "", false, "2026-11-20"}, kToday), "");
+  PeopleStore again(file);
+  ASSERT_EQ(again.load(), "");
+  ASSERT_EQ(again.people().size(), 2u);
+  EXPECT_EQ(again.find("S01")->name, "Name One");
+  EXPECT_TRUE(again.find("s01")->consent);
+  EXPECT_FALSE(again.find("S02")->consent);
+  EXPECT_EQ(again.find("S02")->consentDate, "2026-11-20");
+  EXPECT_EQ(again.find("S03"), nullptr);
+  struct stat st {};
+  ASSERT_EQ(stat(file.c_str(), &st), 0);
+  EXPECT_EQ(st.st_mode & 0777, 0600u);
+}
+
+TEST_F(People, BadRecordsAreRefused) {
+  PeopleStore s(file);
+  ASSERT_EQ(s.load(), "");
+  for (const char* id : {"", "two words", "../x", "a.b", "12345678901234567"}) EXPECT_NE(s.add({id, "", "", true, kToday}, kToday), "") << id;
+  EXPECT_NE(s.add({"S01", "", "", true, ""}, kToday), "");            // consent without a date
+  EXPECT_NE(s.add({"S01", "", "", false, ""}, kToday), "");           // the answer no has a date too
+  EXPECT_NE(s.add({"S01", "", "", true, "2026-11-25"}, kToday), "");  // future
+  EXPECT_NE(s.add({"S01", "", "", true, "2026-02-30"}, kToday), "");
+  EXPECT_NE(s.add({"S01", "", "", true, "24.11.2026"}, kToday), "");
+  EXPECT_NE(s.add({"S01", std::string(61, 'x'), "", true, kToday}, kToday), "");
+  EXPECT_FALSE(fs::exists(file));
+  EXPECT_EQ(s.add({"S01", "", "", true, kToday}, kToday), "");
+  EXPECT_NE(s.add({"s01", "", "", true, kToday}, kToday), "");        // same person
+  EXPECT_EQ(s.people().size(), 1u);
+}
+
+TEST_F(People, ConsentCanBeWithdrawn) {
+  PeopleStore s(file);
+  ASSERT_EQ(s.load(), "");
+  ASSERT_EQ(s.add({"S01", "", "", true, "2026-11-01"}, kToday), "");
+  EXPECT_EQ(s.setConsent("S01", false, kToday, kToday), "");
+  PeopleStore again(file);
+  ASSERT_EQ(again.load(), "");
+  EXPECT_FALSE(again.find("S01")->consent);
+  EXPECT_EQ(again.find("S01")->consentDate, kToday);
+  EXPECT_NE(s.setConsent("S09", true, kToday, kToday), "");
+  EXPECT_NE(s.setConsent("S01", true, "", kToday), "");
+}
+
+TEST_F(People, UnreadableFileIsNeverOverwritten) {
+  fs::create_directories(dir / "state");
+  for (const char* t : {"not json", "{\"format\":2,\"people\":[]}", "{\"format\":1,\"people\":[{\"id\":\"S01\"}]}"}) {
+    std::ofstream(file) << t;
+    PeopleStore s(file);
+    EXPECT_NE(s.load(), "");
+    EXPECT_NE(s.add({"S01", "", "", true, kToday}, kToday), "");
+    EXPECT_NE(s.setConsent("S01", true, kToday, kToday), "");
+    EXPECT_EQ(text(), t);
+  }
+}
+
+TEST_F(People, NothingIsWrittenBeforeLoad) {
+  PeopleStore s(file);
+  EXPECT_NE(s.add({"S01", "", "", true, kToday}, kToday), "");
+  EXPECT_FALSE(fs::exists(file));
+}
