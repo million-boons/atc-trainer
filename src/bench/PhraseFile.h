@@ -12,6 +12,7 @@ struct Phrase {
   std::string text;
   bool negative = false;  // must NOT be accepted as an instruction
   Fields expect;
+  std::vector<std::string> tags = {};  // tags=a,b  labels for the report, never scored
 };
 
 // One phrase per line:   text | callsign=EAGLE-421 runway=09

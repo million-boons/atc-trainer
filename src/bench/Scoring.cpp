@@ -218,6 +218,20 @@ Extracted extractFields(const std::vector<SttWord>& w, const std::set<std::strin
   return e;
 }
 
+std::string actionOf(const std::vector<SttWord>& w) {
+  std::set<std::string> got;
+  const auto is = [&](std::size_t i, const char* s) { return i < w.size() && w[i].text == s; };
+  for (std::size_t i = 0; i < w.size(); ++i) {
+    if (is(i, "takeoff") || (is(i, "take") && is(i + 1, "off"))) got.insert("takeoff");
+    if (is(i, "land") || is(i, "landing")) got.insert("land");
+    if (is(i, "turn") && is(i + 1, "left")) got.insert("turn_left");
+    if (is(i, "turn") && is(i + 1, "right")) got.insert("turn_right");
+    if (is(i, "climb")) got.insert("climb");
+    if (is(i, "descend")) got.insert("descend");
+  }
+  return got.empty() ? "" : got.size() > 1 ? "conflict" : *got.begin();
+}
+
 bool accepted(const Extracted& e, double threshold) {
   return e.fields.count("callsign") && e.fields.size() >= 2 && !e.conflict && e.minConf >= threshold;
 }

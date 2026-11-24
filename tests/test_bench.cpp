@@ -171,3 +171,22 @@ TEST(Shape, RejectsDroppedDigitsAndNeverChangesValues) {
   EXPECT_EQ(judge(p, e, 0, true), Outcome::Wrong);  // right shape, wrong value: shape cannot hide it
   EXPECT_EQ(judge(p, extractFields(words("eagle four two runway zero nine"), kNames), 0, true), Outcome::Rejected);
 }
+
+TEST(Action, SeesASwappedClearance) {
+  const auto a = [](const std::string& s) { return actionOf(words(s)); };
+  EXPECT_EQ(a("eagle four two one runway zero nine cleared for takeoff"), "takeoff");
+  EXPECT_EQ(a("eagle four two one runway zero nine cleared for take off"), "takeoff");
+  EXPECT_EQ(a("eagle four two one runway zero nine cleared to land"), "land");
+  EXPECT_EQ(a("eagle turn left heading zero nine zero"), "turn_left");
+  EXPECT_EQ(a("eagle turn right heading zero nine zero"), "turn_right");
+  EXPECT_EQ(a("eagle taxi via alpha three"), "");
+  EXPECT_EQ(a("climb descend"), "conflict");
+  EXPECT_EQ(a("runway zero nine left"), "");  // a runway side is not a turn
+}
+TEST(Phrases, ReadsActionAndTags) {
+  std::vector<Phrase> p;
+  std::string e;
+  ASSERT_TRUE(parse("x | callsign=EAGLE-421 action=takeoff tags=variant,dev", p, e)) << e;
+  EXPECT_EQ(p[0].expect.at("action"), "takeoff");
+  EXPECT_EQ(p[0].tags, (std::vector<std::string>{"variant", "dev"}));
+}

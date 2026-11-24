@@ -41,6 +41,9 @@ enum class Outcome {
 // 3 digits 001-360, level FL + 3 digits, frequency 3 digits + decimals. Only ever rejects; a value
 // is never changed. PLACEHOLDER shapes, to be validated with the phraseology.
 bool shapeOk(const Extracted& e);
+// Instruction words that must never be swapped: takeoff, land, turn_left, turn_right, climb, descend.
+// "" if none, "conflict" if two. Kept apart from extractFields so existing totals stay comparable.
+std::string actionOf(const std::vector<SttWord>& normalised);
 // Accepted = callsign and at least one other field, no conflict, confidence >= threshold.
 bool accepted(const Extracted& e, double threshold);
 // useShape: a result failing shapeOk is not accepted.

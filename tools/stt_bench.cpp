@@ -1,11 +1,12 @@
 // Speech engine benchmark on recorded transmissions (docs/architecture/02-speech-ptt.md 3.1).
 //   stt_bench --engine vosk|whisper --model PATH --manifest FILE [--manifest FILE ...] --out PREFIX
 //     vosk:    [--grammar WORDS.txt | --sentences SENTENCES.txt]   (phrase_gen makes the second)
+//     [--action]  also score takeoff/land/left/right/climb/descend as a critical field
 //     [--shape]  a result with impossible field lengths is not accepted
 //     whisper: [--threads N] [--audio-ctx N] [--prompt TEXT] [--backends DIR]
 //     [--fast]  feed without real-time pacing (latency and CPU are then not valid)
 //   stt_bench --lexicon WORDS.txt --model VOSK_DIR     words the model does not know
-//   stt_bench --check PHRASES.txt                      check a phrase file
+//   stt_bench [--shape] --check PHRASES.txt            check a phrase file (--shape for script_gen files)
 // One engine per run, so that memory is that engine's alone.
 #include <sys/resource.h>
 
@@ -28,7 +29,7 @@ using namespace atc;
 using nlohmann::json;
 
 namespace {
-bool gShape = false;
+bool gShape = false, gAction = false;
 const double kThresholds[] = {0.0, 0.5, 0.7, 0.8, 0.9, 0.95};
 
 long procKb(const char* key) {
@@ -113,6 +114,12 @@ bool loadManifest(const std::string& path, std::vector<Item>& items, std::map<st
     it.phrase.text = j["transcript"];
     it.phrase.negative = j.value("kind", "") == "negative";
     if (j.contains("expect") && j["expect"].is_object()) it.phrase.expect = j["expect"].get<Fields>();
+    if (gAction && !it.phrase.negative && !it.phrase.expect.count("action")) {
+      std::vector<SttWord> w;
+      for (auto& s : normaliseText(it.phrase.text)) w.push_back({s, 1.0});
+      const auto a = actionOf(w);
+      if (!a.empty()) it.phrase.expect["action"] = a;
+    }
     if (!it.phrase.negative && it.phrase.expect.empty()) {
       ++skipped["no expected fields"];
       continue;
@@ -214,6 +221,7 @@ int main(int argc, char** argv) {
     else if (k == "--grammar") grammarFile = next();
     else if (k == "--sentences") sentenceFile = next();
     else if (k == "--shape") gShape = true;
+    else if (k == "--action") gAction = true;
     else if (k == "--lexicon") lexicon = next();
     else if (k == "--check") check = next();
     else if (k == "--threads") wc.threads = std::atoi(next().c_str());
@@ -242,9 +250,15 @@ int main(int argc, char** argv) {
     for (const auto& x : p) {
       std::vector<SttWord> w;
       for (auto& s : normaliseText(x.text)) w.push_back({s, 1.0});
-      const auto o = judge(x, extractFields(w, names), 0.0);
+      auto ex = extractFields(w, names);
+      if (x.expect.count("action")) ex.fields["action"] = actionOf(w);
+      const auto o = judge(x, ex, 0.0, gShape);
       neg += x.negative;
       if (x.expect.empty() && !x.negative) continue;
+      if (x.expect.count("action") ? actionOf(w) != x.expect.at("action") && o == Outcome::Correct : false) {
+        ++bad;
+        std::printf("ACTION MISMATCH: %s\n", x.text.c_str());
+      }
       if (o != Outcome::Correct && o != Outcome::NegativeOk) {
         ++bad;
         std::printf("MISMATCH: %s\n  expected %s\n  scored   %s\n", x.text.c_str(), str(x.expect).c_str(), str(extractFields(w, names).fields).c_str());
@@ -333,6 +347,8 @@ int main(int argc, char** argv) {
     std::vector<std::string> hyp;
     for (const auto& x : norm) hyp.push_back(x.text);
     r.ex = extractFields(norm, names);
+    if (gAction)
+      if (const auto a = actionOf(norm); !a.empty()) r.ex.fields["action"] = a, r.ex.conflict |= a == "conflict";
     r.edits = editCounts(normaliseText(it.phrase.text), hyp);
     addStats(all, r);
     addStats(bySpeaker[it.speaker], r);
