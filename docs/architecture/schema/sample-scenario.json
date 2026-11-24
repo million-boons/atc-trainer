@@ -1,49 +1,125 @@
 {
   "schemaVersion": 1,
+  "comment": "PLACEHOLDER - validate against approved SOP.",
   "id": "SAMPLE-GND-01",
   "name": "PLACEHOLDER ground taxi sample",
   "category": "ground",
-  "objectives": ["PLACEHOLDER - validate against approved SOP"],
+  "objectives": [
+    "PLACEHOLDER - validate against approved SOP"
+  ],
   "difficulty": "basic",
-  "validation": { "status": "placeholder" },
+  "validation": {
+    "status": "placeholder"
+  },
   "airfield": "SAMPLE-AF",
-  "initialState": { "phase": "parked" },
+  "initialState": {
+    "phase": "parked"
+  },
   "generators": {
-    "runway": { "pool": "runways" },
-    "taxiway": { "pool": "taxiways", "mustServe": "runway" },
-    "aircraftType": { "pool": "aircraftTypes" },
-    "callsign": { "pool": "callsigns", "mustServe": "aircraftType" }
+    "runway": {
+      "pool": "runways"
+    },
+    "taxiway": {
+      "pool": "taxiways",
+      "mustServe": "runway"
+    },
+    "aircraftType": {
+      "pool": "aircraftTypes"
+    },
+    "callsign": {
+      "pool": "callsigns",
+      "mustServe": "aircraftType"
+    }
   },
   "initialStep": "TAXI",
   "steps": [
     {
       "id": "TAXI",
-      "label": "PLACEHOLDER taxi instruction",
+      "label": "Taxi",
       "phase": "taxi",
+      "onEnter": {
+        "say": "REQUEST_TAXI",
+        "delaySeconds": 2
+      },
       "expects": [
         {
           "intent": "TAXI_INSTRUCTION",
-          "required": ["callsign", "taxiway", "runway"],
-          "mustMatch": { "callsign": "{callsign}", "taxiway": "{taxiway}", "runway": "{runway}" }
+          "required": [
+            "callsign",
+            "taxiway",
+            "runway"
+          ],
+          "mustMatch": {
+            "callsign": "{callsign}",
+            "taxiway": "{taxiway}",
+            "runway": "{runway}"
+          }
         }
       ],
-      "safetyRules": [],
       "timeoutSeconds": 30,
       "maxPilotCalls": 2,
       "maxSayAgain": 3,
       "responses": {
-        "CORRECT": { "action": "say", "template": "PLACEHOLDER readback via {taxiway} runway {runway}, {callsign}", "validation": { "status": "placeholder" } },
-        "MISSING_INFO": { "action": "say", "template": "PLACEHOLDER request missing item, {callsign}", "validation": { "status": "placeholder" } },
-        "AMBIGUOUS": { "action": "say", "template": "PLACEHOLDER say again, {callsign}", "validation": { "status": "placeholder" } },
-        "UNINTELLIGIBLE": { "action": "say", "template": "PLACEHOLDER say again, {callsign}", "validation": { "status": "placeholder" } },
-        "INCORRECT": { "action": "say", "template": "PLACEHOLDER query instruction, {callsign}", "validation": { "status": "placeholder" } },
-        "WRONG_CALLSIGN": { "action": "silent" },
-        "TIMEOUT": { "action": "say", "template": "PLACEHOLDER pilot call, {callsign}", "validation": { "status": "placeholder" } }
+        "CORRECT": {
+          "action": "say",
+          "reply": "READBACK_TAXI"
+        },
+        "MISSING_INFO": {
+          "action": "say",
+          "reply": "REQUEST_MISSING"
+        },
+        "AMBIGUOUS": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "UNINTELLIGIBLE": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "WRONG_CALLSIGN": {
+          "action": "silent"
+        },
+        "CONFLICT": {
+          "action": "say",
+          "reply": "CHALLENGE"
+        },
+        "UNEXPECTED": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "INCORRECT": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "TIMEOUT": {
+          "action": "say",
+          "reply": "CALL_AGAIN"
+        }
       },
-      "transitions": [{ "on": "CORRECT", "to": "DONE" }]
+      "transitions": [
+        {
+          "on": "CORRECT",
+          "to": "DONE"
+        }
+      ]
     },
-    { "id": "DONE", "label": "Complete", "phase": "complete", "expects": [], "responses": {}, "transitions": [] }
+    {
+      "id": "DONE",
+      "label": "Complete",
+      "phase": "complete",
+      "expects": [],
+      "responses": {},
+      "transitions": []
+    }
   ],
-  "pttRules": { "pressDuringPilot": "interrupt", "interruptedReply": "repeat" },
-  "completion": { "finalSteps": ["DONE"], "maxDurationSeconds": 600 }
+  "pttRules": {
+    "pressDuringPilot": "interrupt",
+    "interruptedReply": "repeat"
+  },
+  "completion": {
+    "finalSteps": [
+      "DONE"
+    ],
+    "maxDurationSeconds": 900
+  }
 }

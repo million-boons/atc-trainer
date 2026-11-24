@@ -1,4 +1,13 @@
-# Scenario loader and generator (2a, session 8d).
-# No sources yet: turn INTERFACE into STATIC with the first .cpp. Qt-free.
-add_library(atc_scenario INTERFACE)
-target_link_libraries(atc_scenario INTERFACE atc_logic)
+# Scenario loader and generator (2a, session 8d). Qt-free.
+if(EXISTS ${TP}/json/nlohmann/json.hpp)
+  add_library(atc_scenario STATIC ScenarioLoader.cpp ScenarioGenerator.cpp)
+  target_include_directories(atc_scenario SYSTEM PRIVATE ${TP}/json)
+  target_link_libraries(atc_scenario PUBLIC atc_logic)
+  add_executable(scenario_check ${CMAKE_SOURCE_DIR}/tools/scenario_check.cpp)
+  target_link_libraries(scenario_check PRIVATE atc_scenario)
+  install(TARGETS scenario_check RUNTIME DESTINATION bin)
+else()
+  message(STATUS "nlohmann-json not found: run tools/fetch_stt.sh to build the scenario loader")
+  add_library(atc_scenario INTERFACE)
+  target_link_libraries(atc_scenario INTERFACE atc_logic)
+endif()

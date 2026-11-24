@@ -1,0 +1,8 @@
+if(EXISTS ${TP}/json/nlohmann/json.hpp)
+  include(GoogleTest)
+  add_executable(scenario_tests test_scenario.cpp)
+  target_include_directories(scenario_tests SYSTEM PRIVATE ${TP}/json)
+  target_link_libraries(scenario_tests PRIVATE atc_scenario GTest::gtest_main Threads::Threads)
+  gtest_discover_tests(scenario_tests)
+  install(TARGETS scenario_tests RUNTIME DESTINATION bin)
+endif()

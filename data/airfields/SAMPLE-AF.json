@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "comment": "PLACEHOLDER - validate against approved SOP. Invented values.",
+  "id": "SAMPLE-AF",
+  "validation": {
+    "status": "placeholder"
+  },
+  "runways": [
+    "09",
+    "27"
+  ],
+  "taxiways": [
+    {
+      "id": "A3",
+      "serves": [
+        "09"
+      ]
+    },
+    {
+      "id": "B2",
+      "serves": [
+        "27"
+      ]
+    }
+  ],
+  "aircraftTypes": [
+    {
+      "id": "C295"
+    },
+    {
+      "id": "AN-32"
+    }
+  ],
+  "callsigns": [
+    {
+      "id": "EAGLE-421",
+      "spoken": "eagle four two one",
+      "types": [
+        "C295"
+      ]
+    },
+    {
+      "id": "FALCON-732",
+      "spoken": "falcon seven three two",
+      "types": [
+        "AN-32"
+      ]
+    }
+  ]
+}
