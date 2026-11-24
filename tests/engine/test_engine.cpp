@@ -302,6 +302,22 @@ TEST_F(Engine, DeviceLossAndRecogniserFaultAreNotCounted) {
   EXPECT_TRUE(res.steps[0].errors.empty());
 }
 
+// Closed as stuck, lost or silent: sent on as Unrecognized without using the recogniser.
+TEST_F(Engine, OnlyDeviceLossAndRecogniserFaultExcuseTheTrainee) {
+  sim->start();
+  sim->transmit(ParsedInstruction{}, Simulator::goodReport(), TxEnd::Stuck);
+  EXPECT_FALSE(lastJudged().suspectedStt);
+  EXPECT_EQ(lastJudged().problems, std::vector<std::string>{"held too long"});
+  auto silent = Simulator::goodReport();
+  silent.empty = true;
+  sim->transmit(ParsedInstruction{}, silent);
+  EXPECT_FALSE(lastJudged().suspectedStt);
+  EXPECT_EQ(lastJudged().problems, std::vector<std::string>{"no speech"});
+  sim->transmit(ParsedInstruction{}, silent, TxEnd::DeviceLost, "device lost");
+  EXPECT_TRUE(lastJudged().suspectedStt);
+  EXPECT_EQ(lastJudged().problems, std::vector<std::string>{"device lost"});
+}
+
 TEST_F(Engine, NoCallMakesThePilotCallAgainThenAlerts) {
   sim->start();
   sim->wait(ms(400'000));

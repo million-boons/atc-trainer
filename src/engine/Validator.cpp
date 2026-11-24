@@ -20,8 +20,10 @@ std::string expected(const ScenarioContext& ctx, const Expectation& x, const std
 Verdict validate(const ScenarioStep& step, const ScenarioContext& ctx, const ParsedInstruction& p, const TxFacts& facts,
                  const std::string& sttFault, const ValidatorRules& rules) {
   // 1. Was there something usable to judge?
-  if (!sttFault.empty()) return {Outcome::Unintelligible, {"speech recogniser fault"}, true};
   if (facts.closed && facts.end == TxEnd::DeviceLost) return {Outcome::Unintelligible, {"device lost"}, true};
+  if (!sttFault.empty()) return {Outcome::Unintelligible, {"speech recogniser fault"}, true};
+  // Held too long: never recognised, so the recogniser is not the suspect.
+  if (facts.closed && facts.end == TxEnd::Stuck) return {Outcome::Unintelligible, {"held too long"}, false};
   // A recogniser can invent words from silence.
   if (facts.closed && facts.report.empty) return {Outcome::Unintelligible, {"no speech"}, false};
   std::vector<std::string> clipped;
