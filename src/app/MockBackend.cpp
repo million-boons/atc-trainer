@@ -61,8 +61,16 @@ MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs,
   });
   connect(&status_, &StatusFeed::toneRequested, this, [this] {
     StatusInputs s = status_.inputs();
+    s.speaker = SpeakerReady::NotChecked;
+    s.speakerNote = tr("did you hear it? (mock: no sound)");
+    s.toneAwaitingAnswer = true;
+    status_.set(std::move(s));
+  });
+  connect(&status_, &StatusFeed::toneHeardRequested, this, [this] {
+    StatusInputs s = status_.inputs();
+    if (!std::exchange(s.toneAwaitingAnswer, false)) return;
     s.speaker = SpeakerReady::Ok;
-    s.speakerNote = tr("mock: no sound played");
+    s.speakerNote = tr("heard by user");
     status_.set(std::move(s));
   });
   connect(&status_, &StatusFeed::pttTestRequested, this, [this] {
@@ -77,6 +85,12 @@ MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs,
   connect(&status_, &StatusFeed::cancelTestsRequested, this, [this] {
     micTestTicks_ = 0;
     if (status_.inputs().pttTesting) endPttTest({});
+    if (status_.inputs().toneAwaitingAnswer) {  // the screen was left without an answer
+      StatusInputs s = status_.inputs();
+      s.toneAwaitingAnswer = false;
+      s.speakerNote.clear();
+      status_.set(std::move(s));
+    }
     statusTick();
   });
   connect(&status_, &StatusFeed::stopExerciseRequested, this, [this] {

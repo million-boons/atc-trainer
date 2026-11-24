@@ -1,13 +1,15 @@
 import QtQuick
 import Atc
 
-// Dashboard tile. info: {title, level, state, line1, line2, effect, action, actionEnabled}.
-// activated(): its button.
+// Dashboard tile. info: {title, level, state, line1, line2, effect, action, actionEnabled, action2, action2Enabled}.
+// activated(), activated2(): its buttons. A second button shares the row, so the tile never changes size.
 Rectangle {
     id: tile
     property var info: ({})
     readonly property int level: info.level || 0
+    readonly property bool two: (info.action2 || "") !== ""
     signal activated()
+    signal activated2()
     radius: Theme.radius
     color: Theme.raised
     border { color: level > 2 ? Theme.fault : Theme.border; width: Theme.line }
@@ -31,12 +33,23 @@ Rectangle {
             font { pixelSize: Theme.caption; weight: Font.DemiBold } }
     SecondaryButton {
         x: Theme.s12; anchors { bottom: parent.bottom; bottomMargin: Theme.s12 }
-        width: parent.width - 2 * x
+        width: tile.two ? (parent.width - 2 * x - Theme.s8) / 2 : parent.width - 2 * x
         visible: (tile.info.action || "") !== ""
         enabled: tile.info.actionEnabled === true
         text: tile.info.action || ""
         font.pixelSize: Theme.small
         focusPolicy: Qt.NoFocus
         onClicked: tile.activated()
+    }
+    SecondaryButton {
+        anchors { right: parent.right; rightMargin: Theme.s12; bottom: parent.bottom; bottomMargin: Theme.s12 }
+        width: (parent.width - 2 * Theme.s12 - Theme.s8) / 2
+        visible: tile.two
+        enabled: tile.info.action2Enabled === true
+        tint: enabled ? Theme.accent : Theme.border
+        text: tile.info.action2 || ""
+        font.pixelSize: Theme.small
+        focusPolicy: Qt.NoFocus
+        onClicked: tile.activated2()
     }
 }

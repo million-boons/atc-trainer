@@ -97,10 +97,11 @@ void DashboardController::refresh() {
                                  .storage = in.storage, .pttMissingBlocks = in.pttMissingBlocks});
   QStringList blockers;
   const auto add = [&](ReadyTile t, const QString& title, const QString& state, const QString& line1, const QString& line2,
-                       const QString& action, bool actionEnabled) {
+                       const QString& action, bool actionEnabled, const QString& action2 = {}, bool action2Enabled = false) {
     const StartEffect e = r.of(t);
     tiles_.append(QVariantMap{{"title", title}, {"level", int(status_words::level(e))}, {"state", state}, {"line1", line1}, {"line2", line2},
-                              {"effect", wordOf(e)}, {"action", action}, {"actionEnabled", actionEnabled}});
+                              {"effect", wordOf(e)}, {"action", action}, {"actionEnabled", actionEnabled},
+                              {"action2", action2}, {"action2Enabled", action2Enabled}});
     if (e != StartEffect::Blocks) return;
     reasons_.append(tr("%1: %2").arg(title, state.toLower()));
     blockers.append(tr("%1 %2").arg(title, state.toLower()));
@@ -112,7 +113,8 @@ void DashboardController::refresh() {
       in.micTestLeft > 0 ? tr("%1  test %2 s").arg(dbfs).arg(in.micTestLeft) : dbfs, tr("Test"),
       idle && in.micTestLeft == 0 && in.mic != MicReady::Lost);
 
-  add(ReadyTile::Speaker, tr("Speaker"), status_words::word(in.speaker), in.speakerName, in.speakerNote, tr("Test tone"), idle);
+  add(ReadyTile::Speaker, tr("Speaker"), status_words::word(in.speaker), in.speakerName, in.speakerNote, tr("Test tone"), idle,
+      tr("I heard it"), idle && in.toneAwaitingAnswer);
 
   const QString edge = in.ptt == PttReady::Missing ? QString() : in.pttDown ? tr("RIGHT: DOWN") : tr("RIGHT: UP");
   add(ReadyTile::Ptt, tr("PTT"), status_words::word(in.ptt), in.pttName, in.pttNote.isEmpty() ? edge : in.pttNote, tr("Test"),
@@ -201,6 +203,10 @@ bool DashboardController::tileAction(int i) {
     case ReadyTile::Storage: break;
   }
   return false;
+}
+
+void DashboardController::toneHeard() {
+  if (feed_ && feed_->inputs().toneAwaitingAnswer && !running()) emit feed_->toneHeardRequested();
 }
 
 void DashboardController::cancelTests() {

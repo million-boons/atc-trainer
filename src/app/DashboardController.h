@@ -19,7 +19,7 @@ class DashboardController : public QObject {
   Q_PROPERTY(StatusFeed* feed READ feed WRITE setFeed NOTIFY changed)
   Q_PROPERTY(SttController* stt READ stt WRITE setStt NOTIFY changed)
   Q_PROPERTY(QString exerciseModel READ exerciseModel WRITE setExerciseModel NOTIFY changed)  // model id
-  // 6 x {title, level, state, line1, line2, effect, action, actionEnabled}
+  // 6 x {title, level, state, line1, line2, effect, action, actionEnabled, action2, action2Enabled}
   Q_PROPERTY(QVariantList tiles READ tiles NOTIFY changed)
   Q_PROPERTY(QString readyText READ readyText NOTIFY changed)
   Q_PROPERTY(QString blockText READ blockText NOTIFY changed)
@@ -67,6 +67,7 @@ class DashboardController : public QObject {
 
   // Button of tile i (atc::ReadyTile order). True: QML opens the list of missing clips.
   Q_INVOKABLE bool tileAction(int i);
+  Q_INVOKABLE void toneHeard();  // "I heard it" on the Speaker tile (D-306)
   Q_INVOKABLE void cancelTests();
   Q_INVOKABLE void stopExercise();
 

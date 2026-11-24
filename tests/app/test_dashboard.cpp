@@ -106,6 +106,31 @@ TEST_F(Dash, RadioAlertNeverHidesABlockingTile) {
   EXPECT_TRUE(d.alert().contains("PTT missing"));
 }
 
+TEST_F(Dash, HeardItOnlyAfterAToneAndNotInAnExercise) {
+  int heard = 0;
+  QObject::connect(&feed, &StatusFeed::toneHeardRequested, [&heard] { ++heard; });
+  in.speaker = SpeakerReady::NotChecked;
+  const auto enabled = [this] { return tile(ReadyTile::Speaker)["action2Enabled"].toBool(); };
+  send();
+  EXPECT_FALSE(enabled());
+  d.toneHeard();
+  EXPECT_EQ(heard, 0);
+  in.toneAwaitingAnswer = true;
+  in.running = true;
+  send();
+  EXPECT_FALSE(enabled());
+  d.toneHeard();
+  EXPECT_EQ(heard, 0);
+  in.running = false;
+  send(); agree();
+  EXPECT_TRUE(enabled());
+  EXPECT_EQ(chip(1)["value"].toString(), "NOT CHECKED");  // playing is not hearing
+  d.toneHeard();
+  EXPECT_EQ(heard, 1);
+  for (int i = 0; i < 6; ++i)
+    EXPECT_EQ(d.tiles()[i].toMap()["action2"].toString().isEmpty(), ReadyTile(i) != ReadyTile::Speaker) << i;
+}
+
 TEST_F(Dash, ExerciseAlertJoinsTheFooter) {
   ExerciseController ex;
   d.setExercise(&ex);
