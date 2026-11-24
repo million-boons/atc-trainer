@@ -286,6 +286,10 @@ void RadioCore::step() {
   }
   for (auto& f : todo) f();
   const Ns now = clock_();
+  if (const auto i = ring_.newestIndex(); i != micIndex_ || mic_.state != CaptureState::Running) {
+    micIndex_ = i;
+    micAt_ = now;
+  }
   ptt_->tick(now);
   tx_->tick(now);
   if (closing_ && (ring_.newestIndex() >= closing_->endIndex || now > closing_->deadline)) closeNow();
@@ -344,7 +348,7 @@ void RadioCore::publish(Ns now) {
   s.pttError = pttError_;
   s.pulse = pulse_;
   s.mic = mic_;
-  s.micSilent = meter_.zeroRun() > std::uint64_t(cfg_.rate);
+  s.micSilent = meter_.zeroRun() > std::uint64_t(cfg_.rate) || (mic_.state == CaptureState::Running && now - micAt_ > ms(1000));
   s.micDbfs = meter_.takePeakDbfs();
   ev_.snapshot(s);
 }

@@ -7,6 +7,8 @@ Window {
     required property LabController lab
     property MockBackend mock: null   // null: live backend
     required property SttController stt
+    required property StatusFeed feed
+    required property string exerciseModel
     required property string themeMode
     required property bool reduceMotion
     property string screen_: "lab"
@@ -24,11 +26,11 @@ Window {
     // Space is a fallback PTT; losing focus always releases it.
     onActiveChanged: if (!active) lab.releaseRequested("SPACE")
 
-    // The Dashboard shows mock data until 1a feeds it; a live build keeps it disabled.
     DashboardController {
         id: dashCtl
-        feed: root.mock ? root.mock.status : null
+        feed: root.feed
         stt: root.stt
+        exerciseModel: root.exerciseModel
     }
     onScreen_Changed: { lab.releaseRequested("SPACE"); dashCtl.cancelTests() }
     Connections {
@@ -53,7 +55,7 @@ Window {
             id: status
             width: parent.width; height: Theme.px(48)
             chips: root.lab.chips
-            scenario: qsTr("No scenario")
+            scenario: dashCtl.scenario.name || qsTr("No scenario")
             mock: root.mock !== null
         }
         NavRail {
@@ -63,7 +65,7 @@ Window {
             current: root.screen_
             onActivated: (id) => root.screen_ = id
             entries: [
-                { id: "dash", name: qsTr("Dashboard"), enabled: root.mock !== null, icon: "M 3 3 L 9 3 L 9 9 L 3 9 Z M 11 3 L 17 3 L 17 9 L 11 9 Z M 3 11 L 9 11 L 9 17 L 3 17 Z M 11 11 L 17 11 L 17 17 L 11 17 Z" },
+                { id: "dash", name: qsTr("Dashboard"), enabled: true, icon: "M 3 3 L 9 3 L 9 9 L 3 9 Z M 11 3 L 17 3 L 17 9 L 11 9 Z M 3 11 L 9 11 L 9 17 L 3 17 Z M 11 11 L 17 11 L 17 17 L 11 17 Z" },
                 { id: "scen", name: qsTr("Scenarios"), enabled: false, icon: "M 4 5 L 16 5 M 4 10 L 16 10 M 4 15 L 16 15" },
                 { id: "ex", name: qsTr("Exercise"), enabled: false, icon: "M 6 4 L 16 10 L 6 16 Z" },
                 { id: "lab", name: qsTr("Speech Lab"), enabled: true, icon: "M 7 3 L 13 3 L 13 11 L 7 11 Z M 4 9 L 4 14 L 16 14 L 16 9 M 10 14 L 10 18" },

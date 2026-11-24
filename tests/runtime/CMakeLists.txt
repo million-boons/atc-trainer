@@ -8,3 +8,14 @@ if(TARGET atc_pulse)
   target_link_libraries(player_tests PRIVATE atc_pulse GTest::gtest_main Threads::Threads)
   gtest_discover_tests(player_tests)
 endif()
+# The status logic of the app, without a window.
+find_package(Qt6 6.2 QUIET COMPONENTS Core Qml)
+if(Qt6_FOUND)
+  add_executable(status_tests test_status.cpp ${CMAKE_SOURCE_DIR}/src/app/StatusController.h ${CMAKE_SOURCE_DIR}/src/app/StatusController.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/StatusFeed.h ${CMAKE_SOURCE_DIR}/src/app/RowModel.h
+    ${CMAKE_SOURCE_DIR}/src/app/LabController.h ${CMAKE_SOURCE_DIR}/src/app/LabController.cpp)
+  set_target_properties(status_tests PROPERTIES AUTOMOC ON)
+  target_include_directories(status_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/app)
+  target_link_libraries(status_tests PRIVATE atc_runtime Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
+  gtest_discover_tests(status_tests)
+endif()

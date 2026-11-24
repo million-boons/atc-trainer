@@ -53,6 +53,7 @@ struct Rig {
   FakeSpeech speech;
   bool pttStarted = false, micOk = true, playOk = true, stopOk = true, answer = true;
   int level = 3000;
+  bool delivering = true;
   PlayId sounding = 0, lastPlay = 0;
   int plays = 0, stops = 0, sideTones = 0, silentAtOpen = 0, pressed = 0;
   std::optional<Reply> reply;  // given to the next closed transmission
@@ -113,8 +114,10 @@ struct Rig {
       now += ms(10);
       std::vector<std::int16_t> b(160);
       for (int k = 0; k < 160; ++k) b[std::size_t(k)] = std::int16_t(level * std::sin(k * 0.4));
-      ring->push(now, b);
-      meter->add(b);
+      if (delivering) {
+        ring->push(now, b);
+        meter->add(b);
+      }
       core->step();
     }
   }
@@ -184,6 +187,33 @@ TEST(RadioCore, SilenceIsNotRecognised) {
   EXPECT_FALSE(r.closed[0].recognising);
   EXPECT_EQ(r.speech.cancelled, std::vector<std::uint64_t>{1});
   EXPECT_TRUE(r.snap.micSilent);
+}
+
+TEST(RadioCore, RunningMicrophoneThatDeliversNothingIsSilent) {
+  Rig r;
+  CaptureStatus c;
+  c.state = CaptureState::Running;
+  r.micStatus(c);
+  r.run(2000);
+  EXPECT_FALSE(r.snap.micSilent);
+  r.delivering = false;
+  r.run(900);
+  EXPECT_FALSE(r.snap.micSilent);
+  r.run(300);
+  EXPECT_TRUE(r.snap.micSilent);
+  r.delivering = true;
+  r.run(50);
+  EXPECT_FALSE(r.snap.micSilent);
+}
+
+// The tail that never arrives must not hold the radio.
+TEST(RadioCore, TransmissionClosesWithoutItsLastAudio) {
+  Rig r;
+  r.down(); r.run(600);
+  r.delivering = false;
+  r.up(); r.run(1500);
+  ASSERT_EQ(r.closed.size(), 1u);
+  EXPECT_TRUE(r.closed[0].gap);
 }
 
 TEST(RadioCore, ShortTapIsCancelled) {

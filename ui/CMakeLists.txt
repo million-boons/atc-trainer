@@ -45,7 +45,8 @@ if(TARGET atc_pulse)
 endif()
 # Live backend: needs the microphone, PTT and speech libraries.
 if(TARGET atc_stt AND TARGET atc_pulse AND TARGET atc_evdev)
-  target_sources(atc_trainer PRIVATE ${APP}/LiveBackend.h ${APP}/LiveBackend.cpp)
-  target_link_libraries(atc_trainer PRIVATE atc_evdev)
+  target_sources(atc_trainer PRIVATE ${APP}/LiveBackend.h ${APP}/LiveBackend.cpp
+    ${APP}/StatusController.h ${APP}/StatusController.cpp)
+  target_link_libraries(atc_trainer PRIVATE atc_devices)
   target_compile_definitions(atc_trainer PRIVATE ATC_HAVE_LIVE)
 endif()

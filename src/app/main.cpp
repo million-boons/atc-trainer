@@ -102,14 +102,22 @@ int main(int argc, char** argv) {
   std::unique_ptr<LiveBackend> live;
   if (!useMock) {
     LiveConfig lc;
-    lc.pttDevice = cli.isSet(pttOpt) ? cli.value(pttOpt) : cfg["pttDevice"].toString();
-    if (lc.pttDevice == "none") lc.pttDevice.clear();
+    QString ptt = cli.isSet(pttOpt) ? cli.value(pttOpt) : cfg["pttDevice"].toString();
+    if (ptt == "none") ptt.clear();
     lc.pttName = cfg["pttName"].toString("PTT device");
-    lc.pttGrab = cfg["pttGrab"].toBool(false);
-    lc.micSource = cfg["micSource"].toString().toStdString();
-    lc.pulseServer = cli.value(pulseOpt).toStdString();
+    lc.devices.pttDevice = ptt.toStdString();
+    lc.devices.pttGrab = cfg["pttGrab"].toBool(false);
+    lc.devices.pttCode = cfg["pttCode"].toInt(lc.devices.pttCode);
+    lc.devices.micSource = cfg["micSource"].toString().toStdString();
+    lc.devices.pulseServer = cli.value(pulseOpt).toStdString();
+    lc.radio.pilotCutNotice = atc::ms(cfg["pilotCutNoticeMs"].toInt(2000));
+    lc.status.pttName = lc.pttName;
+    lc.status.pttStandIn = cfg["pttStandIn"].toBool(!lc.devices.pttGrab);  // an exclusive device is the pedal
+    lc.status.pttMissingBlocks = cfg["pttMissingBlocks"].toBool(true);
+    lc.status.storagePath = at(paths.writable);
+    lc.status.storageWarnMb = cfg["recordingsWarnFreeMb"].toInt(1000);
     lab.textTag = "NOT VALIDATED";
-    if (lc.pttDevice.isEmpty()) lab.idleHint = "Hold Screen PTT or Space";
+    if (ptt.isEmpty()) lab.idleHint = "Hold Screen PTT or Space";
     stt.start(std::move(models), [engines = paths.engines](const atc::SttModel& m, std::string& e) { return atc::makeRecognizer(m, engines, e); },
               atc::describeModel, atc::availableMemoryMb);
     live = std::make_unique<LiveBackend>(&lab, &stt, lc);
@@ -132,6 +140,10 @@ int main(int argc, char** argv) {
   }
 #endif
 
+  StatusFeed* feed = mockBackend ? mockBackend->status() : nullptr;
+#ifdef ATC_HAVE_LIVE
+  if (live) feed = live->status();
+#endif
   const QStringList wh = cli.value(size).split('x');
   const bool windowed = wh.size() == 2;
   QQmlApplicationEngine engine;
@@ -139,6 +151,8 @@ int main(int argc, char** argv) {
   engine.setInitialProperties({{"lab", QVariant::fromValue(&lab)},
                                {"mock", QVariant::fromValue(mockBackend.get())},
                                {"stt", QVariant::fromValue(&stt)},
+                               {"feed", QVariant::fromValue(feed)},
+                               {"exerciseModel", cfg["exerciseModel"].toString("whisper-tiny-genprompt")},  // D-414
                                {"themeMode", cli.isSet(theme) ? cli.value(theme) : cfg["theme"].toString("dark")},
                                {"reduceMotion", cfg["reduceMotion"].toBool(false)}});
   engine.load(QUrl("qrc:/Atc/Main.qml"));

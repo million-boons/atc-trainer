@@ -34,7 +34,7 @@ struct RadioSnapshot {
   std::string pttError;
   bool pulse = false;      // pulse-type device suspected
   CaptureStatus mic;
-  bool micSilent = false;  // exactly zero for a second
+  bool micSilent = false;  // exactly zero, or no audio delivered, for a second
   double micDbfs = -120;   // peak since the previous snapshot
   bool pilotSpeaking() const { return state == TransmissionController::State::PilotSpeaking; }
 };
@@ -187,6 +187,8 @@ class RadioCore {
   bool lost_ = false;              // audio was overwritten before it could be sent
   std::optional<Closing> closing_;
   CaptureStatus mic_;
+  std::int64_t micIndex_ = 0;
+  Ns micAt_ = 0;                   // when the newest audio was first seen
   Sound sound_ = Sound::None;
   LocalSound local_ = LocalSound::Recording;
   PlayId play_ = 0;
