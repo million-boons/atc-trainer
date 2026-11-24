@@ -220,6 +220,7 @@ Item {
                                                        Math.max(0, recList.contentHeight - recList.height))
             }
             SecondaryButton { width: (s.rightW - 2 * Theme.s12 - Theme.s8) / 2; text: qsTr("Export")
+                              enabled: false   // off for the slice (D-407)
                               onClicked: s.lab.exportRequested() }
         }
     }
