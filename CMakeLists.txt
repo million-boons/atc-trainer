@@ -53,7 +53,7 @@ endif()
 find_path(PULSE_INCLUDE pulse/pulseaudio.h)
 find_library(PULSE_LIB pulse)
 if(PULSE_INCLUDE AND PULSE_LIB)
-  add_library(atc_pulse STATIC src/audio/PulseCapture.cpp src/audio/PulseSideTone.cpp src/audio/PulsePlayback.cpp)
+  add_library(atc_pulse STATIC src/audio/PulseCapture.cpp src/audio/PulseSideTone.cpp src/audio/PulsePlayer.cpp)
   target_include_directories(atc_pulse PUBLIC src PRIVATE ${PULSE_INCLUDE})
   target_link_libraries(atc_pulse PUBLIC atc_logic ${PULSE_LIB} Threads::Threads)
   add_executable(audio_probe tools/audio_probe.cpp)
@@ -166,7 +166,7 @@ endif()
 
 # cmake --install build --prefix DIR --strip. Models and audio are copied by rsync, never from here (D-31).
 foreach(T atc_trainer ptt_monitor audio_probe ptt_record ptt_text stt_bench phrase_gen script_gen
-        logic_tests runtime_tests contract_tests storage_tests parser_tests stt_tests)
+        logic_tests runtime_tests player_tests contract_tests storage_tests parser_tests stt_tests)
   if(TARGET ${T})
     install(TARGETS ${T} RUNTIME DESTINATION bin)
   endif()
