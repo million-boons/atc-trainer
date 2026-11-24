@@ -132,7 +132,7 @@ QVariantList MockBackend::scripts() const {
       {"cut", "PILOT CUT (interrupt)"}, {"blocked", "BLOCKED (rule block)"},
       {"queued", "WAIT (rule queue)"}, {"queueopen", "Queued, then TX"}, {"queuedrop", "Queued, dropped"}, {"queuetalk", "Queued, talked too soon"}, {"ptimeout", "Pilot voice timeout"},
       {"mloading", "Model LOADING"}, {"mfailed", "Model FAILED"}, {"mother", "Other model selected"}, {"mlocked", "Model locked"},
-      {"vloaded", "Bank loaded"}, {"vok", "Bank coverage OK"}, {"vmissing", "Bank missing clips"}, {"vfailed", "Bank failed"},
+      {"vloaded", "Bank loaded"}, {"vchecking", "Bank checking"}, {"vok", "Bank coverage OK"}, {"vmissing", "Bank missing clips"}, {"vfailed", "Bank failed"},
       {"dash", "Dashboard: not ready"}, {"dashready", "Dashboard: all ready"}, {"dashrun", "Dashboard: running"},
       {"dashfault", "Dashboard: faults"}};
   QVariantList l;
@@ -399,6 +399,7 @@ void MockBackend::setStatusCase(const QString& id) {
   s.ptt = pttBase_;
   s.pttName = ready ? tr("Foot pedal (simulated)") : tr("Dell mouse (simulated)");
   s.bank = id == "vloaded" ? BankReady::Loaded
+           : id == "vchecking" ? BankReady::Checking
            : id == "vok" || ready ? BankReady::CoverageOk
            : id == "vmissing" || id == "dash" ? BankReady::MissingClips
            : id == "vfailed" || fault ? BankReady::Failed : BankReady::NotLoaded;

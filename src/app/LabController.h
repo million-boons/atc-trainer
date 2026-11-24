@@ -39,8 +39,7 @@ class LabController : public QObject {
   Q_PROPERTY(double micHigh MEMBER micHigh CONSTANT)
   Q_PROPERTY(double micTarget MEMBER micTarget CONSTANT)
   Q_PROPERTY(QString textTag MEMBER textTag CONSTANT)
-  Q_PROPERTY(QVariantList chips READ chips NOTIFY chipsChanged)
-  Q_PROPERTY(QString pttSource READ pttSource NOTIFY chipsChanged)
+  Q_PROPERTY(QString pttSource READ pttSource NOTIFY pttSourceChanged)
   Q_PROPERTY(bool rightDown READ rightDown NOTIFY buttonsChanged)
   Q_PROPERTY(bool leftDown READ leftDown NOTIFY buttonsChanged)
   Q_PROPERTY(QString text READ text NOTIFY textChanged)
@@ -85,7 +84,6 @@ class LabController : public QObject {
   void setRx(bool active);
   void setPilotCut(bool on);
   void setMic(double dbfs);
-  void setChip(int i, const QString& value, Level l);
   void setPttSource(const QString& s);
   void setButtons(bool right, bool left);
   void setText(const QString& t, const QString& state, bool partial, const QString& resultInfo, bool placeholder);
@@ -99,10 +97,6 @@ class LabController : public QObject {
   void showRecording(int row);  // -1: none
 
   const std::vector<std::int16_t>* waveform() const;
-  enum ChipIndex { Mic, Speaker, Ptt, Stt, VoiceBank };
-  // D-27. NotLoaded is the state before any bank has been loaded.
-  enum class Bank { NotLoaded, Loaded, CoverageOk, MissingClips, Failed };
-  void setVoiceBank(Bank b, int missing = 0);
 
   Tone txTone() const;
   QString txLabel() const;
@@ -112,7 +106,6 @@ class LabController : public QObject {
   bool rxActive() const { return rx_; }
   QString rxSub() const;
   double micDbfs() const { return mic_; }
-  QVariantList chips() const { return chips_; }
   QString pttSource() const { return pttSource_; }
   bool rightDown() const { return right_; }
   bool leftDown() const { return left_; }
@@ -151,7 +144,7 @@ class LabController : public QObject {
   void txTimeChanged();
   void rxChanged();
   void micChanged();
-  void chipsChanged();
+  void pttSourceChanged();
   void buttonsChanged();
   void textChanged();
   void noticeChanged();
@@ -163,7 +156,6 @@ class LabController : public QObject {
   QString txTime_;
   bool rx_ = false, pilotCut_ = false;
   double mic_ = -120;
-  QVariantList chips_;
   QString pttSource_;
   bool right_ = false, left_ = false;
   QString text_, textState_, resultInfo_;

@@ -61,7 +61,7 @@ TEST_F(Dash, EveryStateAgrees) {
   for (auto s : {SpeakerReady::NotChecked, SpeakerReady::Ok}) { in.speaker = s; send(); agree(); }
   for (bool blocks : {true, false})
     for (auto s : {PttReady::StandIn, PttReady::NoHold, PttReady::Missing, PttReady::Ok}) { in.pttMissingBlocks = blocks; in.ptt = s; send(); agree(); }
-  for (auto s : {BankReady::Loaded, BankReady::NotLoaded, BankReady::MissingClips, BankReady::Failed, BankReady::CoverageOk}) { in.bank = s; send(); agree(); }
+  for (auto s : {BankReady::Loaded, BankReady::Checking, BankReady::NotLoaded, BankReady::MissingClips, BankReady::Failed, BankReady::CoverageOk}) { in.bank = s; send(); agree(); }
   for (auto s : {StorageReady::Low, StorageReady::Ok}) { in.storage = s; send(); agree(); }
   for (auto s : {SttState::NotLoaded, SttState::Loading, SttState::Failed, SttState::Busy, SttState::Ready}) { model(s); agree(); }
   model(SttState::Ready, "vosk-grammar"); agree();
@@ -87,6 +87,14 @@ TEST_F(Dash, ModelAndBankThatBlockStartAreFaultChips) {
   send(); agree();
   EXPECT_EQ(chip(3)["level"].toInt(), int(LabController::Fault));
   EXPECT_EQ(chip(4)["level"].toInt(), int(LabController::Fault));
+}
+
+TEST_F(Dash, StartWaitsForTheCoverageCheck) {  // D-115
+  in.bank = BankReady::Checking;
+  send(); agree();
+  EXPECT_EQ(chip(4)["value"].toString(), "CHECKING");
+  EXPECT_EQ(chip(4)["level"].toInt(), int(LabController::Fault));
+  EXPECT_TRUE(d.alert().contains("Voice bank checking"));
 }
 
 TEST_F(Dash, BusyIsReady) {

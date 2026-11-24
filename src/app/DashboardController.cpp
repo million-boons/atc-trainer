@@ -135,11 +135,12 @@ void DashboardController::refresh() {
   switch (in.bank) {
     case BankReady::CoverageOk: bank = tr("COVERAGE OK"); break;
     case BankReady::Loaded: bank = tr("LOADED"); break;
+    case BankReady::Checking: bank = tr("CHECKING"); break;
     case BankReady::NotLoaded: bank = tr("NOT LOADED"); break;
     case BankReady::MissingClips: bank = tr("MISSING CLIPS (%1)").arg(in.missingClips.size()); break;
     case BankReady::Failed: bank = tr("FAILED"); break;
   }
-  add(ReadyTile::Bank, tr("Voice bank"), bank, in.bank == BankReady::Loaded ? tr("Coverage not checked") : QString(), {}, tr("List"),
+  add(ReadyTile::Bank, tr("Voice bank"), bank, in.bank == BankReady::Loaded ? tr("Coverage not checked") : in.bank == BankReady::Checking ? tr("Start waits for the check") : QString(), {}, tr("List"),
       !in.missingClips.isEmpty());
 
   add(ReadyTile::Storage, tr("Storage"), in.storage == StorageReady::Ok ? tr("OK") : tr("LOW"), in.storageFree, {}, {}, false);
