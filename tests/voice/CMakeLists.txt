@@ -1,6 +1,6 @@
 if(EXISTS ${TP}/json/nlohmann/json.hpp)
   include(GoogleTest)
-  add_executable(voice_tests test_voice.cpp)
+  add_executable(voice_tests test_voice.cpp test_clips.cpp)
   target_include_directories(voice_tests SYSTEM PRIVATE ${TP}/json)
   target_link_libraries(voice_tests PRIVATE atc_engine atc_voice GTest::gtest_main Threads::Threads)
   gtest_discover_tests(voice_tests)

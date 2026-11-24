@@ -1,8 +1,12 @@
-# Template parser, voice bank, PhraseAssembler (2c, session 8d). Qt-free.
+# Template parser, voice bank, PhraseAssembler (2c), clip list and trimming (2d), session 8d. Qt-free.
 if(EXISTS ${TP}/json/nlohmann/json.hpp)
-  add_library(atc_voice STATIC PhraseTemplate.cpp VoiceBank.cpp PhraseAssembler.cpp)
+  add_library(atc_voice STATIC PhraseTemplate.cpp VoiceBank.cpp PhraseAssembler.cpp ClipList.cpp ClipTrim.cpp)
   target_include_directories(atc_voice SYSTEM PRIVATE ${TP}/json)
   target_link_libraries(atc_voice PUBLIC atc_scenario)
+  add_executable(voice_tool ${CMAKE_SOURCE_DIR}/tools/voice_tool.cpp)
+  target_include_directories(voice_tool SYSTEM PRIVATE ${TP}/json)
+  target_link_libraries(voice_tool PRIVATE atc_voice)
+  install(TARGETS voice_tool RUNTIME DESTINATION bin)
 else()
   add_library(atc_voice INTERFACE)
   target_link_libraries(atc_voice INTERFACE atc_logic)
