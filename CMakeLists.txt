@@ -138,7 +138,7 @@ if(ATC_BUILD_TESTS)
   find_package(GTest REQUIRED)
   add_executable(logic_tests
     tests/test_ptt.cpp tests/test_tx.cpp tests/test_tx_display.cpp tests/test_ring.cpp tests/test_checks.cpp
-    tests/test_audio_files.cpp tests/test_bench.cpp tests/test_sidetone.cpp tests/test_paths.cpp)
+    tests/test_audio_files.cpp tests/test_bench.cpp tests/test_sidetone.cpp tests/test_paths.cpp tests/test_readiness.cpp)
   target_link_libraries(logic_tests PRIVATE atc_logic GTest::gtest_main Threads::Threads)
   include(GoogleTest)
   gtest_discover_tests(logic_tests)

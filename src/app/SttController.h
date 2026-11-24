@@ -35,6 +35,11 @@ class SttController : public QObject {
   // Mock cases: show this status instead of the service's. Empty: the service again.
   void showScripted(std::optional<atc::SttStatus> s);
   QString nameOf(const std::string& id) const;
+  const atc::SttStatus& status() const { return shown(); }
+  QString catalogError() const { return catalogError_; }
+  bool installed(const QString& id) const;
+  bool canLoad(const QString& id) const;
+  void loadModel(const QString& id);  // Dashboard: does not change the selection
 
   QVariantList models() const { return list_; }
   int selected() const { return selected_; }

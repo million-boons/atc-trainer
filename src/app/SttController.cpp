@@ -94,13 +94,20 @@ QString SttController::message() const {
   return catalogError_.isEmpty() ? QString::fromStdString(shown().message) : catalogError_;
 }
 
-bool SttController::loadEnabled() const {
-  const auto& s = shown();
-  if (!service_ || selected_ < 0 || txActive_ || s.locked) return false;
-  if (s.state == SttState::Loading || s.state == SttState::Busy) return false;
-  const bool same = list_[selected_].toMap()["id"].toString().toStdString() == s.modelId;
-  return list_[selected_].toMap()["installed"].toBool() && !(same && s.state == SttState::Ready);
+bool SttController::installed(const QString& id) const {
+  for (const QVariant& v : list_)
+    if (v.toMap()["id"].toString() == id) return v.toMap()["installed"].toBool();
+  return false;
 }
+
+bool SttController::canLoad(const QString& id) const {
+  const auto& s = shown();
+  if (!service_ || txActive_ || s.locked || !installed(id)) return false;
+  if (s.state == SttState::Loading || s.state == SttState::Busy) return false;
+  return !(id.toStdString() == s.modelId && s.state == SttState::Ready);
+}
+
+bool SttController::loadEnabled() const { return selected_ >= 0 && canLoad(list_[selected_].toMap()["id"].toString()); }
 
 void SttController::select(int row) {
   if (row < 0 || row >= list_.size() || locked() || !list_[row].toMap()["installed"].toBool() || row == selected_) return;
@@ -109,9 +116,13 @@ void SttController::select(int row) {
 }
 
 void SttController::load() {
-  if (!loadEnabled()) return;
+  if (selected_ >= 0) loadModel(list_[selected_].toMap()["id"].toString());
+}
+
+void SttController::loadModel(const QString& id) {
+  if (!canLoad(id)) return;
   scripted_.reset();
-  service_->load(list_[selected_].toMap()["id"].toString().toStdString());
+  service_->load(id.toStdString());
   status_ = service_->status();
   emit changed();
 }
