@@ -13,6 +13,7 @@ inline QString tr(const char* s) { return QCoreApplication::translate("StatusWor
 inline QString word(atc::MicReady s) {
   switch (s) {
     case atc::MicReady::Ok: return tr("OK");
+    case atc::MicReady::NotTested: return tr("NOT TESTED");
     case atc::MicReady::OutsideBand: return tr("LEVEL");
     case atc::MicReady::NoSignal: return tr("NO SIGNAL");
     case atc::MicReady::Muted: return tr("MUTED");

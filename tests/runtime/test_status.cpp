@@ -4,6 +4,7 @@
 #include <QEventLoop>
 #include <QTimer>
 
+#include "app/DashboardController.h"
 #include "app/StatusController.h"
 #include "app/StatusWords.h"
 using namespace atc;
@@ -12,7 +13,7 @@ using TK = PttTest::Kind;
 namespace {
 void spin(int millis) {
   QEventLoop l;
-  QTimer::singleShot(millis, &l, &QEventLoop::quit);
+  QTimer::singleShot(millis, Qt::PreciseTimer, &l, &QEventLoop::quit);  // a coarse one may end 5 % early
   l.exec();
 }
 
@@ -21,11 +22,13 @@ struct Status : testing::Test {
   std::vector<bool> tests;
   int tones = 0, stops = 0, changes = 0;
   StatusConfig cfg{.pttName = "mouse", .storagePath = "/nonexistent/atc"};
-  std::unique_ptr<StatusController> c;
+  DashboardController dash;
+  std::unique_ptr<StatusController> c;  // destroyed before dash, which only watches its feed
   RadioSnapshot snap;
 
   void SetUp() override {
     c = std::make_unique<StatusController>(&lab, cfg, StatusController::Radio{[this](bool on) { tests.push_back(on); }, [this] { ++tones; }, [this] { ++stops; }});
+    dash.setFeed(c->feed());
     snap.mic.state = CaptureState::Running;
     snap.mic.source = "h540";
     snap.mic.description = "H540";
@@ -35,19 +38,24 @@ struct Status : testing::Test {
   }
   void send() { c->onSnapshot(snap); }
   const StatusInputs& in() { return c->feed()->inputs(); }
-  QString chip(int i) { return lab.chips()[i].toMap()["value"].toString(); }
-  // What D-103 asks for: tile and chip from one state.
+  QString chip(int i) { return dash.chips()[i].toMap()["value"].toString(); }
+  QVariantMap tile(int i) { return dash.tiles()[i].toMap(); }
+  // The screen shows what this controller reports, tile and chip alike (D-103, D-110).
   void agree() {
-    EXPECT_EQ(chip(LabController::Mic), status_words::word(in().mic));
-    EXPECT_EQ(chip(LabController::Speaker), status_words::word(in().speaker));
-    EXPECT_EQ(chip(LabController::Ptt), status_words::word(in().ptt));
+    for (int i = 0; i < 3; ++i) {
+      const QString w[] = {status_words::word(in().mic), status_words::word(in().speaker), status_words::word(in().ptt)};
+      EXPECT_EQ(chip(i), w[i]);
+      EXPECT_EQ(tile(i)["state"].toString(), w[i]);
+    }
+    EXPECT_EQ(in().toneAwaitingAnswer, c->toneAwaitingAnswer());
+    EXPECT_EQ(tile(1)["action2Enabled"].toBool(), in().toneAwaitingAnswer);
   }
   OutputStatus out(const char* n = "out", bool mute = false, int vol = 50) { return {true, n, n, mute, vol}; }
 };
 }  // namespace
 
 TEST_F(Status, MicrophoneStates) {
-  EXPECT_EQ(in().mic, MicReady::Ok);
+  EXPECT_EQ(in().mic, MicReady::NotTested); agree();
   EXPECT_EQ(in().micName, "H540");
   snap.micSilent = true; send(); agree();
   EXPECT_EQ(in().mic, MicReady::NoSignal);
@@ -114,7 +122,7 @@ TEST_F(Status, ToneMarksTheSpeakerOnlyWhenPlayedToTheEnd) {
   c->onTone(LocalEnd::Completed); agree();
   EXPECT_EQ(in().speaker, SpeakerReady::NotChecked);  // playing is not hearing
   EXPECT_TRUE(c->toneAwaitingAnswer());
-  c->toneHeard(); agree();
+  dash.toneHeard(); agree();  // the button
   EXPECT_EQ(in().speaker, SpeakerReady::Ok);
   EXPECT_FALSE(c->toneAwaitingAnswer());
 }
@@ -122,16 +130,19 @@ TEST_F(Status, ToneMarksTheSpeakerOnlyWhenPlayedToTheEnd) {
 TEST_F(Status, AnAnswerToAnOldToneDoesNotCount) {
   c->onOutput(out());
   const auto played = [this] { c->onTone(LocalEnd::Started); c->onTone(LocalEnd::Completed); };
+  const auto stale = [this] { EXPECT_FALSE(in().toneAwaitingAnswer); agree(); };
   played();
+  EXPECT_TRUE(in().toneAwaitingAnswer); agree();
   emit c->feed()->cancelTestsRequested();  // the screen was left
+  stale();
   c->toneHeard();
   EXPECT_EQ(in().speaker, SpeakerReady::NotChecked);
   played();
-  c->onOutput(out("other"));
+  c->onOutput(out("other")); stale();
   c->toneHeard();
   EXPECT_EQ(in().speaker, SpeakerReady::NotChecked);
   played();
-  c->onTone(LocalEnd::Started);  // played again
+  c->onTone(LocalEnd::Started); stale();  // played again
   c->toneHeard();
   EXPECT_EQ(in().speaker, SpeakerReady::NotChecked);
 }
@@ -193,7 +204,7 @@ TEST_F(Status, CancelledOrRefusedTestGivesNoResult) {
 TEST_F(Status, MicTestJudgesTheBand) {
   lab.micLow = -20; lab.micHigh = -6;
   snap.micDbfs = -50; send();
-  EXPECT_EQ(in().mic, MicReady::Ok);  // silence between transmissions is not a fault
+  EXPECT_EQ(in().mic, MicReady::NotTested);
   emit c->feed()->micTestRequested();
   EXPECT_EQ(in().micTestLeft, 5);
   spin(150); send();
@@ -204,13 +215,44 @@ TEST_F(Status, MicTestJudgesTheBand) {
   snap.micDbfs = -12; send();
   spin(5200);
   EXPECT_EQ(in().mic, MicReady::Ok); agree();
+  snap.micDbfs = -50; send();
+  EXPECT_EQ(in().mic, MicReady::Ok);  // silence between transmissions is not a fault
+  snap.mic.muted = true; send(); agree();
+  EXPECT_EQ(in().mic, MicReady::Muted);
+  snap.mic.muted = false; send();
+  EXPECT_EQ(in().mic, MicReady::Ok);
+  snap.mic.source = "other"; send(); agree();
+  EXPECT_EQ(in().mic, MicReady::NotTested);
+}
+
+// D-306: a test that could not hear the microphone to its end proves nothing.
+TEST_F(Status, MicTestWithoutAResultStaysNotTested) {
+  lab.micLow = -20; lab.micHigh = -6;
+  snap.micDbfs = -12; send();
+  emit c->feed()->micTestRequested();
+  snap.mic.state = CaptureState::Lost; send();
+  EXPECT_EQ(in().micTestLeft, 0);
+  snap.mic.state = CaptureState::Running; send(); agree();
+  spin(5200);
+  EXPECT_EQ(in().mic, MicReady::NotTested);
+  emit c->feed()->micTestRequested();
+  snap.mic.muted = true; send();
+  spin(5200);
+  snap.mic.muted = false; send(); agree();
+  EXPECT_EQ(in().mic, MicReady::NotTested);
+  emit c->feed()->micTestRequested();
+  send();
+  emit c->feed()->cancelTestsRequested();  // the screen was left
+  spin(5200);
+  EXPECT_EQ(in().mic, MicReady::NotTested);
 }
 
 TEST_F(Status, BankChipAndTileTogether) {
   c->setBank(BankReady::MissingClips, {"a", "b"});
   EXPECT_EQ(in().bank, BankReady::MissingClips);
   EXPECT_EQ(in().missingClips.size(), 2);
-  EXPECT_TRUE(chip(LabController::VoiceBank).contains("2"));
+  EXPECT_TRUE(chip(4).contains("2"));
+  EXPECT_EQ(chip(4), tile(4)["state"].toString());
 }
 
 int main(int argc, char** argv) {

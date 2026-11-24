@@ -41,7 +41,7 @@ Technology cost summary: Qt Quick (about 150 MB, for touch UI); Vosk (about 300 
 | 7 | Voice bank + radio DSP | Listeners identify callsigns and numbers; you choose intensity |
 | 8 | Assessment and logging | Debrief replay matches the log |
 | 9 | Integration and performance | Budgets measured, 4 h soak |
-| 10 | Deployment | Clean-panel offline install: .deb, udev, autostart |
+| 10 | Deployment | Clean-panel offline install: .deb, udev, autostart. Requires G1-P (D-309) |
 
 Phase 2 precedes everything that depends on speech. Phases 1 and 2 can overlap. SOP content entry runs alongside from Phase 3.
 

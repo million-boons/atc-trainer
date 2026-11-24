@@ -6,10 +6,7 @@
 #include <cmath>
 #include <utility>
 
-#include "app/StatusWords.h"
-
 using namespace atc;
-using L = LabController;
 
 namespace {
 constexpr int kMicTestMs = 5000, kPressWaitMs = 10'000, kLevelMs = 500, kLevelTestMs = 100, kStorageMs = 10'000;
@@ -17,7 +14,8 @@ constexpr double kHoldSeconds = 2;
 
 bool same(const StatusInputs& a, const StatusInputs& b) {
   return a.mic == b.mic && a.micName == b.micName && a.micDbfs == b.micDbfs && a.micTestLeft == b.micTestLeft &&
-         a.speaker == b.speaker && a.speakerName == b.speakerName && a.speakerNote == b.speakerNote && a.ptt == b.ptt &&
+         a.speaker == b.speaker && a.speakerName == b.speakerName && a.speakerNote == b.speakerNote &&
+         a.toneAwaitingAnswer == b.toneAwaitingAnswer && a.ptt == b.ptt &&
          a.pttMissingBlocks == b.pttMissingBlocks && a.pttDown == b.pttDown && a.pttName == b.pttName && a.pttNote == b.pttNote &&
          a.pttTesting == b.pttTesting && a.bank == b.bank && a.missingClips == b.missingClips && a.storage == b.storage &&
          a.storageFree == b.storageFree && a.running == b.running && a.scenario == b.scenario;
@@ -38,6 +36,7 @@ StatusController::StatusController(LabController* lab, StatusConfig cfg, Radio r
     tick();
   });
   connect(&feed_, &StatusFeed::toneRequested, this, &StatusController::requestTone);
+  connect(&feed_, &StatusFeed::toneHeardRequested, this, &StatusController::toneHeard);
   connect(&feed_, &StatusFeed::pttTestRequested, this, [this] { radio_.setPttTest(true); });
   connect(&feed_, &StatusFeed::cancelTestsRequested, this, [this] {
     micTest_.invalidate();
@@ -73,13 +72,6 @@ void StatusController::storage() {
 void StatusController::setBank(BankReady b, const QStringList& missing) {
   in_.bank = b;
   in_.missingClips = missing;
-  switch (b) {
-    case BankReady::Loaded: lab_->setVoiceBank(L::Bank::Loaded); break;
-    case BankReady::CoverageOk: lab_->setVoiceBank(L::Bank::CoverageOk); break;
-    case BankReady::MissingClips: lab_->setVoiceBank(L::Bank::MissingClips, int(missing.size())); break;
-    case BankReady::Failed: lab_->setVoiceBank(L::Bank::Failed); break;
-    case BankReady::NotLoaded: lab_->setVoiceBank(L::Bank::NotLoaded); break;
-  }
   apply();
 }
 
@@ -87,15 +79,19 @@ void StatusController::onSnapshot(const RadioSnapshot& s) {
   radioState_ = s;
   peak_ = std::max(peak_, s.micDbfs);
   const QString source = QString::fromStdString(s.mic.source);
-  if (source != micSource_) {  // another microphone has not been tested
+  // Another microphone, or one that was lost, has not been tested; a running test ends without a result.
+  if (source != micSource_ || s.mic.state != CaptureState::Running) {
     micSource_ = source;
-    outside_ = false;
+    micCheck_ = MicCheck::None;
+    micTest_.invalidate();
+    in_.micTestLeft = 0;
   }
   if (micTest_.isValid()) testPeak_ = std::max(testPeak_, s.micDbfs);
   in_.mic = s.mic.state != CaptureState::Running ? MicReady::Lost
             : s.mic.muted ? MicReady::Muted
             : s.micSilent ? MicReady::NoSignal
-            : outside_ ? MicReady::OutsideBand : MicReady::Ok;
+            : micCheck_ == MicCheck::Good ? MicReady::Ok
+            : micCheck_ == MicCheck::Outside ? MicReady::OutsideBand : MicReady::NotTested;
   in_.micName = s.mic.description.empty() ? source : QString::fromStdString(s.mic.description);
   // Slowly, and in whole decibels: each change redraws the tiles.
   if (level_.elapsed() >= (micTest_.isValid() ? kLevelTestMs : kLevelMs)) {
@@ -151,8 +147,10 @@ void StatusController::onTone(LocalEnd e) {
     case LocalEnd::Completed: break;
   }
   if (!out_.available || out_.muted || out_.volumePercent == 0) return speakerNote(tr("muted or lost"));
-  speakerNote(tr("did you hear it?"));
+  in_.speaker = SpeakerReady::NotChecked;
+  in_.speakerNote = tr("did you hear it?");
   toneDone_ = true;
+  apply();
 }
 
 void StatusController::toneHeard() {
@@ -208,7 +206,8 @@ void StatusController::tick() {
     in_.micTestLeft = int(std::max<qint64>(0, (left + 999) / 1000));
     if (left <= 0) {
       micTest_.invalidate();
-      outside_ = testPeak_ < lab_->micLow || testPeak_ > lab_->micHigh;
+      micCheck_ = radioState_.mic.muted ? MicCheck::None  // nothing could be heard
+                  : testPeak_ < lab_->micLow || testPeak_ > lab_->micHigh ? MicCheck::Outside : MicCheck::Good;
       onSnapshot(radioState_);
     }
   }
@@ -218,11 +217,9 @@ void StatusController::tick() {
 }
 
 void StatusController::apply() {
+  in_.toneAwaitingAnswer = toneDone_;
   if (!first_ && same(in_, sent_)) return;
   first_ = false;
   sent_ = in_;
-  lab_->setChip(L::Mic, status_words::word(in_.mic), status_words::level(effect(in_.mic)));
-  lab_->setChip(L::Speaker, status_words::word(in_.speaker), status_words::level(effect(in_.speaker)));
-  lab_->setChip(L::Ptt, status_words::word(in_.ptt), status_words::level(effect(in_.ptt, in_.pttMissingBlocks)));
   feed_.set(in_);
 }

@@ -56,7 +56,7 @@ TEST_F(Dash, AllReady) {
 }
 
 TEST_F(Dash, EveryStateAgrees) {
-  for (auto s : {MicReady::Ok, MicReady::OutsideBand, MicReady::NoSignal, MicReady::Muted, MicReady::Lost}) { in.mic = s; send(); agree(); }
+  for (auto s : {MicReady::Ok, MicReady::NotTested, MicReady::OutsideBand, MicReady::NoSignal, MicReady::Muted, MicReady::Lost}) { in.mic = s; send(); agree(); }
   in.mic = MicReady::Ok;
   for (auto s : {SpeakerReady::NotChecked, SpeakerReady::Ok}) { in.speaker = s; send(); agree(); }
   for (bool blocks : {true, false})

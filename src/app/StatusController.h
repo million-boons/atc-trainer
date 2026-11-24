@@ -56,7 +56,8 @@ class StatusController : public QObject {
   atc::RadioSnapshot radioState_;
   double peak_ = -120, testPeak_ = -120;
   bool toneDone_ = false;     // played to the end, not yet confirmed
-  bool outside_ = false;      // the last microphone test was outside the band
+  enum class MicCheck { None, Good, Outside };  // result of the last 5 s test of this microphone (D-306)
+  MicCheck micCheck_ = MicCheck::None;
   QString micSource_;
   QString testNote_;          // result of the last PTT test
   bool pressSeen_ = false;
