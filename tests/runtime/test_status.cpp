@@ -67,6 +67,22 @@ TEST_F(Status, MicrophoneStates) {
   }
 }
 
+// D-312
+TEST_F(Status, OpenMicrophoneSaysThatItDoesNotTransmit) {
+  const auto says = [this] { return tile(0)["line2"].toString().contains("Mic open – not transmitting"); };
+  EXPECT_TRUE(in().micOpenIdle && says());
+  for (auto st : {TransmissionController::State::TxOpen, TransmissionController::State::TxTail}) {
+    snap.state = st; send();
+    EXPECT_FALSE(in().micOpenIdle || says());
+  }
+  snap.state = TransmissionController::State::Recognising; send();
+  EXPECT_TRUE(says());
+  snap.ptt = PttLink::Lost; send();
+  EXPECT_TRUE(says());  // a missing PTT does not close the microphone
+  snap.mic.state = CaptureState::Lost; send();
+  EXPECT_FALSE(in().micOpenIdle || says());
+}
+
 TEST_F(Status, PttStates) {
   EXPECT_EQ(in().ptt, PttReady::StandIn);
   snap.pulse = true; send(); agree();

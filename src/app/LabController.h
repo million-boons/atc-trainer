@@ -85,6 +85,7 @@ class LabController : public QObject {
   void setRx(bool active);
   void setPilotCut(bool on);
   void setMic(double dbfs);
+  void setMicOpen(bool open);  // idle TX block: "Mic open – not transmitting" (D-312)
   void setChip(int i, const QString& value, Level l);
   void setPttSource(const QString& s);
   void setButtons(bool right, bool left);
@@ -161,7 +162,7 @@ class LabController : public QObject {
   atc::TxDisplay tx_ = atc::TxDisplay::Idle;
   int txId_ = 0;
   QString txTime_;
-  bool rx_ = false, pilotCut_ = false;
+  bool rx_ = false, pilotCut_ = false, micOpen_ = false;
   double mic_ = -120;
   QVariantList chips_;
   QString pttSource_;

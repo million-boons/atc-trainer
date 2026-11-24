@@ -138,6 +138,25 @@ TEST(Ring, SurvivesMonthsOfSamples) {
   ASSERT_EQ(c.samples.size(), 160u);
   EXPECT_EQ(c.samples.front(), 320);
 }
+TEST(Ring, DiscardedAudioIsErasedAndNeverReturned) {
+  PrerollRing r(16000, 16000);
+  for (int b = 0; b < 50; ++b) at(r, ms(b * 10), ramp(b * 160 + 1, 160));  // 8000 samples, none of them 0
+  EXPECT_EQ(r.nonZeroStored(), 8000u);
+  r.discardBefore(3200);
+  EXPECT_EQ(r.nonZeroStored(), 4800u);
+  EXPECT_EQ(r.keptFrom(), 3200);
+  r.discardBefore(1000);  // nothing comes back
+  EXPECT_EQ(r.keptFrom(), 3200);
+  const auto c = r.extractIndex(3000, 3600);
+  EXPECT_EQ(c.missingHead, 200u);
+  ASSERT_EQ(c.samples.size(), 400u);
+  EXPECT_EQ(c.samples.front(), 3201);
+  r.discardBefore(99'999);  // not beyond what was captured
+  EXPECT_EQ(r.keptFrom(), 8000);
+  EXPECT_EQ(r.nonZeroStored(), 0u);
+  at(r, ms(500), ramp(1, 160));
+  EXPECT_EQ(r.extractIndex(8000, 8160).samples.front(), 1);
+}
 TEST(Ring, ConcurrentReadIsConsistent) {
   // The reader keeps asking for the oldest audio while the writer overwrites it.
   PrerollRing r(16000, 4800);  // 300 ms

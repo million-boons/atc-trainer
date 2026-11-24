@@ -110,7 +110,7 @@ void DashboardController::refresh() {
 
   const QString dbfs = tr("%1 dBFS").arg(std::lround(in.micDbfs));
   add(ReadyTile::Mic, tr("Microphone"), status_words::word(in.mic), in.micName,
-      in.micTestLeft > 0 ? tr("%1  test %2 s").arg(dbfs).arg(in.micTestLeft) : dbfs, tr("Test"),
+      (in.micTestLeft > 0 ? tr("%1  test %2 s").arg(dbfs).arg(in.micTestLeft) : dbfs) + (in.micOpenIdle ? tr("\nMic open – not transmitting") : QString()), tr("Test"),
       idle && in.micTestLeft == 0 && in.mic != MicReady::Lost);
 
   add(ReadyTile::Speaker, tr("Speaker"), status_words::word(in.speaker), in.speakerName, in.speakerNote, tr("Test tone"), idle,

@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
+#include <signal.h>
+#include <sys/resource.h>
 
 #include <algorithm>
 #include <atomic>
 #include <cmath>
+#include <cstdio>
 #include <random>
 #include <thread>
 
@@ -32,11 +35,12 @@ struct FakePlayer : IRadioPlayer {
   Rig& rig;
 };
 struct FakeSpeech : ISpeechFeed {
-  bool begin(std::uint64_t tx) override { if (model) open = tx; return model; }
+  bool begin(std::uint64_t tx) override { ++begins; if (model) open = tx; return model; }
   void accept(std::vector<std::int16_t> a) override { samples += a.size(); }
   void finish(Ns) override { finished.push_back(std::exchange(open, 0)); }
   void cancel() override { cancelled.push_back(std::exchange(open, 0)); }
   bool model = true;
+  int begins = 0;
   std::uint64_t open = 0;
   std::size_t samples = 0;
   std::vector<std::uint64_t> finished, cancelled;
@@ -519,6 +523,104 @@ TEST(RadioCore, TestEndsCleanlyIfTheDeviceIsLost) {
 
 // D-300, with the whole radio: whatever happens, nothing sounds while a transmission is
 // open and the pilot never starts while PTT is down.
+namespace {
+volatile sig_atomic_t fileWrites = 0;
+// While it lives, no file can grow: every attempt fails and is counted.
+struct NoFileWrites {
+  NoFileWrites() {
+    fileWrites = 0;
+    old = signal(SIGXFSZ, [](int) { fileWrites = fileWrites + 1; });
+    getrlimit(RLIMIT_FSIZE, &limit);
+    rlimit none = limit;
+    none.rlim_cur = 0;
+    setrlimit(RLIMIT_FSIZE, &none);
+  }
+  ~NoFileWrites() {
+    setrlimit(RLIMIT_FSIZE, &limit);
+    signal(SIGXFSZ, old);
+  }
+  rlimit limit{};
+  void (*old)(int) = nullptr;
+};
+}  // namespace
+
+// D-312: the microphone is open, but without PTT nothing is recognised, recorded or written, and only the
+// 0.3 s pre-roll exists in memory.
+TEST(RadioCore, WithoutPttNothingIsRecognisedRecordedOrWritten) {
+  Rig r;
+  const std::size_t keep = 4800, block = 160;
+  const auto nothing = [&](const char* when) {
+    EXPECT_EQ(r.speech.begins, 0) << when;
+    EXPECT_EQ(r.speech.samples, 0u) << when;
+    EXPECT_TRUE(r.opened.empty() && r.closed.empty() && r.cancelled.empty()) << when;
+    EXPECT_LE(r.ring->nonZeroStored(), keep + block) << when;
+    EXPECT_EQ(r.ring->extract(r.now - ms(5000), r.now - ms(400)).samples.size(), 0u) << when;
+  };
+  {
+    NoFileWrites guard;
+    r.run(90'000);  // longer than the ring
+    nothing("idle");
+    r.micStatus({CaptureState::Lost, "", "", ""});
+    r.run(1000);
+    r.micStatus({CaptureState::Running, "", "", ""});
+    r.run(1000);
+    nothing("microphone lost and back");
+    r.core->playLocal(LocalSound::Tone, std::vector<std::int16_t>(16000, 1000), 16000);
+    r.run(500);
+    nothing("test tone");
+    r.finish();
+    r.pilotNow(1);
+    r.run(500);
+    nothing("pilot speaking");
+    r.finish();
+    r.core->setPttTest(true);
+    r.run(100);
+    r.down(); r.run(2000); r.up(); r.run(100);
+    nothing("PTT test");
+    r.core->setPttTest(false);
+    r.run(1000);
+    nothing("after the PTT test");
+    EXPECT_EQ(fileWrites, 0);
+  }
+  // Controls: the same rig does record, with its whole pre-roll, and the guard does see a write.
+  r.down(); r.run(1000);
+  EXPECT_GT(r.ring->nonZeroStored(), 15'000u);
+  r.up(); r.run(400);
+  ASSERT_EQ(r.closed.size(), 1u);
+  EXPECT_EQ(r.speech.begins, 1);
+  EXPECT_GT(r.speech.samples, 16'000u);
+  EXPECT_EQ(r.closed[0].preRoll, int(keep));
+  EXPECT_FALSE(r.closed[0].gap);
+  r.run(100);
+  EXPECT_LE(r.ring->nonZeroStored(), keep + block);  // and it is gone from the ring again
+  {
+    NoFileWrites guard;
+    if (FILE* f = std::tmpfile()) {
+      std::fputs("x", f);
+      std::fflush(f);
+      std::fclose(f);
+    }
+    EXPECT_GT(fileWrites, 0);
+  }
+}
+
+// A press handled late finds less pre-roll, never less speech, and that is not reported as lost audio.
+TEST(RadioCore, LatePressShortensOnlyThePreRoll) {
+  Rig r;
+  r.run(2000);
+  const Ns t = r.now;
+  r.run(50);
+  r.ptt.edge(t, true);
+  r.core->step();
+  r.run(1000);
+  r.up();
+  r.run(400);
+  ASSERT_EQ(r.closed.size(), 1u);
+  EXPECT_FALSE(r.closed[0].gap);
+  EXPECT_EQ(r.closed[0].preRoll, 4800 - 800);
+  EXPECT_EQ(r.closed[0].audio.size(), 4000u + std::size_t(16 * (1050 + 200)));
+}
+
 TEST(RadioCore, RandomFaultsNeverBreakHalfDuplex) {
   for (unsigned seed = 1; seed <= 60; ++seed) {
     std::mt19937 rng(seed);

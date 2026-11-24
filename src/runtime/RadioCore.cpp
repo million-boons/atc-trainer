@@ -241,7 +241,7 @@ void RadioCore::build() {
     curId_ = id;
     openT_ = tx_->openedAt();
     note({.kind = K::Down, .t = openT_, .source = owner_, .tx = id});
-    cursor_ = ring_.indexAt(from);
+    cursor_ = std::max(ring_.indexAt(from), ring_.keptFrom());
     lost_ = false;
     streaming_ = dev_.speech && dev_.speech->begin(id);
     if (ev_.txOpened) ev_.txOpened(id, openT_, streaming_);
@@ -294,6 +294,9 @@ void RadioCore::step() {
   tx_->tick(now);
   if (closing_ && (ring_.newestIndex() >= closing_->endIndex || now > closing_->deadline)) closeNow();
   else if (streaming_) feed(closing_ ? std::min(closing_->endIndex, ring_.newestIndex()) : ring_.newestIndex());
+  // D-312: without a transmission only the pre-roll exists; older audio is erased at each step.
+  if (!closing_ && tx_->state() != S::TxOpen && tx_->state() != S::TxTail)
+    ring_.discardBefore(ring_.newestIndex() - cfg_.tx.preRoll * cfg_.rate / 1'000'000'000);
   if (now - lastPublish_ >= cfg_.publishEvery || !todo.empty()) publish(now);
 }
 
@@ -310,9 +313,11 @@ void RadioCore::closeNow() {
   const Closing c = *std::exchange(closing_, std::nullopt);
   auto cut = ring_.extract(c.from, c.to);
   RadioTx t{.id = c.id, .from = c.from, .to = c.to, .press = c.press, .release = c.release, .end = c.end};
-  t.gap = lost_ || cut.gap || cut.missingHead || cut.missingTail;
-  // A missing head shortens the pre-roll; the press stays where it was.
-  t.preRoll = std::max(0, int((c.press - c.from) * cfg_.rate / 1'000'000'000) - int(cut.missingHead));
+  const int wanted = int((c.press - c.from) * cfg_.rate / 1'000'000'000);
+  // A missing head shortens the pre-roll; the press stays where it was. While idle only the pre-roll is
+  // kept (D-312), so a press that was handled late finds a little less of it: not lost audio.
+  t.gap = lost_ || cut.gap || cut.missingTail || int(cut.missingHead) > (ring_.keptFrom() ? wanted : 0);
+  t.preRoll = std::max(0, wanted - int(cut.missingHead));
   t.noSpeech = checkUtterance(cut.samples, t.preRoll, {.rate = cfg_.rate}).empty;
   t.hadModel = streaming_;
   t.recognising = streaming_ && c.end == TxEnd::Normal && !t.noSpeech;

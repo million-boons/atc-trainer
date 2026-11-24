@@ -13,7 +13,7 @@ constexpr int kMicTestMs = 5000, kPressWaitMs = 10'000, kLevelMs = 500, kLevelTe
 constexpr double kHoldSeconds = 2;
 
 bool same(const StatusInputs& a, const StatusInputs& b) {
-  return a.mic == b.mic && a.micName == b.micName && a.micDbfs == b.micDbfs && a.micTestLeft == b.micTestLeft &&
+  return a.mic == b.mic && a.micName == b.micName && a.micDbfs == b.micDbfs && a.micTestLeft == b.micTestLeft && a.micOpenIdle == b.micOpenIdle &&
          a.speaker == b.speaker && a.speakerName == b.speakerName && a.speakerNote == b.speakerNote &&
          a.toneAwaitingAnswer == b.toneAwaitingAnswer && a.ptt == b.ptt &&
          a.pttMissingBlocks == b.pttMissingBlocks && a.pttDown == b.pttDown && a.pttName == b.pttName && a.pttNote == b.pttNote &&
@@ -92,6 +92,8 @@ void StatusController::onSnapshot(const RadioSnapshot& s) {
             : s.micSilent ? MicReady::NoSignal
             : micCheck_ == MicCheck::Good ? MicReady::Ok
             : micCheck_ == MicCheck::Outside ? MicReady::OutsideBand : MicReady::NotTested;
+  in_.micOpenIdle = s.mic.state == CaptureState::Running && s.state != TransmissionController::State::TxOpen &&
+                    s.state != TransmissionController::State::TxTail;
   in_.micName = s.mic.description.empty() ? source : QString::fromStdString(s.mic.description);
   // Slowly, and in whole decibels: each change redraws the tiles.
   if (level_.elapsed() >= (micTest_.isValid() ? kLevelTestMs : kLevelMs)) {

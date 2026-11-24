@@ -13,6 +13,7 @@ struct StatusInputs {
   atc::MicReady mic = atc::MicReady::Ok;
   QString micName;
   double micDbfs = -120;
+  bool micOpenIdle = false;  // the microphone runs and no transmission is open (D-312)
   int micTestLeft = 0;    // seconds; 0 = no test running
   atc::SpeakerReady speaker = atc::SpeakerReady::NotChecked;
   QString speakerName, speakerNote;

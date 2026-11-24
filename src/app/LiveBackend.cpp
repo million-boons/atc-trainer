@@ -174,6 +174,7 @@ void LiveBackend::snapshot(const RadioSnapshot& s) {
   lab_->setPilotCut(s.pilotCut);
   lab_->setButtons(s.held && s.owner == "RIGHT", s.otherDown);
   lab_->setMic(s.micDbfs);
+  lab_->setMicOpen(s.mic.state == CaptureState::Running);
   stt_->setTransmissionActive(s.active);
   status_->onSnapshot(s);
 }

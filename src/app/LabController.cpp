@@ -56,7 +56,7 @@ QString LabController::txLabel() const {
 
 QString LabController::txSub() const {
   switch (tx_) {
-    case TxDisplay::Idle: return idleHint;
+    case TxDisplay::Idle: return micOpen_ ? tr("Mic open – not transmitting") : idleHint;
     case TxDisplay::Tx: return tr("Transmitting");
     case TxDisplay::Tail: return tr("Closing transmission");
     case TxDisplay::Wait: return tr("Recognising TX %1").arg(txId_);
@@ -104,6 +104,12 @@ void LabController::setChip(int i, const QString& value, Level l) {
   m["level"] = int(l);
   chips_[i] = m;
   emit chipsChanged();
+}
+
+void LabController::setMicOpen(bool open) {
+  if (open == micOpen_) return;
+  micOpen_ = open;
+  emit txChanged();
 }
 
 void LabController::setPttSource(const QString& s) {

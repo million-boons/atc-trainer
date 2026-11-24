@@ -21,4 +21,15 @@ if(Qt6_FOUND)
   target_include_directories(status_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/app)
   target_link_libraries(status_tests PRIVATE atc_runtime Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
   gtest_discover_tests(status_tests)
+  # The live backend, without a window, against a private PulseAudio server.
+  if(TARGET atc_devices)
+    set(A ${CMAKE_SOURCE_DIR}/src/app)
+    add_executable(live_tests test_live.cpp ${A}/LiveBackend.h ${A}/LiveBackend.cpp ${A}/LabChecks.h ${A}/LabChecks.cpp
+      ${A}/StatusController.h ${A}/StatusController.cpp ${A}/StatusFeed.h ${A}/RowModel.h ${A}/LabController.h ${A}/LabController.cpp
+      ${A}/SttController.h ${A}/SttController.cpp)
+    set_target_properties(live_tests PROPERTIES AUTOMOC ON)
+    target_include_directories(live_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${A})
+    target_link_libraries(live_tests PRIVATE atc_devices atc_logic Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
+    gtest_discover_tests(live_tests)
+  endif()
 endif()

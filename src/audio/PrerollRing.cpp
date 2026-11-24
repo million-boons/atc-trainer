@@ -103,6 +103,20 @@ std::int64_t PrerollRing::indexAt(Ns t) const {
   return whole * rate_ + (frac * rate_ + (frac >= 0 ? kSecond / 2 : -kSecond / 2)) / kSecond;
 }
 
+void PrerollRing::discardBefore(std::int64_t index) {
+  const auto w = newestIndex(), end = std::min(index, w);
+  // The oldest eighth of a full ring is left to the writer, which is about to overwrite it.
+  const auto safe = static_cast<std::int64_t>(reserved_.load(std::memory_order_relaxed)) - static_cast<std::int64_t>(cap_ - cap_ / 8);
+  const auto kept = keptFrom();
+  if (end <= kept) return;
+  for (auto i = std::max(kept, safe); i < end; ++i) write(static_cast<std::uint64_t>(i), 0);
+  kept_.store(end, std::memory_order_relaxed);
+}
+
+std::size_t PrerollRing::nonZeroStored() const {
+  return static_cast<std::size_t>(std::count_if(buf_.begin(), buf_.end(), [](const auto& s) { return s.load(std::memory_order_relaxed) != 0; }));
+}
+
 PrerollRing::Cut PrerollRing::extract(Ns from, Ns to) const {
   if (to <= from) return {};
   const std::int64_t b = indexAt(from);
@@ -119,7 +133,7 @@ PrerollRing::Cut PrerollRing::extractIndex(std::int64_t b, std::int64_t e) const
     cut.missingTail = total;
     return cut;
   }
-  const std::int64_t oldest = static_cast<std::int64_t>(w > cap_ ? w - cap_ : 0);
+  const std::int64_t oldest = std::max(static_cast<std::int64_t>(w > cap_ ? w - cap_ : 0), std::min(keptFrom(), static_cast<std::int64_t>(w)));
   const std::int64_t lo = std::clamp<std::int64_t>(b, oldest, static_cast<std::int64_t>(w));
   const std::int64_t hi = std::clamp<std::int64_t>(e, lo, static_cast<std::int64_t>(w));
   cut.missingHead = std::min(static_cast<std::size_t>(lo - std::min(b, lo)), total);

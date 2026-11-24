@@ -41,6 +41,12 @@ class PrerollRing {
   Cut extractIndex(std::int64_t begin, std::int64_t end) const;
   std::int64_t newestIndex() const { return static_cast<std::int64_t>(written_.load(std::memory_order_acquire)); }
 
+  // Erases everything before this index and never returns it again. One caller thread, not the writer.
+  // Keep the index within the newest part of the ring (the writer must be far from it).
+  void discardBefore(std::int64_t index);
+  std::int64_t keptFrom() const { return kept_.load(std::memory_order_relaxed); }  // 0: nothing was discarded
+  std::size_t nonZeroStored() const;  // tests: what the memory still holds
+
   // Time just after the newest captured sample; 0 before the first block.
   Ns newestTime() const;
   std::uint64_t gaps() const { return gapCount_.load(std::memory_order_relaxed); }
@@ -59,6 +65,7 @@ class PrerollRing {
   std::atomic<std::uint64_t> written_{0};
   std::atomic<std::uint64_t> reserved_{0};  // samples up to here may be being overwritten
   std::atomic<Ns> offset_{0};
+  std::atomic<std::int64_t> kept_{0};
   std::atomic<std::uint64_t> gapCount_{0};
   std::atomic<std::uint64_t> lastGapBegin_{0}, lastGapEnd_{0};
   // Writer only.

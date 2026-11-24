@@ -118,6 +118,7 @@ MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs,
   connect(&timer_, &QTimer::timeout, this, [this] {
     if (!frozen_) advanceTo(wallBase_ + wall_.nsecsElapsed());
   });
+  lab_->setMicOpen(true);
   run("idle");
   goLive();
   timer_.start();
@@ -393,6 +394,7 @@ void MockBackend::setStatusCase(const QString& id) {
   StatusInputs s;
   s.micName = tr("H540 (simulated)");
   s.micDbfs = -12;
+  s.micOpenIdle = true;
   s.speaker = ready ? SpeakerReady::Ok : SpeakerReady::NotChecked;
   s.speakerName = tr("H540 (simulated)");
   pttBase_ = ready ? PttReady::Ok : PttReady::StandIn;  // faults come from syncStatus()
