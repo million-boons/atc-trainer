@@ -1,6 +1,7 @@
 // Records one WAV per PTT transmission, with a manifest for the speech benchmark.
 //   ./ptt_record --out DIR --speaker ID [--prompts FILE] [--device /dev/input/eventN]
 //                [--start N] [--button right|left] [--grab] [--source NAME] [--server S]
+//                [--set dev|test] [--ptt NAME]  labels written to the manifest (NAME: pedal, mouse, ...)
 //                [--tail-ms N]  audio kept after release, 0-1000 (default 200; 500 for the tail test)
 // --prompts: phrase file, see src/bench/PhraseFile.h. --start N begins at phrase N.
 // Without --device, Enter starts and Enter stops a transmission.
@@ -52,6 +53,11 @@ std::string jsonFields(const Fields& f) {
   for (const auto& [k, v] : f) o += (o.size() > 1 ? "," : "") + json(k) + ":" + json(v);
   return o + "}";
 }
+std::string jsonList(const std::vector<std::string>& v) {
+  std::string o = "[";
+  for (const auto& s : v) o += (o.size() > 1 ? "," : "") + json(s);
+  return o + "]";
+}
 bool safeName(const std::string& s) {
   if (s.empty()) return false;
   for (char c : s)
@@ -68,7 +74,7 @@ struct Pending {
 int main(int argc, char** argv) {
   CaptureConfig cc;
   EvdevConfig ec;
-  std::string out, speaker, prompts;
+  std::string out, speaker, prompts, setName, pttName;
   int startAt = 1;
   TxConfig tc;
   for (int i = 1; i < argc; ++i) {
@@ -83,6 +89,8 @@ int main(int argc, char** argv) {
     else if (k == "--grab") ec.grab = true;
     else if (k == "--source") cc.source = next();
     else if (k == "--server") cc.server = next();
+    else if (k == "--set") setName = next();
+    else if (k == "--ptt") pttName = next();
     else if (k == "--tail-ms") {
       const std::string v = next();
       const bool digits = !v.empty() && v.size() <= 4 && v.find_first_not_of("0123456789") == std::string::npos;
@@ -196,6 +204,9 @@ int main(int argc, char** argv) {
              << ",\"transcript\":" << (hasPrompt ? json(lines[idx].text) : "null")
              << ",\"kind\":" << (hasPrompt ? (lines[idx].negative ? "\"negative\"" : "\"scripted\"") : "null")
              << ",\"expect\":" << (hasPrompt ? jsonFields(lines[idx].expect) : "null")
+             << ",\"tags\":" << jsonList(hasPrompt ? lines[idx].tags : std::vector<std::string>{})
+             << ",\"set\":" << json(setName) << ",\"ptt\":" << json(pttName)
+             << ",\"volumePercent\":" << cap.status().volumePercent << ",\"script\":" << json(prompts)
              << ",\"tailSamples\":" << (p.end == TxEnd::Stuck ? 0 : tc.tail * cc.rate / 1'000'000'000)
              << ",\"usable\":" << (usable ? "true" : "false") << ",\"preRollSamples\":" << std::max(0, pre)
              << ",\"peakDbfs\":" << rep.peakDbfs << ",\"empty\":" << (rep.empty ? "true" : "false")

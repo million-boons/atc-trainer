@@ -6,7 +6,9 @@
 #include <set>
 #include <sstream>
 
+#include "bench/Scoring.h"
 #include "phraseology/Phraseology.h"
+#include "phraseology/ScriptGen.h"
 using namespace atc;
 
 namespace {
@@ -131,4 +133,71 @@ TEST(Phraseology, ValidationIsPerIntent) {
   EXPECT_NE(loadChanged("\"status\": \"draft\"", "\"status\": \"validated\", \"sopRef\": \"x\", \"validated_by\": \"y\", \"validated_at\": \"z\"")
                 .find("Validated in a placeholder file"), std::string::npos);
   EXPECT_NE(loadChanged("\"draft\"", "\"done\"").find("status must be draft or validated"), std::string::npos);
+}
+
+namespace {
+ScriptOptions scriptOptions(std::uint32_t seed) {
+  ScriptOptions o;
+  o.seed = seed;
+  for (int i = 0; i < 12; ++i) o.negativeTexts.push_back({"off", "off text " + std::string(1, char('a' + i))});
+  for (int i = 0; i < 12; ++i) o.negativeTexts.push_back({"near", "near text " + std::string(1, char('a' + i))});
+  return o;
+}
+}  // namespace
+
+TEST(Script, SeededBalancedAndEveryLineReadable) {
+  const auto p = real();
+  std::set<std::string> allText;
+  for (std::uint32_t seed = 1; seed <= 4; ++seed) {
+    std::string e;
+    const auto s = makeScript(p, scriptOptions(seed), e);
+    ASSERT_EQ(s.size(), 60u) << e;
+    const auto again = makeScript(p, scriptOptions(seed), e);
+    ASSERT_EQ(again.size(), s.size());
+    std::map<char, int> digits;
+    std::set<char> letters;
+    int neg = 0, variant = 0, malformed = 0;
+    for (std::size_t i = 0; i < s.size(); ++i) {
+      EXPECT_EQ(phraseLine(s[i]), phraseLine(again[i]));
+      std::istringstream line(phraseLine(s[i]));
+      std::vector<Phrase> back;
+      ASSERT_TRUE(readPhrases(line, back, e)) << e;
+      EXPECT_EQ(back[0].text, s[i].text);
+      EXPECT_EQ(back[0].expect, s[i].expect);
+      EXPECT_EQ(back[0].tags, s[i].tags);
+      neg += s[i].negative;
+      variant += std::count(s[i].tags.begin(), s[i].tags.end(), "variant") > 0;
+      malformed += std::count(s[i].tags.begin(), s[i].tags.end(), "malformed") > 0;
+      if (!s[i].negative) {
+        allText.insert(s[i].text);
+        if (const auto c = s[i].expect.find("callsign"); c != s[i].expect.end())
+          for (char d : c->second.substr(c->second.find('-') + 1)) ++digits[d];
+        if (const auto t = s[i].expect.find("taxiway"); t != s[i].expect.end()) letters.insert(t->second[0]);
+      }
+    }
+    EXPECT_EQ(neg, 20);
+    EXPECT_EQ(variant, 10);
+    EXPECT_EQ(malformed, 8);
+    for (char d = '0'; d <= '9'; ++d) EXPECT_GE(digits[d], 6) << d;
+    EXPECT_GE(letters.size(), 6u);
+  }
+  EXPECT_GE(allText.size(), 150u);
+}
+TEST(Script, MalformedIsNeverAnAcceptableInstruction) {
+  const auto p = real();
+  std::string e;
+  for (const auto& x : makeScript(p, scriptOptions(7), e)) {
+    if (!x.negative || x.tags.empty() || x.tags[0] != "malformed") continue;
+    std::vector<SttWord> w;
+    for (auto& s : normaliseText(x.text)) w.push_back({s, 1.0});
+    const std::set<std::string> names{"eagle", "falcon", "hawk", "cobra"};
+    EXPECT_NE(judge(x, extractFields(w, names), 0, true), Outcome::FalseAccept) << x.text;
+  }
+}
+TEST(Script, TooFewNegativesIsAnError) {
+  auto o = scriptOptions(1);
+  o.negativeTexts.clear();
+  std::string e;
+  EXPECT_TRUE(makeScript(real(), o, e).empty());
+  EXPECT_NE(e.find("not enough negatives"), std::string::npos);
 }
