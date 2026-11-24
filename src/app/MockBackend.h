@@ -41,6 +41,7 @@ class MockBackend : public QObject {
 
  private:
   void setStatusCase(const QString& id);  // Dashboard values for a scripted case
+  void syncStatus();                      // PTT and microphone: tiles and chips from one state
   void statusTick();                      // 100 ms, running tests only
   void testEdge(bool down);
   void endPttTest(const QString& note);
@@ -69,6 +70,7 @@ class MockBackend : public QObject {
   StatusFeed status_;
   QTimer statusTimer_;
   QElapsedTimer testHold_;
+  atc::PttReady pttBase_ = atc::PttReady::StandIn;
   int micTestTicks_ = 0, pttTestTicks_ = 0;
   QElapsedTimer wall_;
   atc::Ns wallBase_ = 0, now_ = 0, lastMeter_ = 0;

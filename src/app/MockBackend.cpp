@@ -1,5 +1,7 @@
 #include "app/MockBackend.h"
 
+#include "app/StatusWords.h"
+
 #include <QTime>
 #include <algorithm>
 #include <cmath>
@@ -64,7 +66,7 @@ MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs,
     s.speaker = SpeakerReady::Ok;
     s.speakerNote = tr("mock: no sound played");
     status_.set(std::move(s));
-    lab_->setChip(LabController::Speaker, tr("OK"), LabController::Ok);
+    lab_->setChip(LabController::Speaker, status_words::word(SpeakerReady::Ok), LabController::Ok);
   });
   connect(&status_, &StatusFeed::pttTestRequested, this, [this] {
     pttTestTicks_ = 100;  // 10 s to press
@@ -259,7 +261,6 @@ void MockBackend::restart() {
   }
   speech_ = {};
   lab_->showRecording(-1);
-  lab_->setChip(LabController::Speaker, tr("OK"), LabController::Ok);
   lab_->setVoiceBank(LabController::Bank::NotLoaded);
 }
 
@@ -364,13 +365,13 @@ void MockBackend::setStatusCase(const QString& id) {
   testHold_.invalidate();
   const bool ready = id == "dashready" || id == "dashrun", fault = id == "dashfault";
   StatusInputs s;
-  s.mic = id == "muted" || fault ? MicReady::Muted : MicReady::Ok;
   s.micName = tr("H540 (simulated)");
-  s.micDbfs = s.mic == MicReady::Muted ? -120 : -12;
+  s.micDbfs = -12;
   s.speaker = ready ? SpeakerReady::Ok : SpeakerReady::NotChecked;
   s.speakerName = tr("H540 (simulated)");
-  s.ptt = id == "lost" || fault ? PttReady::Missing : id == "pulse" ? PttReady::NoHold : ready ? PttReady::Ok : PttReady::StandIn;
-  s.pttName = s.ptt == PttReady::Missing ? tr("no device") : ready ? tr("Foot pedal (simulated)") : tr("Dell mouse (simulated)");
+  pttBase_ = ready ? PttReady::Ok : PttReady::StandIn;  // faults come from syncStatus()
+  s.ptt = pttBase_;
+  s.pttName = ready ? tr("Foot pedal (simulated)") : tr("Dell mouse (simulated)");
   s.bank = id == "vloaded" ? BankReady::Loaded
            : id == "vok" || ready ? BankReady::CoverageOk
            : id == "vmissing" || id == "dash" ? BankReady::MissingClips
@@ -390,9 +391,24 @@ void MockBackend::setStatusCase(const QString& id) {
     case BankReady::Failed: lab_->setVoiceBank(LabController::Bank::Failed); break;
     case BankReady::NotLoaded: lab_->setVoiceBank(LabController::Bank::NotLoaded); break;
   }
-  if (id.startsWith("dash") && s.speaker == SpeakerReady::NotChecked)
-    lab_->setChip(LabController::Speaker, tr("NOT CHECKED"), LabController::Caution);
+  lab_->setChip(LabController::Speaker, status_words::word(s.speaker), status_words::level(effect(s.speaker)));
   status_.set(std::move(s));
+}
+
+void MockBackend::syncStatus() {
+  const PttReady ptt = !present_ ? PttReady::Missing : pulse_ ? PttReady::NoHold : pttBase_;
+  const MicReady mic = muted_ ? MicReady::NoSignal : MicReady::Ok;  // pure silence, as in the notice
+  if (ptt != status_.inputs().ptt || mic != status_.inputs().mic) {
+    StatusInputs s = status_.inputs();
+    s.ptt = ptt;
+    s.mic = mic;
+    s.micDbfs = muted_ ? -120 : -12;
+    s.pttName = !present_ ? tr("no device") : pttBase_ == PttReady::Ok ? tr("Foot pedal (simulated)") : tr("Dell mouse (simulated)");
+    status_.set(std::move(s));
+  }
+  lab_->setChip(LabController::Ptt, status_words::word(ptt),
+                status_words::level(effect(ptt, status_.inputs().pttMissingBlocks)));
+  lab_->setChip(LabController::Mic, status_words::word(mic), status_words::level(effect(mic)));
 }
 
 void MockBackend::statusTick() {
@@ -563,9 +579,7 @@ void MockBackend::publish() {
   lab_->setPilotCut(cutUntil_.has_value());
   lab_->setButtons(held_ && owner_ == "RIGHT", false);
   lab_->setPttSource(!present_ ? tr("no device") : pulse_ ? tr("pulse device (mock)") : tr("mock stand-in"));
-  lab_->setChip(LabController::Ptt, !present_ ? tr("LOST") : pulse_ ? tr("PULSE") : tr("STAND-IN"),
-                !present_ || pulse_ ? LabController::Fault : LabController::Caution);
-  lab_->setChip(LabController::Mic, muted_ ? tr("NO SIGNAL") : tr("OK"), muted_ ? LabController::Fault : LabController::Ok);
+  syncStatus();
 
   if (now_ - lastMeter_ < ms(40)) return;  // 25 Hz
   lastMeter_ = now_;

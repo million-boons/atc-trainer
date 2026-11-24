@@ -27,6 +27,8 @@ class DashboardController : public QObject {
   Q_PROPERTY(QVariantMap scenario READ scenario NOTIFY changed)
   Q_PROPERTY(QStringList missingClips READ missingClips NOTIFY changed)
   Q_PROPERTY(bool pttTesting READ pttTesting NOTIFY changed)
+  Q_PROPERTY(int alertLevel READ alertLevel NOTIFY changed)  // LabController.Level, for the alert lane
+  Q_PROPERTY(QString alert READ alert NOTIFY changed)
  public:
   explicit DashboardController(QObject* parent = nullptr) : QObject(parent) {}
 
@@ -48,6 +50,9 @@ class DashboardController : public QObject {
   QStringList missingClips() const { return feed_ ? feed_->inputs().missingClips : QStringList(); }
   bool pttTesting() const { return feed_ && feed_->inputs().pttTesting; }
 
+  int alertLevel() const { return alertLevel_; }
+  QString alert() const { return alert_; }
+
   // Button of tile i (atc::ReadyTile order). True: QML opens the list of missing clips.
   Q_INVOKABLE bool tileAction(int i);
   Q_INVOKABLE void cancelTests();
@@ -67,4 +72,6 @@ class DashboardController : public QObject {
   QString readyText_, blockText_;
   QStringList reasons_;
   bool startEnabled_ = false;
+  int alertLevel_ = 0;
+  QString alert_;
 };

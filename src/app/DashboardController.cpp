@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "app/LabController.h"
+#include "app/StatusWords.h"
 
 using namespace atc;
 
@@ -10,9 +11,6 @@ namespace {
 // Start is connected in package 3b. Until then it is never enabled.
 constexpr bool kStartBuilt = false;
 
-int levelOf(StartEffect e) {
-  return e == StartEffect::Ready ? LabController::Ok : e == StartEffect::Warns ? LabController::Caution : LabController::Fault;
-}
 QString wordOf(StartEffect e) {
   return e == StartEffect::Ready ? DashboardController::tr("READY")
          : e == StartEffect::Warns ? DashboardController::tr("WARNS") : DashboardController::tr("BLOCKS START");
@@ -66,6 +64,8 @@ void DashboardController::refresh() {
   readyText_.clear();
   blockText_.clear();
   startEnabled_ = false;
+  alertLevel_ = LabController::None;
+  alert_.clear();
   if (!feed_) {
     emit changed();
     return;
@@ -77,24 +77,21 @@ void DashboardController::refresh() {
   const auto add = [&](ReadyTile t, const QString& title, const QString& state, const QString& line1, const QString& line2,
                        const QString& action, bool actionEnabled) {
     const StartEffect e = r.of(t);
-    tiles_.append(QVariantMap{{"title", title}, {"level", levelOf(e)}, {"state", state}, {"line1", line1}, {"line2", line2},
+    tiles_.append(QVariantMap{{"title", title}, {"level", int(status_words::level(e))}, {"state", state}, {"line1", line1}, {"line2", line2},
                               {"effect", wordOf(e)}, {"action", action}, {"actionEnabled", actionEnabled}});
     if (e == StartEffect::Blocks) reasons_.append(tr("%1: %2").arg(title, state.toLower()));
   };
   const bool idle = !in.running;
 
-  static const char* const mic[] = {QT_TR_NOOP("OK"), QT_TR_NOOP("LEVEL"), QT_TR_NOOP("NO SIGNAL"), QT_TR_NOOP("MUTED"), QT_TR_NOOP("LOST")};
   const QString dbfs = tr("%1 dBFS").arg(std::lround(in.micDbfs));
-  add(ReadyTile::Mic, tr("Microphone"), tr(mic[int(in.mic)]), in.micName,
+  add(ReadyTile::Mic, tr("Microphone"), status_words::word(in.mic), in.micName,
       in.micTestLeft > 0 ? tr("%1  test %2 s").arg(dbfs).arg(in.micTestLeft) : dbfs, tr("Test"),
       idle && in.micTestLeft == 0 && in.mic != MicReady::Lost);
 
-  static const char* const spk[] = {QT_TR_NOOP("OK"), QT_TR_NOOP("NOT CHECKED")};
-  add(ReadyTile::Speaker, tr("Speaker"), tr(spk[int(in.speaker)]), in.speakerName, in.speakerNote, tr("Test tone"), idle);
+  add(ReadyTile::Speaker, tr("Speaker"), status_words::word(in.speaker), in.speakerName, in.speakerNote, tr("Test tone"), idle);
 
-  static const char* const ptt[] = {QT_TR_NOOP("OK"), QT_TR_NOOP("STAND-IN"), QT_TR_NOOP("NO HOLD"), QT_TR_NOOP("MISSING")};
   const QString edge = in.ptt == PttReady::Missing ? QString() : in.pttDown ? tr("RIGHT: DOWN") : tr("RIGHT: UP");
-  add(ReadyTile::Ptt, tr("PTT"), tr(ptt[int(in.ptt)]), in.pttName, in.pttNote.isEmpty() ? edge : in.pttNote, tr("Test"),
+  add(ReadyTile::Ptt, tr("PTT"), status_words::word(in.ptt), in.pttName, in.pttNote.isEmpty() ? edge : in.pttNote, tr("Test"),
       idle && !in.pttTesting && in.ptt != PttReady::Missing);
 
   static const char* const mod[] = {QT_TR_NOOP("READY"), QT_TR_NOOP("NOT LOADED"), QT_TR_NOOP("LOADING"), QT_TR_NOOP("FAILED"), QT_TR_NOOP("OTHER MODEL")};
@@ -122,6 +119,15 @@ void DashboardController::refresh() {
 
   readyText_ = tr("%1 of %2 ready").arg(r.count(StartEffect::Ready)).arg(int(r.tiles.size()));
   blockText_ = tr("%1 block Start").arg(r.count(StartEffect::Blocks));
+  const int blocks = r.count(StartEffect::Blocks), warns = r.count(StartEffect::Warns);
+  if (in.running) {
+    alertLevel_ = LabController::Ok;
+    alert_ = tr("Exercise running");
+  } else {
+    alertLevel_ = status_words::level(blocks ? StartEffect::Blocks : warns ? StartEffect::Warns : StartEffect::Ready);
+    alert_ = blocks ? tr("Not ready: %1 block Start, %2 warn").arg(blocks).arg(warns)
+             : warns ? tr("%1 warn, none block Start").arg(warns) : tr("All systems ready");
+  }
   startEnabled_ = kStartBuilt && idle && !r.blocked();
   if (!kStartBuilt) reasons_.append(tr("Exercise not built yet (package 3b)"));
   emit changed();
