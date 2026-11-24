@@ -215,6 +215,42 @@ TEST_F(Engine, WrongValuesNeverAdvance) {
   p.fields["taxiway"].value = "Z9";
   expectStays(p, Outcome::Incorrect, "taxiway");
 }
+// D-417: "taxi via A3 hold short runway 09" in a step that does not list hold short.
+TEST_F(Engine, UnlistedCriticalValueIsUnexpectedAndQueried) {
+  auto p = taxi();
+  p.fields["hold_short"].value = "yes";
+  expectStays(p, Outcome::Unexpected, "hold_short");
+  EXPECT_EQ(lastPilot().find("query instruction"), 0u) << lastPilot();
+  EXPECT_FALSE(lastJudged().suspectedStt);
+  EXPECT_TRUE(sim->engine().context().clearances.empty());
+  const auto lines = log.lines();
+  EXPECT_TRUE(std::any_of(lines.begin(), lines.end(), [](const std::string& l) {
+    return l.find("UNEXPECTED") != std::string::npos && l.find("hold_short") != std::string::npos;
+  }));
+  sim->transmit(taxi());  // the step is still open for the instruction it lists
+  EXPECT_EQ(lastJudged().outcome, Outcome::Correct);
+}
+TEST_F(Engine, AnyOtherUnlistedValueIsUnexpectedToo) {
+  auto p = taxi();
+  p.fields["heading"].value = "270";
+  expectStays(p, Outcome::Unexpected, "heading");
+  p.fields["hold_short"].value = "yes";  // each one is named
+  expectStays(p, Outcome::Unexpected, "heading");
+  expectStays(p, Outcome::Unexpected, "hold_short");
+}
+TEST_F(Engine, UnlistedValueDoesNotHideAnEarlierCheck) {
+  auto p = taxi();
+  p.fields["hold_short"].value = "yes";
+  p.fields["callsign"].value = "HAWK-999";
+  expectStays(p, Outcome::WrongCallsign, "callsign");
+  p = taxi();
+  p.fields["hold_short"].value = "yes";
+  p.fields.erase("taxiway");
+  expectStays(p, Outcome::MissingInfo, "taxiway");
+  p = taxi();
+  p.fields["hold_short"].uncertain = true;
+  expectStays(p, Outcome::Ambiguous, "hold_short");
+}
 TEST_F(Engine, SkippedStepNeverAdvances) { expectStays(takeoff(), Outcome::Unexpected, "TAKEOFF_CLEARANCE"); }
 TEST_F(Engine, WrongCallsignGetsSilence) {
   auto p = taxi();
@@ -465,6 +501,7 @@ TEST_F(Engine, RandomInputsNeverBreakTheRules) {
       if (chance(10)) p.fields["runway"].uncertain = true;
       if (chance(10)) p.cls = static_cast<RecognitionClass>(g() % 4);
       if (chance(5)) p.intent = "NONSENSE";
+      if (chance(10)) p.fields["hold_short"].value = "yes";
       auto r = Simulator::goodReport();
       r.releasedEarly = chance(8);
       r.empty = chance(4);
@@ -502,6 +539,7 @@ TEST_F(Engine, RandomInputsNeverBreakTheRules) {
     for (const auto& c : sim->engine().context().clearances) {
       EXPECT_EQ(c.fields.at("callsign"), param("callsign"));
       EXPECT_EQ(c.fields.at("runway"), param("runway"));
+      EXPECT_EQ(c.fields.count("hold_short"), 0u);  // no step lists it
     }
   }
 }
