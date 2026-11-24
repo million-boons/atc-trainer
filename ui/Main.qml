@@ -61,17 +61,22 @@ Window {
         }
         NavRail {
             id: nav
+            z: 1  // its tooltip lies over the screen
             anchors { top: status.bottom; bottom: alert.top }
             width: Theme.px(88)
             current: root.screen_
             onActivated: (id) => root.screen_ = id
             entries: [
                 { id: "dash", name: qsTr("Dashboard"), enabled: true, icon: "M 3 3 L 9 3 L 9 9 L 3 9 Z M 11 3 L 17 3 L 17 9 L 11 9 Z M 3 11 L 9 11 L 9 17 L 3 17 Z M 11 11 L 17 11 L 17 17 L 11 17 Z" },
-                { id: "scen", name: qsTr("Scenarios"), enabled: false, icon: "M 4 5 L 16 5 M 4 10 L 16 10 M 4 15 L 16 15" },
-                { id: "ex", name: qsTr("Exercise"), enabled: false, icon: "M 6 4 L 16 10 L 6 16 Z" },
+                { id: "scen", name: qsTr("Scenarios"), enabled: false, why: qsTr("Not part of the first exercise. No package is planned for this screen yet."),
+                  icon: "M 4 5 L 16 5 M 4 10 L 16 10 M 4 15 L 16 15" },
+                { id: "ex", name: qsTr("Exercise"), enabled: false, why: qsTr("Available after the first exercise works (package 3b)."),
+                  icon: "M 6 4 L 16 10 L 6 16 Z" },
                 { id: "lab", name: qsTr("Speech Lab"), enabled: true, icon: "M 7 3 L 13 3 L 13 11 L 7 11 Z M 4 9 L 4 14 L 16 14 L 16 9 M 10 14 L 10 18" },
-                { id: "ass", name: qsTr("Assessment"), enabled: false, icon: "M 4 16 L 4 10 M 10 16 L 10 4 M 16 16 L 16 8" },
-                { id: "set", name: qsTr("Settings"), enabled: false, icon: "M 3 6 L 17 6 M 13 4 L 13 8 M 3 14 L 17 14 M 7 12 L 7 16" }
+                { id: "ass", name: qsTr("Assessment"), enabled: false, why: qsTr("Available after the first exercise works (package 3b)."),
+                  icon: "M 4 16 L 4 10 M 10 16 L 10 4 M 16 16 L 16 8" },
+                { id: "set", name: qsTr("Settings"), enabled: false, why: qsTr("Available with the login and recordings screens (package 1c)."),
+                  icon: "M 3 6 L 17 6 M 13 4 L 13 8 M 3 14 L 17 14 M 7 12 L 7 16" }
             ]
         }
         Loader {
