@@ -1,10 +1,10 @@
 {
-  "comment": "Speech models offered in the Speech Lab. Paths are relative to the project folder. peakMb: highest process memory measured 2026-11-23 on speaker s1 or synthetic speech; not a limit. None of these has passed the accuracy target.",
+  "comment": "Speech models offered in the Speech Lab. Paths are relative to the project folder. peakMb: highest process memory measured 2026-11-23 or 2026-11-24 on speaker s1 or synthetic speech; not a limit. None of these has passed the accuracy target.",
   "models": [
     { "id": "whisper-tiny-genprompt", "name": "Whisper tiny + generated prompt", "engine": "whisper",
       "path": "third_party/archives/ggml-tiny.en-q5_1.bin", "threads": 4, "audioCtx": 768,
-      "promptFile": "data/phraseology/generated/whisper_prompt.txt", "peakMb": 161,
-      "note": "Best so far on one speaker (86 of 102 fields). Text after release; delay not re-measured." },
+      "promptFile": "data/phraseology/generated/whisper_prompt.txt", "peakMb": 163,
+      "note": "Best so far on one speaker (87 of 102 fields). Text after release; delay not re-measured." },
     { "id": "whisper-tiny-prompt", "name": "Whisper tiny + prompt", "engine": "whisper",
       "path": "third_party/archives/ggml-tiny.en-q5_1.bin", "threads": 4, "audioCtx": 768,
       "promptFile": "data/bench/placeholder_prompt.txt", "peakMb": 125,

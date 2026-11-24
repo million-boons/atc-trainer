@@ -127,6 +127,9 @@ TEST(Parser, DecimalRunwayIsAmbiguousNotCorrected) {  // 06 section 7
   EXPECT_TRUE(p.fields.at("runway").uncertain);
   EXPECT_EQ(p.fields.at("runway").value, "");
   EXPECT_EQ(p.fields.at("runway").heard, "0.9");
+  const auto q = parse("Hawk 674 line up runway 09.5");  // not "09" with something behind it
+  EXPECT_EQ(q.cls, C::Ambiguous);
+  EXPECT_EQ(q.fields.at("runway").value, "");
 }
 TEST(Parser, PartialNamesWhatIsMissing) {
   auto p = parse("eagle four two one taxi via alpha three");
