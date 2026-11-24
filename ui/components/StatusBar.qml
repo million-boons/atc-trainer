@@ -30,6 +30,7 @@ Rectangle {
     }
     Row {
         id: chipRow
+        objectName: "chipRow"
         anchors { left: name.right; leftMargin: Theme.s12; verticalCenter: parent.verticalCenter }
         spacing: Theme.s4
         Repeater {
@@ -38,6 +39,7 @@ Rectangle {
         }
     }
     Row {
+        objectName: "statusRight"
         anchors { right: parent.right; rightMargin: Theme.s12; verticalCenter: parent.verticalCenter }
         spacing: Theme.s8
         Tag { id: mockTag; visible: bar.mock; text: qsTr("MOCK"); anchors.verticalCenter: parent.verticalCenter }
