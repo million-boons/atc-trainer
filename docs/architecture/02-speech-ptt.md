@@ -233,6 +233,8 @@ Rules:
 - Back-references resolve from ScenarioContext only with exactly one candidate.
 - Raw text, normalised text, confidence and parse are all logged, so STT errors can be separated from trainee errors at debrief.
 - Intent patterns live in JSON and are PLACEHOLDER until validated.
+- **As built (2e):** `src/parser/`, rules in the `parse` block of `data/phraseology/placeholder.json`; TAXI_INSTRUCTION, LINE_UP, TAKEOFF_CLEARANCE. Every word of the transmission must be explained by a cue, flag or value; a leftover word ("cancel", "not", "and wait", "run with", a number without its marker) makes it AMBIGUOUS. A value must fit a slot form exactly and lie in its range, otherwise the field is uncertain and empty. Grouped numbers ("twenty seven") are not accepted.
+- **Measured 2026-11-24, speaker s1 only, placeholder phrases, optimistic, accuracy only (not timed):** whisper tiny, old generated prompt 86 of 102 fields (reproduced), prompt regenerated with LINE_UP **87 of 102**, WER 14.5 % to 8.3 % (the looping recording no longer loops). Prompt 165 tokens of at most 223, so nothing is cut. Peak memory 161 MB and 163 MB. With the parser, on the 20 recordings of the three intents: old prompt 11 right, 0 wrong, 9 say again; new 12 right, **0 wrong, 8 say again (40 %, target at most 10 %)**; 0 of 30 other transmissions accepted. In 3 of the 8 the word "runway" was heard as "run with" and the number was right; none of the recordings contains LINE_UP. Repeat: `stt_bench`, then `parse_cli --score RUN.csv`.
 
 Illustrative only: "Eagle Four Two One, taxi via Alpha Three, hold short runway Zero Nine" →
 `{"callsign":"EAGLE-421","intent":"TAXI_INSTRUCTION","taxiway":"A3","runway":"09","instruction":"HOLD_SHORT"}`

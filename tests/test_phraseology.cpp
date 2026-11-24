@@ -25,6 +25,11 @@ Phraseology real() {
   EXPECT_TRUE(loadPhraseology(phraseologyFile(), p, e)) << e;
   return p;
 }
+std::size_t examples(const Phraseology& p) {
+  std::size_t n = 0;
+  for (const auto& i : p.intents) n += i.examples.size();
+  return n;
+}
 std::string loadChanged(const std::string& from, const std::string& to) {
   std::ifstream f(phraseologyFile());
   std::stringstream s;
@@ -93,7 +98,7 @@ TEST(Phraseology, UnkOnlyWhenAsked) {
   };
   EXPECT_EQ(unk(), 0);
   o.unkEvery = 5;
-  EXPECT_EQ(unk(), 22);  // 11 examples x 10 / 5
+  EXPECT_EQ(unk(), int(examples(p)) * 10 / 5);
 }
 TEST(Phraseology, PromptHasAllNamesAndNoDigitsOfAScenario) {
   const auto s = whisperPrompt(real());
@@ -115,7 +120,7 @@ TEST(Phraseology, ExcludeRemovesTheFormNotTheDigit) {
   o.exclude = {"niner", "x-ray"};
   std::string e;
   const auto v = expandPhrases(p, o, &e);
-  ASSERT_EQ(v.size(), 2200u) << e;
+  ASSERT_EQ(v.size(), examples(p) * 200) << e;
   int nine = 0, seven = 0;
   for (const auto& s : v) {
     EXPECT_EQ(s.find("niner"), std::string::npos);

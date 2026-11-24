@@ -193,6 +193,19 @@
    "{digit} {digit} {digit} decimal {digit}"
   ]
  },
+ "parse": {
+  "comment": "PLACEHOLDER. How the parser finds values (02 section 4). Slots without a marker start with a pool name (callsign). Every word must be explained: there are no filler words.",
+  "markers": {
+   "runway": ["runway"],
+   "taxiway": ["via", "taxiway"]
+  },
+  "flags": {
+   "hold_short": ["hold short"]
+  },
+  "ranges": {
+   "runway": [1, 36]
+  }
+ },
  "intents": [
   {
    "id": "TAXI_INSTRUCTION",
@@ -200,6 +213,25 @@
     "{callsign} taxi via {taxiway} runway {runway}",
     "{callsign} taxi via {taxiway} hold short runway {runway}"
    ],
+   "parse": {
+    "cues": ["taxi"],
+    "required": ["callsign", "taxiway", "runway"],
+    "optional": ["hold_short"]
+   },
+   "validation": {
+    "status": "draft"
+   }
+  },
+  {
+   "id": "LINE_UP",
+   "examples": [
+    "{callsign} line up runway {runway}"
+   ],
+   "parse": {
+    "cues": ["line up"],
+    "required": ["callsign", "runway"],
+    "optional": []
+   },
    "validation": {
     "status": "draft"
    }
@@ -209,6 +241,11 @@
    "examples": [
     "{callsign} runway {runway} cleared for takeoff"
    ],
+   "parse": {
+    "cues": ["cleared for takeoff", "cleared for take off"],
+    "required": ["callsign", "runway"],
+    "optional": []
+   },
    "validation": {
     "status": "draft"
    }

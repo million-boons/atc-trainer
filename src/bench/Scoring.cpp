@@ -226,6 +226,7 @@ std::string actionOf(const std::vector<SttWord>& w) {
     if (is(i, "land") || is(i, "landing")) got.insert("land");
     if (is(i, "turn") && is(i + 1, "left")) got.insert("turn_left");
     if (is(i, "turn") && is(i + 1, "right")) got.insert("turn_right");
+    if (is(i, "line") && is(i + 1, "up")) got.insert("line_up");
     if (is(i, "climb")) got.insert("climb");
     if (is(i, "descend")) got.insert("descend");
   }
