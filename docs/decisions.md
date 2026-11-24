@@ -45,7 +45,7 @@
 | D-41 | 2026-11-23 | Whisper gets equal treatment: prompt generated from `data/phraseology` (all pool values, never only the expected ones) plus a GBNF grammar variant, tuned on the same dev set with the same bias tests. | User |
 | D-42 | 2026-11-23 | User arranges 8 speakers, varied accents, including female voices (4 dev, 4 test). If fewer: 4 test speakers stay separate and dev shrinks. | User |
 | D-43 | 2026-11-23 | Dev set may use placeholder phrases. The locked test set waits for approved phraseology. | User |
-| D-44 | 2026-11-23 | Only unclassified material is shared with the assistant. Restricted SOP text and **all voice recordings stay offline**; no cloud upload of recordings is to be proposed. | User |
+| D-44 | 2026-11-23 | Only unclassified material is shared with the assistant. Restricted SOP text and **all voice recordings stay offline**; no cloud upload of recordings is to be proposed. **Amended 2026-11-24 by D-412:** recordings may be copied from the panel to the PC over the LAN only; everything else here still holds. | User |
 | D-45 | 2026-11-23 | `data/phraseology/` is defined now as the single source; Phraseology Studio edits it later. | User |
 | D-46 | 2026-11-23 | Track B (custom Vosk graph) not yet. If needed, the build uses text and lexicon only, on a separate Linux machine or a temporary AWS instance, unclassified text only. | User |
 | D-47 | 2026-11-23 | whisper small.en is an accuracy reference only, not a run-time candidate. | User |
@@ -65,6 +65,21 @@
 | D-103 | 2026-11-24 | Dashboard wireframe approved with fixes: the ready count is computed from the tiles; the Speech model tile has "Load exercise model" (loads the configured default, locked at Start); every tile shows whether it blocks Start or only warns. Voice bank missing and model not loaded block; speaker not checked warns. | User |
 | D-104 | 2026-11-24 | Exercise and Result mockups (2g) are drafted now, without a build. | User |
 | D-105 | 2026-11-24 | Commits: the ui session commits only its own files and works in its worktree (confirms D-31 and D-304). Session b2 edits `MockBackend.cpp` and `LiveBackend.cpp` when its TransmissionController changes merge; the ui session then checks the screens and reports. | User |
+| D-400 | 2026-11-23 | S-1: a fourth session (`atc-trainer-8d`) on branch and worktree `engine`, decision range D-400 to D-499 (extends D-304). Development moves to the user's GPU PC: all worktrees, builds, tests and Piper generation. The i3 panel is used only for measurements and acceptance (3c, G1 audio checks, timing) with nothing else running. The repo sync (git push/pull between PC and panel) is planned as part of 0a. Until moved, at most two sessions build/test on the panel. | User |
+| D-401 | 2026-11-23 | S-2: the slice's event log is JSON Lines behind `IEventLog`. | User |
+| D-402 | 2026-11-23 | S-3: schema gains `onEnter`; replies are referenced by id; clip IDs are derived from the reply text; replies live in `data/phraseology/replies/`. | User |
+| D-403 | 2026-11-23 | S-4: line-up wording is "line up runway {runway}", marked PLACEHOLDER. The user supplies approved wording later if unclassified. | User |
+| D-404 | 2026-11-23 | S-5: Piper runs on the GPU PC; only clips are copied. Licences are checked first (result: `06-vertical-slice.md` §5). | User |
+| D-405 | 2026-11-23 | S-6: pilot clips are WAV for now. | User |
+| D-406 | 2026-11-23 | S-7: the slice uses `whisper-tiny-prompt`, locked per exercise; 93 pauses accuracy work for about one day for 2e. Before the demo, 93 does one clean timing run on the idle panel. **Corrected 2026-11-24 by D-414** (model id). | User |
+| D-407 | 2026-11-23 | S-8: Speech Lab export stays off. | User |
+| D-408 | 2026-11-23 | S-9: scenario files are checked by hand-written loader checks with file and path in each error; no vendored JSON-schema validator. `01-system.md` §7 updated. | User |
+| D-409 | 2026-11-23 | Vertical slice plan approved with the changes above (`docs/architecture/06-vertical-slice.md`). Open item, not in slice scope: pilot readback of a wrong value that exists in the airfield pools should become possible so readback errors can be trained; values outside pools lead to challenge or say again. | User |
+| D-410 | 2026-11-24 | The same-absolute-path requirement is removed. Config, data, models and voices are found through an install prefix and config file, or relative to the executable, so the panel and later deployments can use any path. Own small task **0d** (`06-vertical-slice.md` §2, §4.1). | User (requirement; placing it as 0d instead of inside 0a: assistant, as the user allowed either) |
+| D-411 | 2026-11-24 | The PC has an SSH server. If its OS is not Ubuntu 22.04, builds run in an Ubuntu 22.04 + Qt 6.2.4 container there. OS, LAN address, user name and GPU are **not yet recorded**: the fields were left blank in the answer (Q-2 stays open). | User |
+| D-412 | 2026-11-24 | Q-1: voice recordings may be copied panel → PC over the LAN only: rsync over ssh, one-way, logged. On the PC they live in one folder outside git, with no cloud sync on it and local access only. Amends D-44. | User |
+| D-413 | 2026-11-24 | `en_US-norman-medium` approved as the placeholder pilot voice. Piper and the voice model are PC-only tools and are not shipped. Completes D-404. | User |
+| D-414 | 2026-11-24 | Corrects D-406: the slice model is Whisper tiny with the **generated** prompt, id `whisper-tiny-genprompt` (added by package 0b), not `whisper-tiny-prompt`. The rest of D-406 stays: locked per exercise (D-39), one clean timing run on the idle panel before the demo. | User (ruling, `docs/status/briefs-2026-11-24.md` on branch `audit`) |
 
 ## Check results
 

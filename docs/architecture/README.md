@@ -9,6 +9,7 @@ Status: **v0.1 APPROVED by the user, 2026-11-23** (D-04). C-1 ruled: interrupt (
 | [03-scenario-pilot.md](03-scenario-pilot.md) | Scenario schema, sequence engine, pilot behaviour, radio voice, assessment, logging |
 | [04-ui.md](04-ui.md) | Wireframes at 1280×800, QML structure |
 | [05-budget-roadmap-risks.md](05-budget-roadmap-risks.md) | Memory/CPU budget, roadmap with gates, risks |
+| [06-vertical-slice.md](06-vertical-slice.md) | Vertical slice: work packages, PC/panel split, repo sync, open items (D-400 to D-409) |
 | [schema/](schema/) | `scenario.schema.json`, `airfield.schema.json`, and PLACEHOLDER samples |
 
 ## Observed on this machine (2026-11-23, read-only inspection)
