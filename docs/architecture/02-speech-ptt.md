@@ -78,14 +78,9 @@ If replacement is needed: choose a pedal documented as holding its key or button
 - Hot-plug: libudev monitor; rebind on add; synthetic release on loss.
 - "Learn pedal": listens on all candidate devices, asks for a 2 s hold, shows device, code and **measured hold time**, writes `config/ptt.json`. A press shorter than 100 ms during the hold step is refused as "pulse-type device, cannot do hold-to-talk".
 
-Draft udev rule (inactive; finalise after §1.2):
+Udev rule: `deploy/panel/72-atc-ptt.rules`, installed by `deploy/setup_panel.sh` (D-200). It must sort before `73-seat-late.rules`, and it never matches a keyboard.
 
-```
-# 70-atc-ptt.rules
-ACTION!="remove", SUBSYSTEM=="input", KERNEL=="event*", ATTRS{idVendor}=="04d8", ATTRS{idProduct}=="0055", \
-  TAG+="uaccess", ENV{LIBINPUT_IGNORE_DEVICE}="1"
-```
-`uaccess` grants the active local seat user; no root and no `input` group membership needed.
+`uaccess` grants the active local seat user read and write; no root and no group membership needed. Read-only is ensured by the app, which opens the pedal `O_RDONLY` (question A-1 of the 2026-11-24 briefs is open).
 
 ### 1.4 Timing (all configurable; defaults are starting points to tune)
 
@@ -202,15 +197,22 @@ Findings: (1) Vosk grammar order was tested against three alternatives, all with
 - *The scorer could not see a swapped instruction.* Both order-4 runs checked (seeds 1 and 2) heard "cleared for takeoff" as "cleared to land" and were scored correct; the old-prompt whisper run had a similar climb/land error. `actionOf` now scores takeoff, land, turn left/right, climb and descend (`stt_bench --action`); it must be part of the gate.
 - **All of these use wording the s1 prompts were written from, so they are optimistic, and order/seed were chosen on s1.**
 
-Proposed gate, to be approved and then *measured*:
+Approved gate (D-40), on the locked test set; **none of it is measured yet**:
 
 | Metric | Target |
 |---|---|
-| **Wrong critical value accepted as RECOGNIZED** (callsign, runway, level, heading, hold short) | as near zero as possible; main selection criterion |
-| Critical field accuracy | ≥ 95 % per speaker |
-| Off-script speech accepted as valid | ≤ 2 % |
-| Release-to-text p95 | ≤ 2 s |
-| Process RSS growth over 4 h | none beyond noise |
+| **Wrong critical value accepted** | 0 of 160 |
+| Value pulled to the step's expected value (bias test) | 0 |
+| Critical fields right | at least 95 % overall **and** at least 90 % for every speaker |
+| Callsign, runway, heading/level, hold short | at least 93 % each |
+| Correct speech sent to "say again" | at most 10 % |
+| Off-script speech accepted | at most 1 of 80 |
+| Scripted WER | at most 8 % (diagnostic, not a gate) |
+| niner/tree/fife and Indian-English subset | within 3 points of the rest |
+| Release-to-text | p95 at most 2 s, max at most 3 s |
+| Engine memory | at most 450 MB |
+| CPU during TX | at most 1 core (Vosk) |
+| Memory growth over 4 h | none |
 
 If no engine passes, options are vocabulary/phrasing aliases, model adaptation, or a hardware change. These go to you; thresholds are not quietly lowered.
 
