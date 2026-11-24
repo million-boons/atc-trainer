@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "comment": "PLACEHOLDER - validate against approved SOP. Pilot replies only; never read by the speech corpus generator (D-402). Invented wording.",
+  "validation": {
+    "status": "placeholder"
+  },
+  "replies": [
+    {
+      "id": "REQUEST_TAXI",
+      "text": "{callsign}, request taxi",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "READY_DEPARTURE",
+      "text": "{callsign}, ready for departure runway {runway}",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "READBACK_TAXI",
+      "text": "taxi via {taxiway} runway {runway}, {callsign}",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "READBACK_LINE_UP",
+      "text": "line up runway {runway}, {callsign}",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "READBACK_TAKEOFF",
+      "text": "runway {runway} cleared for takeoff, {callsign}",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "REQUEST_MISSING",
+      "text": "say again all parts, {callsign}",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "SAY_AGAIN",
+      "text": "say again, {callsign}",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CHALLENGE",
+      "text": "confirm instruction, {callsign}",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "QUERY",
+      "text": "query instruction, {callsign}",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CALL_AGAIN",
+      "text": "{callsign}, standing by",
+      "validation": {
+        "status": "draft"
+      }
+    }
+  ]
+}

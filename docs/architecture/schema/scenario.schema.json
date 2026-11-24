@@ -1,12 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "ATC trainer scenario (draft v0.1)",
+  "title": "ATC trainer scenario (draft v0.2; documentation, the loader checks, D-408)",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "id", "name", "category", "validation", "airfield", "initialState", "generators", "initialStep", "steps", "pttRules", "completion"],
   "properties": {
     "schemaVersion": { "const": 1 },
-    "id": { "type": "string", "pattern": "^[A-Z0-9-]+$" },
+    "comment": { "type": "string" },
+    "id": { "type": "string", "pattern": "^[A-Z0-9_-]+$" },
     "name": { "type": "string" },
     "category": { "enum": ["departure", "arrival", "ground", "landing", "go-around", "emergency", "rcf", "abnormal"] },
     "objectives": { "type": "array", "items": { "type": "string" } },
@@ -17,7 +18,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["phase"],
-      "properties": { "phase": { "type": "string" }, "parameters": { "type": "object" } }
+      "properties": { "phase": { "type": "string" } }
     },
     "generators": {
       "type": "object",
@@ -73,11 +74,10 @@
       "required": ["action"],
       "properties": {
         "action": { "enum": ["say", "silent"] },
-        "template": { "type": "string" },
-        "validation": { "$ref": "#/definitions/validation" }
+        "reply": { "type": "string", "description": "id in data/phraseology/replies (D-402)" }
       },
       "if": { "properties": { "action": { "const": "say" } } },
-      "then": { "required": ["action", "template", "validation"] }
+      "then": { "required": ["action", "reply"] }
     },
     "guard": {
       "type": "object",
@@ -109,6 +109,12 @@
         "phase": { "type": "string" },
         "expects": { "type": "array", "items": { "$ref": "#/definitions/expectation" } },
         "safetyRules": { "type": "array", "items": { "type": "string" } },
+        "onEnter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["say", "delaySeconds"],
+          "properties": { "say": { "type": "string", "description": "reply id" }, "delaySeconds": { "type": "number", "minimum": 0 } }
+        },
         "timeoutSeconds": { "type": "integer", "minimum": 1 },
         "maxPilotCalls": { "type": "integer", "minimum": 0 },
         "maxSayAgain": { "type": "integer", "minimum": 1 },
