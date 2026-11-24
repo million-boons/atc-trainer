@@ -146,6 +146,7 @@ if(ATC_BUILD_TESTS)
   add_subdirectory(tests/scenario)
   add_subdirectory(tests/engine)
   add_subdirectory(tests/voice)
+  add_subdirectory(tests/runtime)
   if(TARGET atc_storage)
     add_executable(storage_tests tests/test_storage.cpp)
     target_link_libraries(storage_tests PRIVATE atc_storage GTest::gtest_main)
@@ -165,7 +166,7 @@ endif()
 
 # cmake --install build --prefix DIR --strip. Models and audio are copied by rsync, never from here (D-31).
 foreach(T atc_trainer ptt_monitor audio_probe ptt_record ptt_text stt_bench phrase_gen script_gen
-        logic_tests contract_tests storage_tests parser_tests stt_tests)
+        logic_tests runtime_tests contract_tests storage_tests parser_tests stt_tests)
   if(TARGET ${T})
     install(TARGETS ${T} RUNTIME DESTINATION bin)
   endif()

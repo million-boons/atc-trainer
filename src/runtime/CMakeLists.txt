@@ -1,4 +1,3 @@
-# RadioCore (1a) and ExerciseRuntime (3a), session b2.
-# No sources yet: turn INTERFACE into STATIC with the first .cpp. Qt-free.
-add_library(atc_runtime INTERFACE)
-target_link_libraries(atc_runtime INTERFACE atc_logic)
+# RadioCore (1a) and ExerciseRuntime (3a), session b2. Qt-free; hardware behind RadioDevices.h.
+add_library(atc_runtime STATIC RadioCore.cpp)
+target_link_libraries(atc_runtime PUBLIC atc_logic Threads::Threads)
