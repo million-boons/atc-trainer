@@ -6,10 +6,12 @@
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
+#include "app/LabController.h"
 #include "app/StatusFeed.h"
 #include "app/SttController.h"
 
-// View state of the Dashboard. Counts and reasons are computed from the tiles, never typed (D-103).
+// The one state behind the Dashboard tiles, the status-bar chips and the footer (D-110): all three are
+// made from the same tiles, so they cannot disagree. Counts and reasons are computed, never typed (D-103).
 class DashboardController : public QObject {
   Q_OBJECT
   QML_ELEMENT
@@ -27,8 +29,11 @@ class DashboardController : public QObject {
   Q_PROPERTY(QVariantMap scenario READ scenario NOTIFY changed)
   Q_PROPERTY(QStringList missingClips READ missingClips NOTIFY changed)
   Q_PROPERTY(bool pttTesting READ pttTesting NOTIFY changed)
-  Q_PROPERTY(int alertLevel READ alertLevel NOTIFY changed)  // LabController.Level, for the alert lane
-  Q_PROPERTY(QString alert READ alert NOTIFY changed)
+  Q_PROPERTY(LabController* lab READ lab WRITE setLab NOTIFY alertChanged)  // radio alerts; may be null
+  Q_PROPERTY(QVariantList chips READ chips NOTIFY chipsChanged)     // 5 x {name, value, level}
+  // Footer: the radio alert, then the tiles. Its level is the worse of the two, on every screen.
+  Q_PROPERTY(int alertLevel READ alertLevel NOTIFY alertChanged)    // LabController.Level
+  Q_PROPERTY(QString alert READ alert NOTIFY alertChanged)
  public:
   explicit DashboardController(QObject* parent = nullptr) : QObject(parent) {}
 
@@ -38,6 +43,8 @@ class DashboardController : public QObject {
   void setStt(SttController* s);
   QString exerciseModel() const { return model_; }
   void setExerciseModel(const QString& id);
+  LabController* lab() const { return lab_; }
+  void setLab(LabController* l);
 
   QVariantList tiles() const { return tiles_; }
   QString readyText() const { return readyText_; }
@@ -50,6 +57,7 @@ class DashboardController : public QObject {
   QStringList missingClips() const { return feed_ ? feed_->inputs().missingClips : QStringList(); }
   bool pttTesting() const { return feed_ && feed_->inputs().pttTesting; }
 
+  QVariantList chips() const { return chips_; }
   int alertLevel() const { return alertLevel_; }
   QString alert() const { return alert_; }
 
@@ -60,18 +68,22 @@ class DashboardController : public QObject {
 
  signals:
   void changed();
+  void chipsChanged();
+  void alertChanged();
 
  private:
   void refresh();
+  void refreshAlert();
   atc::ModelReady modelState() const;
 
   QPointer<StatusFeed> feed_;
   QPointer<SttController> stt_;
+  QPointer<LabController> lab_;
   QString model_ = QStringLiteral("whisper-tiny-genprompt");  // D-414
-  QVariantList tiles_;
+  QVariantList tiles_, chips_;
   QString readyText_, blockText_;
   QStringList reasons_;
   bool startEnabled_ = false;
-  int alertLevel_ = 0;
-  QString alert_;
+  int readyLevel_ = 0, alertLevel_ = 0;
+  QString readyAlert_, alert_;
 };

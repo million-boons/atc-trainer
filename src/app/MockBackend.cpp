@@ -1,7 +1,5 @@
 #include "app/MockBackend.h"
 
-#include "app/StatusWords.h"
-
 #include <QTime>
 #include <algorithm>
 #include <cmath>
@@ -48,8 +46,6 @@ MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs,
           [this] { lab_->setNotice(LabController::Caution, tr("Mock backend: no audio playback.")); });
   connect(lab, &LabController::exportRequested, this,
           [this] { lab_->setNotice(LabController::Caution, tr("Mock backend: export is not available.")); });
-  const auto chip = [this] { lab_->setChip(LabController::Stt, stt_->stateText(), LabController::Level(stt_->level())); };
-  connect(stt, &SttController::changed, this, chip);
   connect(stt, &SttController::result, this,
           [this](quint64 tx, const QString& model, const QString& config, const QString& text, const QStringList& words,
                  const QList<double>& conf, double sec) {
@@ -66,7 +62,6 @@ MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs,
     s.speaker = SpeakerReady::Ok;
     s.speakerNote = tr("mock: no sound played");
     status_.set(std::move(s));
-    lab_->setChip(LabController::Speaker, status_words::word(SpeakerReady::Ok), LabController::Ok);
   });
   connect(&status_, &StatusFeed::pttTestRequested, this, [this] {
     pttTestTicks_ = 100;  // 10 s to press
@@ -100,7 +95,6 @@ MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs,
   run("idle");
   goLive();
   timer_.start();
-  chip();
 }
 
 QVariantList MockBackend::scripts() const {
@@ -261,7 +255,6 @@ void MockBackend::restart() {
   }
   speech_ = {};
   lab_->showRecording(-1);
-  lab_->setVoiceBank(LabController::Bank::NotLoaded);
 }
 
 void MockBackend::at(double tMs, std::function<void()> f) { script_.emplace_back(Ns(tMs * 1e6), std::move(f)); }
@@ -384,14 +377,6 @@ void MockBackend::setStatusCase(const QString& id) {
   s.scenario = QVariantMap{{"name", tr("Departure 01")}, {"summary", tr("Taxi, line up, takeoff")}, {"callsign", "EAGLE-421"},
                 {"type", "C295"}, {"runway", "09"}, {"taxiway", "A3"}, {"rule", tr("interrupt")}, {"steps", 3},
                 {"sop", QString()}, {"placeholder", true}};
-  switch (s.bank) {
-    case BankReady::Loaded: lab_->setVoiceBank(LabController::Bank::Loaded); break;
-    case BankReady::CoverageOk: lab_->setVoiceBank(LabController::Bank::CoverageOk); break;
-    case BankReady::MissingClips: lab_->setVoiceBank(LabController::Bank::MissingClips, int(s.missingClips.size())); break;
-    case BankReady::Failed: lab_->setVoiceBank(LabController::Bank::Failed); break;
-    case BankReady::NotLoaded: lab_->setVoiceBank(LabController::Bank::NotLoaded); break;
-  }
-  lab_->setChip(LabController::Speaker, status_words::word(s.speaker), status_words::level(effect(s.speaker)));
   status_.set(std::move(s));
 }
 
@@ -406,9 +391,6 @@ void MockBackend::syncStatus() {
     s.pttName = !present_ ? tr("no device") : pttBase_ == PttReady::Ok ? tr("Foot pedal (simulated)") : tr("Dell mouse (simulated)");
     status_.set(std::move(s));
   }
-  lab_->setChip(LabController::Ptt, status_words::word(ptt),
-                status_words::level(effect(ptt, status_.inputs().pttMissingBlocks)));
-  lab_->setChip(LabController::Mic, status_words::word(mic), status_words::level(effect(mic)));
 }
 
 void MockBackend::statusTick() {

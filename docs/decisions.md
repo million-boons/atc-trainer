@@ -100,6 +100,7 @@
 | D-107 | 2026-11-24 | Exercise modes: Practice shows the live verdict; Assessed hides it until debrief. Completes D-104. What else Assessed hides, and choosing the mode in a Start dialog, are proposals shown in the 2g mockup (A-7), not decided. | User |
 | D-108 | 2026-11-24 | Exercise audio is stored locally under the Lab recording rules (D-101, D-102). Trainee consent is given once and kept in the trainee record. Which package owns that record is open (A-5); until then no exercise audio is saved. | User |
 | D-109 | 2026-11-24 | Speakers: 8 (4 dev, 4 test, as D-42), consent required, only the instructor role may add one. How the role is enforced is open (A-4); until then Add and Delete stay disabled. | User |
+| D-110 | 2026-11-24 | Status-bar chips, Dashboard tiles and the footer come from **one state**. A tile that blocks Start shows as a fault in its chip and in the footer, on every screen; the Lab footer no longer shows "Ready" while the PTT is missing. As built (assistant): `DashboardController` makes all three from the same tiles; the footer names the blocking tiles, and a radio alert is shown before them without hiding them; also while an exercise runs. The chip setters left in `LabController`, `StatusController` and `LiveBackend` no longer reach the screen (b2 removes its own). | User (ruling); as-built details: assistant |
 
 ## Check results
 

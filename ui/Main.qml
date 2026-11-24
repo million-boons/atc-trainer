@@ -30,6 +30,7 @@ Window {
         id: dashCtl
         feed: root.feed
         stt: root.stt
+        lab: root.lab
         exerciseModel: root.exerciseModel
     }
     onScreen_Changed: { lab.releaseRequested("SPACE"); dashCtl.cancelTests() }
@@ -54,7 +55,7 @@ Window {
         StatusBar {
             id: status
             width: parent.width; height: Theme.px(48)
-            chips: root.lab.chips
+            chips: dashCtl.chips
             scenario: dashCtl.scenario.name || qsTr("No scenario")
             mock: root.mock !== null
         }
@@ -87,10 +88,8 @@ Window {
             id: alert
             anchors.bottom: parent.bottom
             width: parent.width; height: Theme.px(32)
-            // A radio alert comes first; otherwise the Dashboard shows its own summary.
-            readonly property bool dashAlert: root.screen_ === "dash" && root.lab.alertLevel < LabController.Caution
-            level: dashAlert ? dashCtl.alertLevel : root.lab.alertLevel
-            text: dashAlert ? dashCtl.alert : root.lab.alert
+            level: dashCtl.alertLevel
+            text: dashCtl.alert
         }
 
         BaseButton {
