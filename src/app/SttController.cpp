@@ -85,8 +85,7 @@ int SttController::level() const {
   switch (shown().state) {
     case SttState::Ready:
     case SttState::Busy: return LabController::Ok;
-    case SttState::Failed: return LabController::Fault;
-    default: return LabController::Caution;
+    default: return LabController::Fault;  // as the tile and the chip (D-110)
   }
 }
 
