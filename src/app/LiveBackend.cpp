@@ -35,9 +35,6 @@ LiveBackend::LiveBackend(LabController* lab, SttController* stt, LiveConfig cfg,
   connect(lab, &L::playRequested, this, &LiveBackend::play);
   connect(lab, &L::exportRequested, this, [this] { lab_->setNotice(L::Caution, tr("Export is off. Recordings stay in memory.")); });
 
-  const auto chip = [this] { lab_->setChip(L::Stt, stt_->stateText(), L::Level(stt_->level())); };
-  connect(stt, &SttController::changed, this, chip);
-  chip();
   connect(stt, &SttController::result, this,
           [this](quint64 tx, const QString& model, const QString& config, const QString& text, const QStringList& words,
                  const QList<double>& conf, double sec) {

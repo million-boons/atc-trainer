@@ -28,6 +28,7 @@ struct StoredRecording {
   std::string key;           // file name without extension
   std::int64_t startedMs = 0;  // Unix time
   int tx = 0;
+  std::string speaker;         // ID code of the trainee record (D-101); required
   std::string pttSource, end;  // end: normal, stuck, lost
   bool gap = false;
   int rate = 16000;
@@ -38,13 +39,15 @@ struct StoredRecording {
 
 struct StoreConfig {
   std::string dir;
-  long minFreeMb = 500;      // nothing is saved below this
+  long minFreeMb = 200;      // nothing is saved below this (recordingsMinFreeMb, D-306)
   std::size_t maxQueue = 16;
   std::function<long()> freeMb;  // empty: ask the file system
 };
 
 // Speech Lab recordings: <key>.wav and <key>.json in one local folder (D-44). The folder is
-// created readable by the owner only. Nothing is sent anywhere and nothing is ever deleted.
+// created readable by the owner only. Nothing is sent anywhere. Nothing is deleted automatically (D-102):
+// remove() is for the instructor role, which the caller checks, and is logged in deletions.log, which is
+// never deleted.
 // All file work runs on one worker thread; callbacks run on that thread.
 class RecordingStore {
  public:
@@ -61,6 +64,8 @@ class RecordingStore {
   // Newest first. unreadable: files that are not valid recordings.
   void list(std::size_t max, std::function<void(std::vector<StoredRecording>, int unreadable)> done);
   void loadAudio(std::string key, std::function<void(std::optional<std::vector<std::int16_t>>)> done);
+  // Logs first, then removes the WAV and the JSON. why is empty if both are gone.
+  void remove(std::string key, std::string role, std::function<void(const std::string& why)> done);
   const std::string& dir() const { return cfg_.dir; }
 
  private:

@@ -48,6 +48,7 @@ TEST(Readiness, BankBlocksUnlessLoadedOrCovered) {
 TEST(Readiness, MicrophoneFaultsBlockAndLevelOnlyWarns) {
   for (const auto s : {MicReady::Lost, MicReady::Muted, MicReady::NoSignal}) EXPECT_EQ(effect(s), E::Blocks);
   EXPECT_EQ(effect(MicReady::OutsideBand), E::Warns);
+  EXPECT_EQ(effect(MicReady::NotTested), E::Warns);  // D-306
 }
 
 TEST(Readiness, MissingPttFollowsConfigurationAndNoHoldAlwaysBlocks) {

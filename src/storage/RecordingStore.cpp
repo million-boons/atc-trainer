@@ -12,6 +12,8 @@
 #include <nlohmann/json.hpp>
 
 #include "audio/WavFile.h"
+#include "storage/PeopleStore.h"
+#include "storage/PrivateFile.h"
 
 namespace fs = std::filesystem;
 using nlohmann::json;
@@ -37,7 +39,7 @@ json toJson(const StoredRecording& r) {
     rs.push_back({{"stt_model_id", x.modelId}, {"stt_model_name", x.modelName}, {"stt_model_config", cfg},
                   {"raw", x.text}, {"words", words}, {"release_to_text_ms", x.releaseToTextMs}});
   }
-  json j{{"format", 1}, {"kind", "speech-lab"}, {"started_ms", r.startedMs}, {"tx", r.tx}, {"ptt_source", r.pttSource},
+  json j{{"format", 1}, {"kind", "speech-lab"}, {"started_ms", r.startedMs}, {"tx", r.tx}, {"speaker", r.speaker}, {"ptt_source", r.pttSource},
          {"end", r.end}, {"gap", r.gap}, {"rate", r.rate}, {"samples", r.samples}, {"press_sample", r.pressSample},
          {"end_sample", r.endSample}, {"recognition", rs}};
   json c{{"empty", r.report.empty}, {"overload", r.report.overload}, {"spoke_before_keying", r.report.spokeBeforeKeying},
@@ -52,6 +54,7 @@ StoredRecording fromJson(const json& j, const std::string& key) {  // throws on 
   r.key = key;
   j.at("started_ms").get_to(r.startedMs);
   j.at("tx").get_to(r.tx);
+  j.at("speaker").get_to(r.speaker);
   j.at("ptt_source").get_to(r.pttSource);
   j.at("end").get_to(r.end);
   j.at("gap").get_to(r.gap);
@@ -170,6 +173,7 @@ void RecordingStore::save(StoredRecording rec, std::vector<std::int16_t> audio) 
   };
   const bool queued = post([this, report, rec = std::move(rec), audio = std::move(audio)]() mutable {
     if (!validKey(rec.key)) return report("invalid name");
+    if (!validPersonId(rec.speaker)) return report("no speaker ID");
     if (const std::string why = prepare(); !why.empty()) return report(why);
     const std::string wav = path(rec.key, ".wav");
     std::error_code ec;
@@ -219,6 +223,27 @@ void RecordingStore::loadAudio(std::string key, std::function<void(std::optional
     if (validKey(key))
       if (auto w = readWav(path(key, ".wav")); w && w->rate == 16000) out = std::move(w->samples);
     done(std::move(out));
+  }, true);
+}
+
+void RecordingStore::remove(std::string key, std::string role, std::function<void(const std::string&)> done) {
+  post([this, key = std::move(key), role = std::move(role), done = std::move(done)] {
+    if (!validKey(key)) return done("invalid name");
+    const std::string wav = path(key, ".wav"), meta = path(key, ".json"), log = cfg_.dir + "/deletions.log";
+    std::error_code ec;
+    if (!fs::exists(wav, ec) && !fs::exists(meta, ec)) return done("not found");
+    const auto r = readMeta(key);
+    const auto line = [&](const char* event) {
+      return json{{"event", event}, {"time_ms", std::int64_t(std::time(nullptr)) * 1000}, {"role", role}, {"recording", key},
+                  {"speaker", r ? r->speaker : "unknown"}}.dump(-1, ' ', false, json::error_handler_t::replace);
+    };
+    if (!appendPrivateLine(log, line("delete"))) return done("the deletion log cannot be written: nothing was deleted");
+    fs::remove(wav, ec);
+    const bool wavGone = !fs::exists(wav);
+    fs::remove(meta, ec);
+    if (wavGone && !fs::exists(meta)) return done("");
+    appendPrivateLine(log, line("delete_failed"));
+    done("the files could not be removed");
   }, true);
 }
 

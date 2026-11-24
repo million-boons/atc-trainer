@@ -6,7 +6,7 @@ namespace atc {
 
 // Dashboard tiles: does each one allow, warn about or block Start?
 // Rules: docs/architecture/04-ui.md section 5a (D-103, D-106).
-enum class MicReady { Ok, OutsideBand, NoSignal, Muted, Lost };
+enum class MicReady { Ok, NotTested, OutsideBand, NoSignal, Muted, Lost };
 enum class SpeakerReady { Ok, NotChecked };
 enum class PttReady { Ok, StandIn, NoHold, Missing };
 enum class ModelReady { Ready, NotLoaded, Loading, Failed, OtherLoaded };
@@ -26,7 +26,8 @@ struct ReadinessInputs {
 };
 
 constexpr StartEffect effect(MicReady s) {
-  return s == MicReady::Ok ? StartEffect::Ready : s == MicReady::OutsideBand ? StartEffect::Warns : StartEffect::Blocks;
+  return s == MicReady::Ok ? StartEffect::Ready
+         : s == MicReady::NotTested || s == MicReady::OutsideBand ? StartEffect::Warns : StartEffect::Blocks;
 }
 constexpr StartEffect effect(SpeakerReady s) { return s == SpeakerReady::Ok ? StartEffect::Ready : StartEffect::Warns; }
 constexpr StartEffect effect(PttReady s, bool missingBlocks) {

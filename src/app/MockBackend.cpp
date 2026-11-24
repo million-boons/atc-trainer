@@ -1,6 +1,6 @@
 #include "app/MockBackend.h"
 
-#include "app/StatusWords.h"
+#include "app/ExerciseMock.h"
 
 #include <QTime>
 #include <algorithm>
@@ -48,8 +48,6 @@ MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs,
           [this] { lab_->setNotice(LabController::Caution, tr("Mock backend: no audio playback.")); });
   connect(lab, &LabController::exportRequested, this,
           [this] { lab_->setNotice(LabController::Caution, tr("Mock backend: export is not available.")); });
-  const auto chip = [this] { lab_->setChip(LabController::Stt, stt_->stateText(), LabController::Level(stt_->level())); };
-  connect(stt, &SttController::changed, this, chip);
   connect(stt, &SttController::result, this,
           [this](quint64 tx, const QString& model, const QString& config, const QString& text, const QStringList& words,
                  const QList<double>& conf, double sec) {
@@ -63,10 +61,17 @@ MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs,
   });
   connect(&status_, &StatusFeed::toneRequested, this, [this] {
     StatusInputs s = status_.inputs();
-    s.speaker = SpeakerReady::Ok;
-    s.speakerNote = tr("mock: no sound played");
+    s.speaker = SpeakerReady::NotChecked;
+    s.speakerNote = tr("did you hear it? (mock: no sound)");
+    s.toneAwaitingAnswer = true;
     status_.set(std::move(s));
-    lab_->setChip(LabController::Speaker, status_words::word(SpeakerReady::Ok), LabController::Ok);
+  });
+  connect(&status_, &StatusFeed::toneHeardRequested, this, [this] {
+    StatusInputs s = status_.inputs();
+    if (!std::exchange(s.toneAwaitingAnswer, false)) return;
+    s.speaker = SpeakerReady::Ok;
+    s.speakerNote = tr("heard by user");
+    status_.set(std::move(s));
   });
   connect(&status_, &StatusFeed::pttTestRequested, this, [this] {
     pttTestTicks_ = 100;  // 10 s to press
@@ -80,6 +85,12 @@ MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs,
   connect(&status_, &StatusFeed::cancelTestsRequested, this, [this] {
     micTestTicks_ = 0;
     if (status_.inputs().pttTesting) endPttTest({});
+    if (status_.inputs().toneAwaitingAnswer) {  // the screen was left without an answer
+      StatusInputs s = status_.inputs();
+      s.toneAwaitingAnswer = false;
+      s.speakerNote.clear();
+      status_.set(std::move(s));
+    }
     statusTick();
   });
   connect(&status_, &StatusFeed::stopExerciseRequested, this, [this] {
@@ -90,6 +101,16 @@ MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs,
     st.locked = false;
     stt_->showScripted(st);
   });
+  const auto go = [this](const char* id) { return [this, id] { run(id); }; };
+  connect(&exercise_, &ExerciseController::startRequested, this, go("excall"));
+  connect(&exercise_, &ExerciseController::stopRequested, this, go("exresulta"));
+  connect(&exercise_, &ExerciseController::resultRequested, this, go("exresult"));
+  connect(&exercise_, &ExerciseController::screenPttRequested, this, go("exwait"));
+  connect(&exercise_, &ExerciseController::runAgainRequested, this, go("exstart"));
+  connect(&exercise_, &ExerciseController::cancelStartRequested, this, go("dashready"));
+  connect(&exercise_, &ExerciseController::leaveRequested, this, go("dashready"));
+  connect(&exercise_, &ExerciseController::playRequested, this,
+          [this] { lab_->setNotice(LabController::Caution, tr("Mock backend: no audio playback.")); });
   statusTimer_.setInterval(100);
   connect(&statusTimer_, &QTimer::timeout, this, &MockBackend::statusTick);
   timer_.setTimerType(Qt::PreciseTimer);
@@ -100,7 +121,6 @@ MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs,
   run("idle");
   goLive();
   timer_.start();
-  chip();
 }
 
 QVariantList MockBackend::scripts() const {
@@ -261,24 +281,25 @@ void MockBackend::restart() {
   }
   speech_ = {};
   lab_->showRecording(-1);
-  lab_->setVoiceBank(LabController::Bank::NotLoaded);
 }
 
 void MockBackend::at(double tMs, std::function<void()> f) { script_.emplace_back(Ns(tMs * 1e6), std::move(f)); }
 
 void MockBackend::run(const QString& id) {
-  rule_ = id == "blocked" ? PressRule::Block : id.startsWith("queue") ? PressRule::Queue : PressRule::Interrupt;
+  const bool ex = exercise_mock::isCase(id);
+  const QString r = ex ? exercise_mock::radioCase(id) : id;  // the radio part of an Exercise case
+  rule_ = r == "blocked" ? PressRule::Block : r.startsWith("queue") ? PressRule::Queue : PressRule::Interrupt;
   frozen_ = true;  // scripted: never touches the speech service
   restart();
   SttStatus st;
   st.state = SttState::Ready;
   st.modelId = kScriptModel;
   if (id == "idle" || id == "dash") st = SttStatus{};
-  if (id == "recog") st.state = SttState::Busy;
+  if (r == "recog") st.state = SttState::Busy;
   if (id == "mloading") st.state = SttState::Loading;
   if (id == "mfailed" || id == "dashfault") { st.state = SttState::Failed; st.message = "not enough memory: 210 MB free, 325 MB needed"; }
   if (id == "mother") st.modelId = "vosk-grammar";
-  if (id == "mlocked" || id == "dashrun") st.locked = true;
+  if (id == "mlocked" || id == "dashrun" || exercise_mock::running(id)) st.locked = true;
   stt_->showScripted(st);
   setStatusCase(id);
   double freeze = 200;
@@ -288,18 +309,18 @@ void MockBackend::run(const QString& id) {
   };
   const auto pilot = [&] { at(500, [this] { tx_->requestPilot({"mock", 0}, now_); }); };
 
-  if (id == "tx") { talk(0); freeze = 4400; }
-  else if (id == "tail") { talk(5100); freeze = 5200; }
-  else if (id == "recog") { talk(5100); freeze = 5360; }
-  else if (id == "good") { talk(5100); freeze = 5700; }
-  else if (id == "clipped") { speech_.gain = 4; talk(5100); freeze = 5700; }
-  else if (id == "early") { speech_.endBeforeReleaseMs = -400; talk(5100); freeze = 5700; }
-  else if (id == "before") { speech_.startMs = -400; talk(5100); freeze = 5700; }
-  else if (id == "empty") { speech_.gain = 0; talk(5100); freeze = 5700; }
-  else if (id == "tap") { talk(1140); freeze = 1600; }
-  else if (id == "other") { talk(0); at(2000, [this] { edge(2000, "SCREEN", true); }); freeze = 3100; }
-  else if (id == "stuck") { talk(0); freeze = 31500; }
-  else if (id == "lost") {
+  if (r == "tx") { talk(0); freeze = 4400; }
+  else if (r == "tail") { talk(5100); freeze = 5200; }
+  else if (r == "recog") { talk(5100); freeze = 5360; }
+  else if (r == "good") { talk(5100); freeze = 5700; }
+  else if (r == "clipped") { speech_.gain = 4; talk(5100); freeze = 5700; }
+  else if (r == "early") { speech_.endBeforeReleaseMs = -400; talk(5100); freeze = 5700; }
+  else if (r == "before") { speech_.startMs = -400; talk(5100); freeze = 5700; }
+  else if (r == "empty") { speech_.gain = 0; talk(5100); freeze = 5700; }
+  else if (r == "tap") { talk(1140); freeze = 1600; }
+  else if (r == "other") { talk(0); at(2000, [this] { edge(2000, "SCREEN", true); }); freeze = 3100; }
+  else if (r == "stuck") { talk(0); freeze = 31500; }
+  else if (r == "lost") {
     talk(0);
     at(4000, [this] {
       present_ = false;
@@ -309,37 +330,42 @@ void MockBackend::run(const QString& id) {
     });
     freeze = 4700;
   }
-  else if (id == "pulse") { talk(1001); freeze = 1400; }
-  else if (id == "muted") {
+  else if (r == "pulse") { talk(1001); freeze = 1400; }
+  else if (r == "muted") {
     muted_ = true;
     lab_->setNotice(LabController::Fault, tr("Microphone sends pure silence. Check the mute key on the headset."));
     lab_->setAlert(LabController::Fault, tr("Mic: no signal (headset mute?)"));
   }
   else if (id == "dashfault") { muted_ = true; present_ = false; }
-  else if (id == "rx") { pilot(); freeze = 1500; }
-  else if (id == "ptimeout") { pilotHangs_ = true; pilot(); freeze = 21000; }
-  else if (id == "cut") {
+  else if (r == "rx") { pilot(); freeze = 1500; }
+  else if (r == "ptimeout") { pilotHangs_ = true; pilot(); freeze = 21000; }
+  else if (r == "cut") {
     pilot();
     at(2000, [this] { edge(2000, "RIGHT", true); });
     freeze = 3000;
   }
-  else if (id == "blocked") {
+  else if (r == "blocked") {
     pilot();
     at(2000, [this] { edge(2000, "RIGHT", true); });
     freeze = 2800;
   }
-  else if (id.startsWith("queue")) {
+  else if (r.startsWith("queue")) {
     pilot();
     at(2000, [this] { edge(2000, "RIGHT", true); });
-    if (id == "queuetalk") {
+    if (r == "queuetalk") {
       speech_.startMs = -400;
       at(9000, [this] { edge(9000, "RIGHT", false); });
     }
-    if (id == "queuedrop") at(3000, [this] { edge(3000, "RIGHT", false); });
-    freeze = id == "queuetalk" ? 9700 : id == "queueopen" ? 8500 : id == "queuedrop" ? 3500 : 2800;
+    if (r == "queuedrop") at(3000, [this] { edge(3000, "RIGHT", false); });
+    freeze = r == "queuetalk" ? 9700 : r == "queueopen" ? 8500 : r == "queuedrop" ? 3500 : 2800;
   }
   advanceTo(Ns(freeze * 1e6));
   current_ = id;
+  if (ex) exercise_mock::show(exercise_, id, assessed_, consent_);
+  else if (exercise_.phase() != ExerciseController::Idle) {
+    exercise_.begin({}, false, false);
+    emit exercise_.screenRequested(id.startsWith("dash") ? "dash" : "lab");
+  }
   emit currentChanged();
 }
 
@@ -363,7 +389,7 @@ void MockBackend::setStatusCase(const QString& id) {
   micTestTicks_ = pttTestTicks_ = 0;
   statusTimer_.stop();
   testHold_.invalidate();
-  const bool ready = id == "dashready" || id == "dashrun", fault = id == "dashfault";
+  const bool ready = id == "dashready" || id == "dashrun" || exercise_mock::isCase(id), fault = id == "dashfault";
   StatusInputs s;
   s.micName = tr("H540 (simulated)");
   s.micDbfs = -12;
@@ -380,18 +406,10 @@ void MockBackend::setStatusCase(const QString& id) {
     for (int i = 1; i <= 12; ++i) s.missingClips << tr("PLACEHOLDER_CLIP_%1").arg(i, 2, 10, QChar('0'));
   s.storage = fault ? StorageReady::Low : StorageReady::Ok;
   s.storageFree = fault ? tr("0.8 GB free") : tr("94 GB free");
-  s.running = id == "dashrun";
+  s.running = id == "dashrun" || exercise_mock::running(id);
   s.scenario = QVariantMap{{"name", tr("Departure 01")}, {"summary", tr("Taxi, line up, takeoff")}, {"callsign", "EAGLE-421"},
                 {"type", "C295"}, {"runway", "09"}, {"taxiway", "A3"}, {"rule", tr("interrupt")}, {"steps", 3},
                 {"sop", QString()}, {"placeholder", true}};
-  switch (s.bank) {
-    case BankReady::Loaded: lab_->setVoiceBank(LabController::Bank::Loaded); break;
-    case BankReady::CoverageOk: lab_->setVoiceBank(LabController::Bank::CoverageOk); break;
-    case BankReady::MissingClips: lab_->setVoiceBank(LabController::Bank::MissingClips, int(s.missingClips.size())); break;
-    case BankReady::Failed: lab_->setVoiceBank(LabController::Bank::Failed); break;
-    case BankReady::NotLoaded: lab_->setVoiceBank(LabController::Bank::NotLoaded); break;
-  }
-  lab_->setChip(LabController::Speaker, status_words::word(s.speaker), status_words::level(effect(s.speaker)));
   status_.set(std::move(s));
 }
 
@@ -406,9 +424,6 @@ void MockBackend::syncStatus() {
     s.pttName = !present_ ? tr("no device") : pttBase_ == PttReady::Ok ? tr("Foot pedal (simulated)") : tr("Dell mouse (simulated)");
     status_.set(std::move(s));
   }
-  lab_->setChip(LabController::Ptt, status_words::word(ptt),
-                status_words::level(effect(ptt, status_.inputs().pttMissingBlocks)));
-  lab_->setChip(LabController::Mic, status_words::word(mic), status_words::level(effect(mic)));
 }
 
 void MockBackend::statusTick() {
@@ -451,6 +466,7 @@ void MockBackend::userEdge(const QString& src, bool down) {
     testEdge(down);
     return;
   }
+  if (frozen_ && exercise_mock::isCase(current_)) return exerciseEdge(down);
   if (frozen_) {
     if (!down) return;
     run("idle");
@@ -460,6 +476,37 @@ void MockBackend::userEdge(const QString& src, bool down) {
   ptt_->rawEdge(now_, src.toStdString(), down);
   publish();
 }
+
+// A press on the Exercise screen walks through the cases: TX, processing, pilot reply.
+void MockBackend::exerciseEdge(bool down) {
+  if (down) {
+    if (exPressed_ || !exercise_mock::running(current_)) return;
+    exPressed_ = true;
+    run("extx");
+    return;
+  }
+  if (!std::exchange(exPressed_, false) || current_ != "extx") return;
+  run("exproc");
+  QTimer::singleShot(900, this, [this] {
+    if (current_ == "exproc" && !exPressed_) run("exrx");
+  });
+}
+
+void MockBackend::setAssessed(bool on) {
+  if (assessed_ == on) return;
+  assessed_ = on;
+  if (exercise_mock::isCase(current_)) run(current_);
+  else emit currentChanged();
+}
+
+void MockBackend::setConsent(bool on) {
+  if (consent_ == on) return;
+  consent_ = on;
+  if (exercise_mock::isCase(current_)) run(current_);
+  else emit currentChanged();
+}
+
+QVariantList MockBackend::exerciseScripts() const { return exercise_mock::cases(); }
 
 void MockBackend::advanceTo(Ns t) {
   while (now_ < t) {

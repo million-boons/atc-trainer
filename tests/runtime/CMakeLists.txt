@@ -13,7 +13,10 @@ find_package(Qt6 6.2 QUIET COMPONENTS Core Qml)
 if(Qt6_FOUND)
   add_executable(status_tests test_status.cpp ${CMAKE_SOURCE_DIR}/src/app/StatusController.h ${CMAKE_SOURCE_DIR}/src/app/StatusController.cpp
     ${CMAKE_SOURCE_DIR}/src/app/StatusFeed.h ${CMAKE_SOURCE_DIR}/src/app/RowModel.h
-    ${CMAKE_SOURCE_DIR}/src/app/LabController.h ${CMAKE_SOURCE_DIR}/src/app/LabController.cpp)
+    ${CMAKE_SOURCE_DIR}/src/app/LabController.h ${CMAKE_SOURCE_DIR}/src/app/LabController.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/DashboardController.h ${CMAKE_SOURCE_DIR}/src/app/DashboardController.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/SttController.h ${CMAKE_SOURCE_DIR}/src/app/SttController.cpp
+    ${CMAKE_SOURCE_DIR}/src/app/ExerciseController.h ${CMAKE_SOURCE_DIR}/src/app/ExerciseController.cpp)
   set_target_properties(status_tests PROPERTIES AUTOMOC ON)
   target_include_directories(status_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/app)
   target_link_libraries(status_tests PRIVATE atc_runtime Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)

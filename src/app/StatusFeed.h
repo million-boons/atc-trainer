@@ -16,6 +16,7 @@ struct StatusInputs {
   int micTestLeft = 0;    // seconds; 0 = no test running
   atc::SpeakerReady speaker = atc::SpeakerReady::NotChecked;
   QString speakerName, speakerNote;
+  bool toneAwaitingAnswer = false;  // the tone played to its end: "I heard it" may be pressed (D-306)
   atc::PttReady ptt = atc::PttReady::Missing;
   bool pttMissingBlocks = true;
   bool pttDown = false;
@@ -47,6 +48,7 @@ class StatusFeed : public QObject {
   void changed();
   void micTestRequested();
   void toneRequested();
+  void toneHeardRequested();  // the only way to SpeakerReady::Ok
   void pttTestRequested();
   void cancelTestsRequested();
   void stopExerciseRequested();

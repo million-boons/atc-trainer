@@ -32,6 +32,7 @@ Item {
                     height: Theme.px(240)
                     info: s.dash.tiles[index] || ({})
                     onActivated: if (s.dash.tileAction(index)) s.showClips = true
+                    onActivated2: s.dash.toneHeard()   // only the Speaker tile has a second button
                 }
             }
         }

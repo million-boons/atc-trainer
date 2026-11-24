@@ -26,7 +26,9 @@ Sessions: b2 = `runtime`, 93 = `stt`, 31 = `ui`, 8d = `engine`.
 | 1a | `RadioCore`, `PulsePlayer`, Lab playback, speaker check, `StatusController`. Export stays off (D-407) | b2 | 0a, 0c | 7–9 |
 | 1b | Dashboard wireframe, user OK, QML; remaining Lab controls. Start disabled until 3b | 31 | 0c; 1a to connect | 4–5 |
 | 1c | Recordings: speaker ID and consent required before saving, saving wired to RadioCore, off switch in Settings, list, instructor-only logged delete, low-space warning (D-101, D-102, 04 §5b). Speakers are added by the instructor role only. | 31 | 1a; role mechanism (A-4) | to be estimated by 31 |
-| **G1** | User tests Lab and Dashboard on the panel with the H540 | user | 1a, 1b | – |
+| **G1** | User tests Lab and Dashboard on the panel with the H540; PTT is the mouse stand-in, Screen PTT and Space (D-309) | user | 1a, 1b | – |
+| 1d | Keyboard-type PTT is refused without exclusive grab and exact VID:PID (new config keys, fake-device tests); udev rule with `LIBINPUT_IGNORE_DEVICE` for the matched pedal only, its VID:PID filled in when the pedal arrives (D-310) | b2 | 1a; before G1-P | – |
+| **G1-P** | Short pedal test when the replacement pedal arrives (below); 3a and 3c do not wait for it; final acceptance and deployment (phase 10) require it (D-309) | user, b2 | 1d, pedal | – |
 | 2a | Loader (hand-written checks, D-408), generator, `scenario_check`, departure JSON | 8d | 0c | 4–5 |
 | 2b | Context, validator, sequence engine, pilot behaviour, result metrics, `sim_cli` | 8d | 2a | 8–10 |
 | 2c | Template parser, voice bank, coverage, `PhraseAssembler` | 8d | 2a | 4–5 |
@@ -34,20 +36,31 @@ Sessions: b2 = `runtime`, 93 = `stt`, 31 = `ui`, 8d = `engine`.
 | 2e | `LINE_UP` data, parser for 3 intents, 4 classes, `parse_cli`, Lab intent data | 93 | 0b, 0c | 6–8 |
 | 2f | `RadioAudioProcessor`, `radio_ab` | b2 | 1a | 2–3 |
 | 2g | Exercise and Result mockups, user OK, QML on a mock controller | 31 | 1b | 7–9 |
-| 3a | `ExerciseRuntime`: RadioCore, STT, parser, engine, voice, player; model lock; JSON Lines log (D-401) | b2 | G1, 2a–2f | 7–9 |
+| 3a | `ExerciseRuntime`: RadioCore, STT, parser, engine, voice, player; model lock; JSON Lines log (D-401); "fallback PTT used" in log and result (D-311) | b2 | G1, 2a–2f | 7–9 |
 | 3b | Real controllers for Exercise, Result, Dashboard Start/Stop | 31 | 2g, 3a | 3–4 |
 | T | Clean STT timing run on the idle panel (D-406) | 93 | before 3c demo | 1 |
-| 3c | Acceptance run, fixes, panel measurements | all, b2 leads | 3a, 3b, T | 6–10 |
+| 3c | Acceptance run, fixes, panel measurements; accepted with the mouse stand-in, marked "pedal pending" (D-309) | all, b2 leads | 3a, 3b, T | 6–10 |
 
-Order: `0a → 0b, 0c, 0d → 1a → G1 → 3a → 3b → 3c`. Wave 2 runs beside Wave 1 from 0c. 1c follows 1a. G1 does not wait for 1c; it needs only 1a and 1b (D-415).
+Order: `0a → 0b, 0c, 0d → 1a → G1 → 3a → 3b → 3c`. Wave 2 runs beside Wave 1 from 0c. 1c follows 1a. G1 does not wait for 1c; it needs only 1a and 1b (D-415). G1 has no pedal checks; they are G1-P, and neither 3a nor 3c waits for G1-P (D-309).
 Estimate before the move to the PC: 67–88 session-hours (before 0d, which adds 2–4, and before 1c, not yet estimated), likely 5–6 working days, range 4–8. Not yet re-estimated for the PC: builds get faster, the move itself (§4) is extra.
+
+### G1-P: pedal test (D-309, deferred until the pedal arrives)
+
+The pedal is still **not passed** (D-02, D-03); G1 does not pass it.
+
+1. VID:PID and the kind of device Linux reports (mouse, joystick or keyboard). A keyboard-type pedal only under D-310: exact VID:PID and grabbed exclusively; no other keyboard.
+2. Press and release are reported as separate events, also for a hold of several seconds; not pulse type (D-01). Which event code it sends; `pttDevice`, `pttCode` and `pttGrab` in `ui.json` are set to match.
+3. D-01: right down opens the transmission, right up closes it; left is reported only.
+4. `uaccess` (and, for a keyboard-type pedal, package 1d first): after the pedal rule has its VID:PID and the user has installed it, the app opens the device read-only without a group or root, also after replug, login and reboot.
+5. In the app: PTT tile OK instead of STAND-IN; PTT test 2 s; hold over 30 s closes as STUCK; unplug while held closes the transmission and shows MISSING; replug recovers.
+6. The result is recorded against D-02.
 
 ## 3. Where work happens (D-400)
 
 | | GPU PC | i3 panel |
 |---|---|---|
 | Worktrees, sessions, builds, tests, Piper | Yes | Only until the move: at most two sessions build/test; D-37 was not withdrawn |
-| G1 audio checks, timing, 3c acceptance | No | Yes, **nothing else running** |
+| G1 audio checks, G1-P, timing, 3c acceptance | No | Yes, **nothing else running** |
 
 Until the move the two build/test slots are **b2** (0a) and **93** (0b). 8d and 31 write files but do not build.
 Claude sessions do not move with the repository. New sessions on the PC start from `CLAUDE.md`, this file and `docs/decisions.md`, so anything they need must be committed.
@@ -111,7 +124,7 @@ Not affected: the udev rules and H540 service, which use fixed system paths by d
 7. Result screen: steps, attempts, response time, PTT discipline, suspected STT errors shown separately, no pass mark.
 8. Release-to-reply time, RAM and CPU measured on the idle panel and reported.
 
-Out of scope: Phraseology Studio, real recordings, SQLite and resume, injected events, assessed mode, packaging, pedal gate (D-03).
+Out of scope: Phraseology Studio, real recordings, SQLite and resume, injected events, assessed mode, packaging, pedal gate (D-03; its checks are G1-P, D-309).
 
 Modes (ruling 2026-11-24): Practice shows the live verdict; Assessed hides it until debrief. The slice runs Practice only; P-11 refuses Assessed while any text is placeholder. Exercise audio is stored only with the trainee's consent on record; until A-5 is answered none is saved. (ui records these as D-107 and D-108.)
 

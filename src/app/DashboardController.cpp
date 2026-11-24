@@ -1,8 +1,9 @@
 #include "app/DashboardController.h"
 
+#include <algorithm>
 #include <cmath>
+#include <iterator>
 
-#include "app/LabController.h"
 #include "app/StatusWords.h"
 
 using namespace atc;
@@ -36,6 +37,24 @@ void DashboardController::setStt(SttController* s) {
   refresh();
 }
 
+void DashboardController::setLab(LabController* l) {
+  if (lab_ == l) return;
+  if (lab_) disconnect(lab_.data(), nullptr, this, nullptr);
+  lab_ = l;
+  if (l) connect(l, &LabController::noticeChanged, this, &DashboardController::refreshAlert);
+  emit alertChanged();
+  refreshAlert();
+}
+
+void DashboardController::setExercise(ExerciseController* e) {
+  if (exercise_ == e) return;
+  if (exercise_) disconnect(exercise_.data(), nullptr, this, nullptr);
+  exercise_ = e;
+  if (e) connect(e, &ExerciseController::changed, this, &DashboardController::refreshAlert);
+  emit alertChanged();
+  refreshAlert();
+}
+
 void DashboardController::setExerciseModel(const QString& id) {
   if (model_ == id) return;
   model_ = id;
@@ -64,22 +83,28 @@ void DashboardController::refresh() {
   readyText_.clear();
   blockText_.clear();
   startEnabled_ = false;
-  alertLevel_ = LabController::None;
-  alert_.clear();
+  readyLevel_ = LabController::None;
+  readyAlert_.clear();
   if (!feed_) {
+    chips_.clear();
     emit changed();
-    return;
+    emit chipsChanged();
+    return refreshAlert();
   }
   const StatusInputs& in = feed_->inputs();
   const ModelReady model = modelState();
   const Readiness r = readiness({.mic = in.mic, .speaker = in.speaker, .ptt = in.ptt, .model = model, .bank = in.bank,
                                  .storage = in.storage, .pttMissingBlocks = in.pttMissingBlocks});
+  QStringList blockers;
   const auto add = [&](ReadyTile t, const QString& title, const QString& state, const QString& line1, const QString& line2,
-                       const QString& action, bool actionEnabled) {
+                       const QString& action, bool actionEnabled, const QString& action2 = {}, bool action2Enabled = false) {
     const StartEffect e = r.of(t);
     tiles_.append(QVariantMap{{"title", title}, {"level", int(status_words::level(e))}, {"state", state}, {"line1", line1}, {"line2", line2},
-                              {"effect", wordOf(e)}, {"action", action}, {"actionEnabled", actionEnabled}});
-    if (e == StartEffect::Blocks) reasons_.append(tr("%1: %2").arg(title, state.toLower()));
+                              {"effect", wordOf(e)}, {"action", action}, {"actionEnabled", actionEnabled},
+                              {"action2", action2}, {"action2Enabled", action2Enabled}});
+    if (e != StartEffect::Blocks) return;
+    reasons_.append(tr("%1: %2").arg(title, state.toLower()));
+    blockers.append(tr("%1 %2").arg(title, state.toLower()));
   };
   const bool idle = !in.running;
 
@@ -88,7 +113,8 @@ void DashboardController::refresh() {
       in.micTestLeft > 0 ? tr("%1  test %2 s").arg(dbfs).arg(in.micTestLeft) : dbfs, tr("Test"),
       idle && in.micTestLeft == 0 && in.mic != MicReady::Lost);
 
-  add(ReadyTile::Speaker, tr("Speaker"), status_words::word(in.speaker), in.speakerName, in.speakerNote, tr("Test tone"), idle);
+  add(ReadyTile::Speaker, tr("Speaker"), status_words::word(in.speaker), in.speakerName, in.speakerNote, tr("Test tone"), idle,
+      tr("I heard it"), idle && in.toneAwaitingAnswer);
 
   const QString edge = in.ptt == PttReady::Missing ? QString() : in.pttDown ? tr("RIGHT: DOWN") : tr("RIGHT: UP");
   add(ReadyTile::Ptt, tr("PTT"), status_words::word(in.ptt), in.pttName, in.pttNote.isEmpty() ? edge : in.pttNote, tr("Test"),
@@ -101,7 +127,8 @@ void DashboardController::refresh() {
   else if (stt_ && model == ModelReady::OtherLoaded) note = tr("Loaded: %1").arg(stt_->loadedName());
   else if (!installed) note = tr("not installed");
   else if (stt_ && stt_->locked()) note = tr("locked");
-  add(ReadyTile::Model, tr("Speech model"), tr(mod[int(model)]), modelName(), note, tr("Load exercise model"),
+  const bool busy = model == ModelReady::Ready && stt_->status().state == SttState::Busy;
+  add(ReadyTile::Model, tr("Speech model"), busy ? tr("BUSY") : tr(mod[int(model)]), modelName(), note, tr("Load exercise model"),
       idle && stt_ && stt_->canLoad(model_));
 
   QString bank;
@@ -119,18 +146,48 @@ void DashboardController::refresh() {
 
   readyText_ = tr("%1 of %2 ready").arg(r.count(StartEffect::Ready)).arg(int(r.tiles.size()));
   blockText_ = tr("%1 block Start").arg(r.count(StartEffect::Blocks));
-  const int blocks = r.count(StartEffect::Blocks), warns = r.count(StartEffect::Warns);
-  if (in.running) {
-    alertLevel_ = LabController::Ok;
-    alert_ = tr("Exercise running");
-  } else {
-    alertLevel_ = status_words::level(blocks ? StartEffect::Blocks : warns ? StartEffect::Warns : StartEffect::Ready);
-    alert_ = blocks ? tr("Not ready: %1 block Start, %2 warn").arg(blocks).arg(warns)
-             : warns ? tr("%1 warn, none block Start").arg(warns) : tr("All systems ready");
+  QVariantList chips;
+  const QString names[] = {tr("Mic"), tr("Speaker"), tr("PTT"), tr("STT"), tr("VOICE BANK")};  // ReadyTile order (D-27)
+  for (int i = 0; i < int(std::size(names)); ++i) {
+    const QVariantMap m = tiles_[i].toMap();
+    chips.append(QVariantMap{{"name", names[i]}, {"value", m["state"]}, {"level", m["level"]}});
   }
+  const bool newChips = chips != chips_;  // the level meter changes the tiles, not the chips
+  chips_ = chips;
+
+  const int blocks = r.count(StartEffect::Blocks), warns = r.count(StartEffect::Warns);
+  readyLevel_ = status_words::level(blocks ? StartEffect::Blocks : warns ? StartEffect::Warns : StartEffect::Ready);
+  const QString more = warns ? tr("; %1 warn").arg(warns) : QString();
+  if (in.running)
+    readyAlert_ = blocks ? tr("Exercise running: %1%2").arg(blockers.join(", "), more)
+                  : warns ? tr("Exercise running; %1 warn").arg(warns) : tr("Exercise running");
+  else
+    readyAlert_ = blocks ? tr("Not ready to start: %1%2").arg(blockers.join(", "), more)
+                  : warns ? tr("%1 warn, none block Start").arg(warns) : tr("All systems ready");
   startEnabled_ = kStartBuilt && idle && !r.blocked();
   if (!kStartBuilt) reasons_.append(tr("Exercise not built yet (package 3b)"));
   emit changed();
+  if (newChips) emit chipsChanged();
+  refreshAlert();
+}
+
+void DashboardController::refreshAlert() {
+  QStringList parts;
+  int level = readyLevel_;
+  const auto add = [&](int l, const QString& text) {
+    if (l < LabController::Caution) return;
+    level = std::max(level, l);
+    parts.append(text);
+  };
+  if (lab_) add(lab_->alertLevel(), lab_->alert());
+  const bool exercise = exercise_ && exercise_->phase() != ExerciseController::Idle;
+  if (exercise) add(exercise_->alertLevel(), exercise_->alert());
+  if (readyLevel_ >= LabController::Caution) parts.append(readyAlert_);
+  const QString text = !parts.isEmpty() ? parts.join("  |  ") : exercise ? exercise_->alert() : readyAlert_;
+  if (level == alertLevel_ && text == alert_) return;
+  alertLevel_ = level;
+  alert_ = text;
+  emit alertChanged();
 }
 
 bool DashboardController::tileAction(int i) {
@@ -146,6 +203,10 @@ bool DashboardController::tileAction(int i) {
     case ReadyTile::Storage: break;
   }
   return false;
+}
+
+void DashboardController::toneHeard() {
+  if (feed_ && feed_->inputs().toneAwaitingAnswer && !running()) emit feed_->toneHeardRequested();
 }
 
 void DashboardController::cancelTests() {
