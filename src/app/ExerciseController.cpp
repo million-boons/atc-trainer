@@ -136,5 +136,5 @@ void ExerciseController::useScreenPtt() {
 }
 
 void ExerciseController::play(int row) {
-  if (consent_ && row >= 0 && row < timeline_.rowCount()) emit playRequested(row);
+  if (audioSaved() && row >= 0 && row < timeline_.rowCount()) emit playRequested(row);
 }

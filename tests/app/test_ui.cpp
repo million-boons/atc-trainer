@@ -137,7 +137,9 @@ TEST_P(UiAll, EveryCaseLoadsWithoutWarningsAndNoButtonIsCutOff) {
       // The model dropdown shortens its name on purpose.
       walk(i, [&](QQuickItem* x) {
         const QString s = isText(x) ? x->property("text").toString() : QString();
-        if (!s.startsWith("Whisper") && !s.startsWith("Vosk")) EXPECT_FALSE(isText(x) && x->property("truncated").toBool()) << id.toStdString() << ": " << s.toStdString();
+        if (!s.startsWith("Whisper") && !s.startsWith("Vosk")) {
+          EXPECT_FALSE(isText(x) && x->property("truncated").toBool()) << id.toStdString() << ": " << s.toStdString();
+        }
       });
       const QPointF a = i->mapToScene({0, 0}), b = i->mapToScene({i->width(), i->height()});
       EXPECT_GE(a.x(), -0.5) << id.toStdString();
@@ -159,6 +161,11 @@ TEST_F(Ui, StatusBarNeverOverlaps) {
     ASSERT_TRUE(chips && right);
     EXPECT_LE(chips->mapToScene({chips->width(), 0}).x(), right->mapToScene({0, 0}).x() + 0.5) << id;
     EXPECT_LE(right->mapToScene({right->width(), 0}).x(), win->width()) << id;
+    if (QString(id) == "setinstr") {
+      auto* name = win->findChild<QQuickItem*>("scenarioName");
+      ASSERT_TRUE(name);
+      EXPECT_FALSE(name->property("truncated").toBool()) << name->width();
+    }
   }
 }
 
@@ -314,8 +321,7 @@ TEST_F(Ui, DeleteNeedsInstructorSelectionAndConfirmation) {
   recordings.offer(rec, std::vector<std::int16_t>(16000));
   run("setinstr");
   waitLogin();
-  clickText("Speech\nLab");
-  if (screen() != "lab") clickText("Speech Lab");
+  clickText("Speech Lab");
   ASSERT_EQ(screen(), "lab");
   clickButton("Stored");
   ASSERT_EQ(recordings.stored()->rowCount(), 1);
@@ -371,7 +377,9 @@ TEST_F(Ui, CriticalValuesAreNeverCutOff) {
     EXPECT_FALSE(i->property("truncated").toBool()) << v;
   }
   walk(win->contentItem(), [&](QQuickItem* x) {
-    if (isText(x) && x->property("text").toString().startsWith("eagle")) EXPECT_FALSE(x->property("truncated").toBool()) << x->property("text").toString().toStdString();
+    if (isText(x) && x->property("text").toString().startsWith("eagle")) {
+      EXPECT_FALSE(x->property("truncated").toBool()) << x->property("text").toString().toStdString();
+    }
   });
 }
 

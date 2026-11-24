@@ -1,8 +1,8 @@
 import QtQuick
 import Atc
 
-// chips: list of {name, value, level}. scenario: active scenario name; it is shortened when the chips
-// need the space. mock: show MOCK. login: who is logged in, short; loginAsked(): its button;
+// chips: list of {name, value, level}. scenario: active scenario name; two lines, then shortened, when the
+// chips need the space. mock: show MOCK. login: who is logged in, short; loginAsked(): its button;
 // loggedIn: show Log out; logoutAsked(). The app name gives way last, so that nothing overlaps.
 Rectangle {
     id: bar
@@ -43,7 +43,8 @@ Rectangle {
         anchors { right: parent.right; rightMargin: Theme.s12; verticalCenter: parent.verticalCenter }
         spacing: Theme.s8
         Tag { id: mockTag; visible: bar.mock; text: qsTr("MOCK"); anchors.verticalCenter: parent.verticalCenter }
-        Label { text: bar.scenario; color: Theme.textSecondary; font.pixelSize: Theme.caption
+        Label { objectName: "scenarioName"; text: bar.scenario; color: Theme.textSecondary; font.pixelSize: Theme.caption
+                wrapMode: Text.WordWrap; maximumLineCount: 2
                 width: Math.max(0, Math.min(implicitWidth, bar.width - chipRow.x - chipRow.width - bar.fixedW - 2 * Theme.s12))
                 anchors.verticalCenter: parent.verticalCenter }
         BaseButton {

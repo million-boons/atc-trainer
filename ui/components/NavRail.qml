@@ -40,7 +40,7 @@ Rectangle {
                     color: nb.on ? Theme.raised : "transparent"
                     border { width: nb.on || nb.visualFocus ? Theme.line : 0
                              color: nb.visualFocus ? Theme.accent : Theme.border }
-                    Rectangle { visible: nb.on; width: 3 * Theme.line; height: parent.height; color: Theme.accent }
+                    Rectangle { visible: nb.on; x: -Theme.s8; width: 3 * Theme.line; height: parent.height; color: Theme.accent }  // at the edge: the longest name fills the entry
                 }
                 contentItem: Item {
                     Column {

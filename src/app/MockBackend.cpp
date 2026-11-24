@@ -43,6 +43,7 @@ std::unique_ptr<ISpeechRecognizer> MockBackend::fakeEngine(const SttModel&, std:
 
 MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs, QObject* parent)
     : QObject(parent), lab_(lab), stt_(stt), pilotCutMs_(pilotCutMs) {
+  exercise_.setAudioConnected();  // the mock shows both consent cases
   connect(lab, &LabController::pressRequested, this, [this](const QString& s) { userEdge(s, true); });
   connect(lab, &LabController::releaseRequested, this, [this](const QString& s) { userEdge(s, false); });
   connect(lab, &LabController::playRequested, this,
