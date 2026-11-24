@@ -199,26 +199,38 @@
    "examples": [
     "{callsign} taxi via {taxiway} runway {runway}",
     "{callsign} taxi via {taxiway} hold short runway {runway}"
-   ]
+   ],
+   "validation": {
+    "status": "draft"
+   }
   },
   {
    "id": "TAKEOFF_CLEARANCE",
    "examples": [
     "{callsign} runway {runway} cleared for takeoff"
-   ]
+   ],
+   "validation": {
+    "status": "draft"
+   }
   },
   {
    "id": "LANDING_CLEARANCE",
    "examples": [
     "{callsign} runway {runway} cleared to land"
-   ]
+   ],
+   "validation": {
+    "status": "draft"
+   }
   },
   {
    "id": "TURN",
    "examples": [
     "{callsign} turn left heading {heading}",
     "{callsign} turn right heading {heading}"
-   ]
+   ],
+   "validation": {
+    "status": "draft"
+   }
   },
   {
    "id": "CLIMB_DESCEND",
@@ -227,13 +239,19 @@
     "{callsign} descend flight level {level}",
     "{callsign} climb {altitude}",
     "{callsign} descend {altitude}"
-   ]
+   ],
+   "validation": {
+    "status": "draft"
+   }
   },
   {
    "id": "CONTACT",
    "examples": [
     "{callsign} contact tower {frequency}"
-   ]
+   ],
+   "validation": {
+    "status": "draft"
+   }
   }
  ]
 }

@@ -1,0 +1,24 @@
+# PLACEHOLDER. Recordings that must NOT be accepted as an instruction.
+# kind | text.  off = not ATC, near = sounds like ATC but is not a complete instruction.
+off | Please tell the technician to check the printer
+off | What time is the briefing tomorrow morning
+off | I will be back after lunch
+off | Can somebody close the window please
+off | We have four new trainees this week
+off | Hold on a moment I am writing it down
+off | Nine people are waiting outside the office
+off | The taxi to the station was late again
+off | My phone battery is almost empty
+off | She parked the car on the left side
+off | Turn the light off when you leave
+off | The heading of the letter is wrong
+near | Falcon hold position
+near | Eagle stand by
+near | Say again all after taxi
+near | Runway in sight
+near | Cleared
+near | Hawk Cobra Falcon
+near | Two Seven Zero Nine
+near | Taxi via Alpha
+near | Cobra turn left
+near | Contact tower

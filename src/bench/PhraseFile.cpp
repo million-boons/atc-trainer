@@ -14,7 +14,7 @@ std::string trim(const std::string& s) {
 
 bool readPhrases(std::istream& in, std::vector<Phrase>& out, std::string& error) {
   static const std::set<std::string> known{"callsign", "runway",   "taxiway",   "heading",
-                                           "level",    "altitude", "frequency", "hold_short"};
+                                           "level",    "altitude", "frequency", "hold_short", "action"};
   int n = 0;
   const auto fail = [&](const std::string& why) {
     error = "line " + std::to_string(n) + ": " + why;
@@ -39,6 +39,11 @@ bool readPhrases(std::istream& in, std::vector<Phrase>& out, std::string& error)
         const auto eq = item.find('=');
         if (eq == std::string::npos || eq + 1 == item.size()) return fail("expected name=value, got " + item);
         const std::string k = item.substr(0, eq);
+        if (k == "tags") {
+          std::istringstream ts(item.substr(eq + 1));
+          for (std::string x; std::getline(ts, x, ',');) p.tags.push_back(x);
+          continue;
+        }
         if (!known.count(k)) return fail("unknown field " + k);
         if (!p.expect.emplace(k, item.substr(eq + 1)).second) return fail("field given twice: " + k);
       }

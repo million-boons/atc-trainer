@@ -1,0 +1,86 @@
+#!/bin/bash
+# USB headset microphone settings from /etc/atc-audio.conf. Runs as the logged-in user, no root.
+#   atc-audio-setup                     apply to every connected headset that has a section
+#   atc-audio-setup --check             compare only. Exit 0 as configured, 1 drift, 2 none connected
+#   atc-audio-setup --detect [VID:PID]  print what is connected (changes nothing)
+#   atc-audio-setup --set VID:PID on|off|none PERCENT    set now, not stored (used by the installer)
+set -u
+export LC_ALL=C
+CONF="${ATC_AUDIO_CONF:-/etc/atc-audio.conf}"
+PROC="${ATC_PROC_ASOUND:-/proc/asound}"
+WAIT="${ATC_AUDIO_WAIT:-30}"          # seconds to wait for PulseAudio after plug-in
+
+cards() {  # "card vid:pid" for USB cards that can record
+  local f c
+  for f in "$PROC"/card*/usbid; do
+    [ -r "$f" ] || continue
+    c=${f%/usbid}; compgen -G "$c/pcm*c" >/dev/null || continue
+    echo "${c##*/card} $(cat "$f")"
+  done
+}
+sources() {  # "card source" for microphones, not monitors
+  pactl list sources 2>/dev/null | awk '
+    /^Source #/ {n=""; m=1}
+    $1=="Name:" {n=$2}
+    /Monitor of Sink: n\/a/ {m=0}
+    /alsa\.card = / {gsub(/"/,"",$3); if (!m && n!="") {print $3, n; n=""}}'
+}
+source_of() { sources | awk -v c="$1" '$1==c {print $2; exit}'; }
+controls() { amixer -c "$1" controls 2>/dev/null | sed -n "s/.*iface=MIXER,name='\([^']*\)'.*/\1/p"; }
+agc_control() { controls "$1" | grep -iE -m1 'auto.?gain|(^| )agc( |$)'; }
+capture_control() { controls "$1" | grep -E 'Capture Volume$' | sort | awk '/Mic/ {m=$0} {if (!f) f=$0} END {print (m!="") ? m : f}'; }
+get_agc() { amixer -c "$1" cget "iface=MIXER,name=$2" 2>/dev/null | sed -n 's/^ *: values=//p' | cut -d, -f1; }
+set_agc() { amixer -q -c "$1" cset "iface=MIXER,name=$2" "$3" >/dev/null; }
+get_percent() { pactl get-source-volume "$1" 2>/dev/null | grep -o '[0-9]*%' | sort -u | paste -sd' ' | tr -d '%'; }
+conf() { awk -v s="[$1]" -v k="$2" '$0==s {i=1; next} /^\[/ {i=0} i && index($0,k"=")==1 {print substr($0,length(k)+2); exit}' "$CONF" 2>/dev/null; }
+valid() {  # agc percent control
+  [[ "$1" =~ ^(on|off|none)$ ]] && [[ "$2" =~ ^[0-9]{1,3}$ ]] && [ "$((10#$2))" -ge 1 ] && [ "$((10#$2))" -le 100 ] &&
+    [[ "$3" =~ ^[A-Za-z0-9\ ._/()-]*$ ]]
+}
+apply() {  # card agc control percent wait
+  local src="" i
+  for ((i = 0; i <= $5 * 2; i++)); do src=$(source_of "$1"); [ -n "$src" ] && break; sleep 0.5; done
+  [ "$2" = none ] || set_agc "$1" "$3" "$2" || { echo "cannot set '$3'" >&2; return 1; }   # first: it changes the level
+  [ -n "$src" ] || { echo "PulseAudio does not show the microphone of card $1" >&2; return 1; }
+  pactl set-source-volume "$src" "$4%"
+}
+check() {  # card agc control percent id
+  local rc=0 src v
+  if [ "$2" != none ]; then
+    v=$(get_agc "$1" "$3")
+    [ "$v" = "$2" ] && echo "ok    $5 AGC $v" || { echo "DRIFT $5 AGC is '$v', configured '$2'"; rc=1; }
+  fi
+  src=$(source_of "$1")
+  if [ -z "$src" ]; then echo "DRIFT $5 PulseAudio does not show the microphone"; return 1; fi
+  v=$(get_percent "$src")
+  [ "$v" = "$((10#$4))" ] && echo "ok    $5 capture $v%" || { echo "DRIFT $5 capture is '$v%', configured '$4%'"; rc=1; }
+  pactl get-source-mute "$src" | grep -q 'Mute: no' && echo "ok    $5 not muted" || { echo "DRIFT $5 is muted"; rc=1; }
+  return $rc
+}
+
+case "${1:-}" in
+  --detect)
+    while read -r c id; do
+      [ -z "${2:-}" ] || [ "$2" = "$id" ] || continue
+      a=$(agc_control "$c"); s=$(source_of "$c"); d=$(pactl info 2>/dev/null | sed -n 's/^Default Source: //p')
+      printf '%s|%s|%s|%s|%s|%s|%s|%s\n' "$id" "$c" "${a:-none}" "$(capture_control "$c")" "$([ -n "$a" ] && get_agc "$c" "$a" || echo none)" \
+        "$( [ -n "$s" ] && get_percent "$s")" "$([ -n "$s" ] && [ "$s" = "$d" ] && echo default || echo -)" "$(sed -n "s/^ *$c \[.*\]: .* - //p" "$PROC/cards" 2>/dev/null | head -1)"
+    done < <(cards) ;;
+  --set)
+    c=$(cards | awk -v i="${2:-}" '$2==i {print $1; exit}')
+    [ -n "$c" ] && valid "${3:-}" "${4:-}" "" || { echo "bad --set" >&2; exit 2; }
+    apply "$c" "$3" "$(agc_control "$c")" "$4" 5 ;;
+  ""|--check)
+    n=0; rc=0
+    while read -r c id; do
+      agc=$(conf "$id" AGC); pct=$(conf "$id" CAPTURE_PERCENT); ctl=$(conf "$id" AGC_CONTROL)
+      [ -n "$agc$pct" ] || continue                         # no section: not ours
+      n=$((n + 1))
+      valid "$agc" "$pct" "$ctl" || { echo "bad values for $id in $CONF" >&2; rc=1; continue; }
+      [ "${1:-}" = --check ] || apply "$c" "$agc" "$ctl" "$pct" "$WAIT" || rc=1
+      check "$c" "$agc" "$ctl" "$pct" "$id" || rc=1
+    done < <(cards)
+    [ $n -gt 0 ] || { echo "no configured headset connected"; [ "${1:-}" = --check ] && exit 2; exit 0; }
+    exit $rc ;;
+  *) sed -n '2,6p' "$0"; exit 2 ;;
+esac

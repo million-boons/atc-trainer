@@ -1,5 +1,0 @@
-# Logitech H540 microphone: no automatic gain (docs/architecture/02-speech-ptt.md section 2).
-# Runs after 90-alsa-restore.rules, so a stored "AGC on" cannot win. Needs no login.
-# Volume is NOT set here: PulseAudio stores it per user and applies it itself.
-ACTION=="add", SUBSYSTEM=="sound", KERNEL=="controlC*", ATTRS{idVendor}=="046d", ATTRS{idProduct}=="0a37", \
-  RUN+="/usr/bin/amixer -q -c $attr{device/number} cset name='Auto Gain Control' off"

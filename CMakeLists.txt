@@ -74,11 +74,14 @@ if(EXISTS ${TP}/vosk/libvosk.so AND EXISTS ${TP}/whisper-install/lib/libwhisper.
   target_include_directories(atc_stt SYSTEM PUBLIC ${TP}/json PRIVATE ${TP}/vosk ${TP}/whisper-install/include)
   target_link_libraries(atc_stt PUBLIC ${TP}/vosk/libvosk.so ${TP}/whisper-install/lib/libwhisper.so
     ${TP}/whisper-install/lib/libggml.so ${TP}/whisper-install/lib/libggml-base.so)
-  add_library(atc_phraseology STATIC src/phraseology/Phraseology.cpp)
+  add_library(atc_phraseology STATIC src/phraseology/Phraseology.cpp src/phraseology/ScriptGen.cpp)
   target_include_directories(atc_phraseology PUBLIC src)
   target_include_directories(atc_phraseology SYSTEM PUBLIC ${TP}/json)
+  target_link_libraries(atc_phraseology PUBLIC atc_logic)
   add_executable(phrase_gen tools/phrase_gen.cpp)
   target_link_libraries(phrase_gen PRIVATE atc_phraseology)
+  add_executable(script_gen tools/script_gen.cpp)
+  target_link_libraries(script_gen PRIVATE atc_phraseology)
   add_executable(stt_bench tools/stt_bench.cpp)
   target_compile_definitions(stt_bench PRIVATE ATC_GGML_DIR="${GGML_DIR}")
   target_link_libraries(stt_bench PRIVATE atc_logic atc_stt Threads::Threads)
@@ -104,6 +107,7 @@ endif()
 
 if(ATC_BUILD_TESTS)
   enable_testing()
+  add_test(NAME setup_panel COMMAND bash ${CMAKE_SOURCE_DIR}/tests/test_setup_panel.sh)
   find_package(GTest REQUIRED)
   add_executable(logic_tests
     tests/test_ptt.cpp tests/test_tx.cpp tests/test_tx_display.cpp tests/test_ring.cpp tests/test_checks.cpp
