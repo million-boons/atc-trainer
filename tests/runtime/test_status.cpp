@@ -109,14 +109,38 @@ TEST_F(Status, ToneMarksTheSpeakerOnlyWhenPlayedToTheEnd) {
   }
   emit c->feed()->toneRequested();
   EXPECT_EQ(tones, 1);
+  c->toneHeard();  // still playing
+  EXPECT_EQ(in().speaker, SpeakerReady::NotChecked);
   c->onTone(LocalEnd::Completed); agree();
+  EXPECT_EQ(in().speaker, SpeakerReady::NotChecked);  // playing is not hearing
+  EXPECT_TRUE(c->toneAwaitingAnswer());
+  c->toneHeard(); agree();
   EXPECT_EQ(in().speaker, SpeakerReady::Ok);
+  EXPECT_FALSE(c->toneAwaitingAnswer());
+}
+
+TEST_F(Status, AnAnswerToAnOldToneDoesNotCount) {
+  c->onOutput(out());
+  const auto played = [this] { c->onTone(LocalEnd::Started); c->onTone(LocalEnd::Completed); };
+  played();
+  emit c->feed()->cancelTestsRequested();  // the screen was left
+  c->toneHeard();
+  EXPECT_EQ(in().speaker, SpeakerReady::NotChecked);
+  played();
+  c->onOutput(out("other"));
+  c->toneHeard();
+  EXPECT_EQ(in().speaker, SpeakerReady::NotChecked);
+  played();
+  c->onTone(LocalEnd::Started);  // played again
+  c->toneHeard();
+  EXPECT_EQ(in().speaker, SpeakerReady::NotChecked);
 }
 
 TEST_F(Status, SpeakerCheckIsLostWithTheOutputOrItsSound) {
   for (const auto& s : {out("other"), out("out", true), out("out", false, 0), OutputStatus{}}) {
     c->onOutput(out());
     c->onTone(LocalEnd::Completed);
+    c->toneHeard();
     ASSERT_EQ(in().speaker, SpeakerReady::Ok);
     c->onOutput(s); agree();
     EXPECT_EQ(in().speaker, SpeakerReady::NotChecked);
@@ -125,6 +149,7 @@ TEST_F(Status, SpeakerCheckIsLostWithTheOutputOrItsSound) {
   emit c->feed()->toneRequested();
   EXPECT_EQ(tones, 0);
   c->onTone(LocalEnd::Completed);  // muted while it played
+  c->toneHeard();
   EXPECT_EQ(in().speaker, SpeakerReady::NotChecked);
 }
 

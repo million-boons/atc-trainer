@@ -41,6 +41,7 @@ StatusController::StatusController(LabController* lab, StatusConfig cfg, Radio r
   connect(&feed_, &StatusFeed::pttTestRequested, this, [this] { radio_.setPttTest(true); });
   connect(&feed_, &StatusFeed::cancelTestsRequested, this, [this] {
     micTest_.invalidate();
+    if (std::exchange(toneDone_, false)) in_.speakerNote.clear();
     radio_.stopLocal();  // also ends Lab playback: the screen it belongs to has closed
     radio_.setPttTest(false);
     in_.micTestLeft = 0;
@@ -118,6 +119,7 @@ void StatusController::onOutput(const OutputStatus& s) {
   in_.speakerName = s.available ? QString::fromStdString(s.description) : tr("no output");
   // A check holds only for the output it was made on, and while that can be heard.
   if (other || s.muted || s.volumePercent == 0) {
+    toneDone_ = false;
     in_.speaker = SpeakerReady::NotChecked;
     in_.speakerNote = s.available && s.muted ? tr("muted") : s.available && s.volumePercent == 0 ? tr("volume is 0") : QString();
   } else if (in_.speaker == SpeakerReady::NotChecked && (in_.speakerNote == tr("muted") || in_.speakerNote == tr("volume is 0"))) {
@@ -129,6 +131,7 @@ void StatusController::onOutput(const OutputStatus& s) {
 void StatusController::speakerNote(const QString& note) {
   in_.speaker = SpeakerReady::NotChecked;
   in_.speakerNote = note;
+  toneDone_ = false;
   apply();
 }
 
@@ -148,8 +151,14 @@ void StatusController::onTone(LocalEnd e) {
     case LocalEnd::Completed: break;
   }
   if (!out_.available || out_.muted || out_.volumePercent == 0) return speakerNote(tr("muted or lost"));
+  speakerNote(tr("did you hear it?"));
+  toneDone_ = true;
+}
+
+void StatusController::toneHeard() {
+  if (!std::exchange(toneDone_, false)) return;
   in_.speaker = SpeakerReady::Ok;
-  in_.speakerNote = tr("tone played");
+  in_.speakerNote = tr("heard by user");
   apply();
 }
 

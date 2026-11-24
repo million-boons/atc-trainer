@@ -19,12 +19,13 @@ struct PathInputs {
   std::string exe;   // full path of the running program
   std::string home;  // the user's home folder
   std::string etc = "/etc";
+  std::string root{};  // --root; beats everything else
 };
 
 PathInputs systemPathInputs();                        // /proc/self/exe and HOME
 std::string engineFolder(const std::string& exe);     // <prefix>/lib/ggml for <prefix>/bin/<program>
 
-// Root, first match wins: root= in HOME/.config/atc-trainer/paths.conf, then in etc/atc-trainer/paths.conf,
+// Root, first match wins: --root (A-3; models and voices then come from it too), root= in HOME/.config/atc-trainer/paths.conf, then in etc/atc-trainer/paths.conf,
 // then <prefix>/bin -> <prefix>/share/atc-trainer. A location named in a file but missing is an error
 // that names it and never falls through. If nothing matches, the error lists every place tried.
 bool resolvePaths(const PathInputs& in, Paths& out, std::string& error);

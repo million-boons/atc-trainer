@@ -32,6 +32,9 @@ class StatusController : public QObject {
   void onSnapshot(const atc::RadioSnapshot& s);
   void onOutput(const atc::OutputStatus& s);
   void onTone(atc::LocalEnd e);
+  // "I heard it" (D-306): counts only after the tone played to its end.
+  void toneHeard();
+  bool toneAwaitingAnswer() const { return toneDone_; }
   void onPttTest(const atc::PttTest& t);
   void setBank(atc::BankReady b, const QStringList& missing = {});
 
@@ -52,6 +55,7 @@ class StatusController : public QObject {
   atc::OutputStatus out_;
   atc::RadioSnapshot radioState_;
   double peak_ = -120, testPeak_ = -120;
+  bool toneDone_ = false;     // played to the end, not yet confirmed
   bool outside_ = false;      // the last microphone test was outside the band
   QString micSource_;
   QString testNote_;          // result of the last PTT test

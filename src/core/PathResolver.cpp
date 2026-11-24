@@ -83,12 +83,26 @@ bool resolvePaths(const PathInputs& in, Paths& out, std::string& error) {
     error = "HOME is not set to an absolute folder";
     return false;
   }
+  if (!in.root.empty()) {
+    std::error_code ec;
+    const std::string given = fs::absolute(in.root, ec).lexically_normal().string();
+    if (ec || !isDir(given)) {
+      error = "--root: folder not found: " + in.root;
+      return false;
+    }
+    if (!isDir(given + "/config")) {
+      error = "--root: no config folder in " + given;
+      return false;
+    }
+  }
   struct Found {
     std::string value, file;
   };
   std::map<std::string, Found> set;
   std::string tried;
+  // --root replaces the configuration files altogether, so that a test run depends on nothing else.
   for (const std::string& file : {in.home + "/.config/atc-trainer/paths.conf", in.etc + "/atc-trainer/paths.conf"}) {
+    if (!in.root.empty()) break;
     std::error_code ec;
     const bool there = fs::exists(file, ec);
     if (ec) {
@@ -111,7 +125,10 @@ bool resolvePaths(const PathInputs& in, Paths& out, std::string& error) {
     }
 
   Paths p;
-  if (const auto r = set.find("root"); r != set.end()) {
+  if (!in.root.empty()) {
+    p.root = fs::absolute(in.root).lexically_normal().string();
+    if (p.root.size() > 1 && p.root.back() == '/') p.root.pop_back();
+  } else if (const auto r = set.find("root"); r != set.end()) {
     if (!isDir(r->second.value + "/config")) {
       error = r->second.file + ": no config folder in root " + r->second.value;
       return false;

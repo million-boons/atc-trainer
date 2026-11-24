@@ -64,6 +64,43 @@ TEST_F(PathsTest, UserFileBeatsSystemFileBeatsExecutable) {
   EXPECT_EQ(out.engines, (base / "opt/lib/ggml").string());  // engines stay beside the executable
 }
 
+TEST_F(PathsTest, RootOptionBeatsEverythingAndReplacesTheFiles) {
+  root("opt/share/atc-trainer");
+  const auto a = root("a"), b = root("b"), m = root("m");
+  file(user, "root=" + a + "\nmodels=" + m + "\n");
+  in.root = b + "/";
+  ASSERT_TRUE(run()) << error;
+  EXPECT_EQ(out.root, b);
+  EXPECT_EQ(out.config, b + "/config");
+  EXPECT_EQ(out.models, b);
+  EXPECT_EQ(out.voices, b + "/voices");
+  file(user, "broken");  // not read at all
+  EXPECT_TRUE(run()) << error;
+}
+
+TEST_F(PathsTest, WrongRootOptionIsAnErrorAndNeverFallsThrough) {
+  root("opt/share/atc-trainer");
+  in.root = (base / "gone").string();
+  EXPECT_FALSE(run());
+  EXPECT_TRUE(says("--root")) << error;
+  fs::create_directories(base / "empty");
+  in.root = (base / "empty").string();
+  EXPECT_FALSE(run());
+  EXPECT_TRUE(says("no config folder")) << error;
+}
+
+TEST_F(PathsTest, EnvironmentIsNotUsed) {
+  const auto r = root("opt/share/atc-trainer");
+  const auto a = root("a");
+  setenv("ATC_ROOT", a.c_str(), 1);
+  EXPECT_TRUE(run()) << error;
+  unsetenv("ATC_ROOT");
+  EXPECT_EQ(out.root, r);
+  in.exe = (base / "proj/build/bin/x").string();  // no developer fallback to the folder above a build folder
+  root("proj");
+  EXPECT_FALSE(run());
+}
+
 TEST_F(PathsTest, ModelsAndVoicesCanBeElsewhere) {
   const auto r = root("opt/share/atc-trainer");
   const auto m = root("m"), v = root("v"), v2 = root("v2");

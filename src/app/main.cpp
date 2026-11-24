@@ -32,7 +32,14 @@ int main(int argc, char** argv) {
   QGuiApplication app(argc, argv);
   atc::Paths paths;
   std::string pathError;
-  const bool havePaths = atc::resolvePaths(atc::systemPathInputs(), paths, pathError);
+  // Before the parser: the defaults of the other options depend on it.
+  auto pathInputs = atc::systemPathInputs();
+  const QStringList args = app.arguments();
+  for (int i = 1; i < args.size(); ++i) {
+    if (args[i] == "--root") pathInputs.root = i + 1 < args.size() ? args[i + 1].toStdString() : "";
+    else if (args[i].startsWith("--root=")) pathInputs.root = args[i].mid(7).toStdString();
+  }
+  const bool havePaths = atc::resolvePaths(pathInputs, paths, pathError);
   const auto at = [](const std::string& s) { return QString::fromStdString(s); };
   QCommandLineParser cli;
   cli.addHelpOption();
@@ -43,7 +50,7 @@ int main(int argc, char** argv) {
   const QCommandLineOption state("state", "Mock case to show.", "id");
   const QCommandLineOption grab("grab", "Save a screenshot and quit.", "file.png");
   const QCommandLineOption modelsOpt("models", "Speech model list.", "file", at(paths.config + "/stt_models.json"));
-  const QCommandLineOption root("root", "Project folder, for the model paths.", "dir", at(paths.root));
+  const QCommandLineOption root("root", "Program files (holds config/, data/ and models) instead of the installed ones.", "dir");
   const QCommandLineOption pttOpt("ptt-device", "PTT input device (overrides the settings file); \"none\" for no device.", "path");
   const QCommandLineOption pulseOpt("pulse-server", "PulseAudio server.", "address");
   cli.addOptions({pttOpt, pulseOpt, modelsOpt, root, mock, config, size, theme, state, grab});
@@ -85,8 +92,7 @@ int main(int argc, char** argv) {
   std::vector<atc::SttModel> models;
 #ifdef ATC_HAVE_STT
   std::string error;
-  const std::string rootDir = cli.value(root).toStdString();
-  if (!atc::loadSttCatalog(cli.value(modelsOpt).toStdString(), rootDir, models, error, cli.isSet(root) ? rootDir : paths.models)) {
+  if (!atc::loadSttCatalog(cli.value(modelsOpt).toStdString(), paths.root, models, error, paths.models)) {
     models.clear();
     stt.setCatalogError(QString::fromStdString(error));
   }
