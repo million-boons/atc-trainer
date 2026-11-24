@@ -654,3 +654,25 @@ TEST_F(Tx, RandomisedInvariants) {
     self = nullptr;
   }
 }
+
+TEST(TxReply, IdSurvivesInterruptAndRepeat) {
+  std::vector<std::pair<std::uint64_t, PlaybackId>> started;
+  std::vector<std::uint64_t> stopped;
+  const auto none1 = [](std::uint64_t, Ns) {};
+  TransmissionController c(TxConfig{}, {none1, [](std::uint64_t, Ns, Ns, TxEnd) {}, [](std::uint64_t) {},
+                                        [&](const Reply& r, PlaybackId p) { started.emplace_back(r.id, p); },
+                                        [&](const Reply& r, PlaybackId, PilotStop) { stopped.push_back(r.id); }});
+  c.requestPilot(Reply{.text = "call", .delay = 0, .expected = 0, .id = 42}, ms(1000));
+  c.tick(ms(1100));
+  ASSERT_EQ(started.size(), 1u);
+  c.onPress(ms(1500));  // rule Interrupt
+  ASSERT_EQ(stopped.size(), 1u);
+  EXPECT_EQ(stopped[0], 42u);
+  c.onRelease(ms(2500), ReleaseReason::Normal);
+  for (int t = 2500; t <= 4000; t += 10) c.tick(ms(t));
+  c.onProcessed(1, std::nullopt, ms(4000));
+  for (int t = 4000; t <= 8000 && started.size() < 2; t += 10) c.tick(ms(t));
+  ASSERT_EQ(started.size(), 2u);
+  EXPECT_EQ(started[1].first, 42u);                // the same utterance
+  EXPECT_NE(started[1].second, started[0].second);  // a new playback
+}

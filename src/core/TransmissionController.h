@@ -43,6 +43,7 @@ struct Reply {
   std::string text;
   Ns delay = 0;     // chosen by the caller's seeded RNG
   Ns expected = 0;  // length of the assembled speech; 0 = unknown, only the cap applies
+  std::uint64_t id = 0;  // PilotUtterance::id, kept when a reply is withdrawn or repeated
 };
 
 using PlaybackId = std::uint64_t;
