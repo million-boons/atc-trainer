@@ -125,8 +125,8 @@ Item {
             Row {
                 x: Theme.s12; height: parent.height
                 spacing: Theme.s8
-                Label { text: qsTr("Parser not installed"); font { pixelSize: Theme.small; weight: Font.DemiBold } height: parent.height }
-                Label { text: qsTr("Arrives in Phase 3. Nothing is interpreted or scored yet."); color: Theme.textSecondary
+                Label { text: qsTr("Parser not connected"); font { pixelSize: Theme.small; weight: Font.DemiBold } height: parent.height }
+                Label { text: qsTr("Nothing on this screen is interpreted or scored yet."); color: Theme.textSecondary
                         font.pixelSize: Theme.small; height: parent.height }
             }
         }
