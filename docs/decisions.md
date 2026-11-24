@@ -108,6 +108,7 @@
 | D-115 | 2026-11-24 | Voice bank: the coverage check runs automatically when a scenario is selected; Start waits while it runs; missing clips block. Completes D-106. Not done yet (assistant): the code still only warns for a bank that is loaded but not checked (`src/core/Readiness.h`), and no check is started on scenario select. | User (ruling); status: assistant |
 | D-116 | 2026-11-24 | A missing PTT blocks Start by default. An instructor option allows the on-screen fallback; then Start only warns and the result logs "fallback PTT used". Completes D-106. As built (assistant): the default blocks; the configuration key `pttMissingBlocks` = false makes it warn. Not done yet: the instructor option (needs the 1c login and Settings) and the log entry (engine log and Result, 3a/3b). | User (ruling); status: assistant |
 | D-117 | 2026-11-24 | G1 waits for session b2's build with the ui commits up to 6c5118c. | User |
+| D-118 | 2026-11-24 | 1c wireframe (`04-ui.md` §5b) approved as drawn, with the consent sentence of D-114 included. Its proposals in D-111 and D-112 are part of that: trainees choose an ID without a PIN; instructor PIN of 6 to 12 digits, set with `set_instructor_pin`; a 60 s wait after 5 wrong entries; speakers and trainees share one record; the save switch is for the instructor. The screens start after session b2's G1 report. | User |
 
 ## Check results
 
