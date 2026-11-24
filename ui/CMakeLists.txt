@@ -26,7 +26,7 @@ qt_add_qml_module(atc_trainer
   SOURCES
     ${APP}/RowModel.h ${APP}/LabController.h ${APP}/LabController.cpp
     ${APP}/SttController.h ${APP}/SttController.cpp
-    ${APP}/StatusFeed.h ${APP}/DashboardController.h ${APP}/DashboardController.cpp
+    ${APP}/StatusFeed.h ${APP}/StatusWords.h ${APP}/DashboardController.h ${APP}/DashboardController.cpp
     ${APP}/LabChecks.h ${APP}/LabChecks.cpp
     ${APP}/Painted.h ${APP}/Painted.cpp ${APP}/MockBackend.h ${APP}/MockBackend.cpp)
 

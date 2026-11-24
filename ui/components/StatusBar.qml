@@ -1,7 +1,8 @@
 import QtQuick
 import Atc
 
-// chips: list of {name, value, level}. scenario: active scenario name. mock: show MOCK DATA.
+// chips: list of {name, value, level}. scenario: active scenario name; it is shortened when the chips
+// need the space. mock: show MOCK.
 Rectangle {
     id: bar
     property var chips: []
@@ -18,8 +19,9 @@ Rectangle {
         font { pixelSize: Theme.small; weight: Font.DemiBold }
     }
     Row {
+        id: chipRow
         anchors { left: name.right; leftMargin: Theme.s12; verticalCenter: parent.verticalCenter }
-        spacing: Theme.px(6)
+        spacing: Theme.s4
         Repeater {
             model: bar.chips
             StatusChip { name: modelData.name; value: modelData.value; level: modelData.level }
@@ -28,8 +30,10 @@ Rectangle {
     Row {
         anchors { right: parent.right; rightMargin: Theme.s12; verticalCenter: parent.verticalCenter }
         spacing: Theme.s8
-        Tag { visible: bar.mock; text: qsTr("MOCK DATA"); anchors.verticalCenter: parent.verticalCenter }
+        Tag { id: mockTag; visible: bar.mock; text: qsTr("MOCK"); anchors.verticalCenter: parent.verticalCenter }
         Label { text: bar.scenario; color: Theme.textSecondary; font.pixelSize: Theme.caption
+                width: Math.max(0, Math.min(implicitWidth, bar.width - chipRow.x - chipRow.width - clock.width
+                       - (bar.mock ? mockTag.width + Theme.s8 : 0) - Theme.s12 - 2 * Theme.s8))
                 anchors.verticalCenter: parent.verticalCenter }
         Label {
             id: clock

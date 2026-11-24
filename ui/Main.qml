@@ -85,8 +85,10 @@ Window {
             id: alert
             anchors.bottom: parent.bottom
             width: parent.width; height: Theme.px(32)
-            level: root.lab.alertLevel
-            text: root.lab.alert
+            // A radio alert comes first; otherwise the Dashboard shows its own summary.
+            readonly property bool dashAlert: root.screen_ === "dash" && root.lab.alertLevel < LabController.Caution
+            level: dashAlert ? dashCtl.alertLevel : root.lab.alertLevel
+            text: dashAlert ? dashCtl.alert : root.lab.alert
         }
 
         BaseButton {

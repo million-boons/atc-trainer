@@ -6,7 +6,7 @@ Rectangle {
     property string name
     property string value
     property int level: 0
-    implicitWidth: row.implicitWidth + 2 * Theme.s8
+    implicitWidth: row.implicitWidth + 2 * Theme.px(6)
     implicitHeight: Theme.px(28)
     radius: Theme.radiusChip
     color: Theme.raised
