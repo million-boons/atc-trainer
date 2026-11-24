@@ -19,6 +19,7 @@
 #include <vector>
 
 #include "audio/PulseCapture.h"
+#include "core/PathResolver.h"
 #include "core/TransmissionController.h"
 #include "ptt/EvdevPttSource.h"
 #include "stt/SttFactory.h"
@@ -32,7 +33,7 @@ std::atomic<bool> g_stop{false};
 int main(int argc, char** argv) {
   CaptureConfig cc;
   EvdevConfig ec;
-  std::string startModel, config = ATC_ROOT "/config/stt_models.json";
+  std::string startModel;
   for (int i = 1; i < argc; ++i) {
     const std::string k = argv[i];
     const auto next = [&]() -> std::string { return i + 1 < argc ? argv[++i] : ""; };
@@ -49,7 +50,9 @@ int main(int argc, char** argv) {
   }
   std::vector<SttModel> models;
   std::string error;
-  if (!loadSttCatalog(config, ATC_ROOT, models, error)) {
+  Paths paths;
+  if (!resolvePaths(systemPathInputs(), paths, error) ||
+      !loadSttCatalog(paths.config + "/stt_models.json", paths.root, models, error, paths.models)) {
     std::fprintf(stderr, "%s\n", error.c_str());
     return 1;
   }
@@ -76,7 +79,7 @@ int main(int argc, char** argv) {
 
   TransmissionController* txp = nullptr;
   SttService svc(
-      models, [](const SttModel& x, std::string& e) { return makeRecognizer(x, ATC_GGML_DIR, e); }, describeModel,
+      models, [&paths](const SttModel& x, std::string& e) { return makeRecognizer(x, paths.engines, e); }, describeModel,
       {[&](const SttStatus& s) {
          post([s] {
            if (s.state == SttState::Loading) std::printf("MODEL: loading %s ...\n", s.modelId.c_str());

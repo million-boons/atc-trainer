@@ -22,6 +22,7 @@
 #include "audio/WavFile.h"
 #include "bench/PhraseFile.h"
 #include "bench/Scoring.h"
+#include "core/PathResolver.h"
 #include "core/Time.h"
 #include "stt/VoskStt.h"
 #include "stt/WhisperStt.h"
@@ -209,7 +210,7 @@ int main(int argc, char** argv) {
   std::string engine, model, out, grammarFile, sentenceFile, lexicon, check;
   std::vector<std::string> manifests;
   WhisperConfig wc;
-  wc.backendDir = ATC_GGML_DIR;
+  wc.backendDir = engineFolder(systemPathInputs().exe);
   bool fast = false;
   for (int i = 1; i < argc; ++i) {
     const std::string k = argv[i];

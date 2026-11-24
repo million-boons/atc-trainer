@@ -10,7 +10,8 @@
 
 namespace atc {
 
-bool loadSttCatalog(const std::string& file, const std::string& root, std::vector<SttModel>& out, std::string& error) {
+bool loadSttCatalog(const std::string& file, const std::string& root, std::vector<SttModel>& out, std::string& error,
+                    const std::string& modelsRoot) {
   std::ifstream f(file);
   if (!f) {
     error = "cannot read " + file;
@@ -21,9 +22,10 @@ bool loadSttCatalog(const std::string& file, const std::string& root, std::vecto
     error = file + ": not a valid model list";
     return false;
   }
-  const auto abs = [&](const std::string& p) {
-    return p.empty() ? p : (std::filesystem::path(root) / p).lexically_normal().string();
+  const auto under = [](const std::string& base, const std::string& p) {
+    return p.empty() ? p : (std::filesystem::path(base) / p).lexically_normal().string();
   };
+  const auto abs = [&](const std::string& p) { return under(root, p); };
   std::vector<SttModel> models;
   std::set<std::string> ids;
   for (const auto& m : j["models"]) {
@@ -32,7 +34,7 @@ bool loadSttCatalog(const std::string& file, const std::string& root, std::vecto
       s.id = m.at("id").get<std::string>();
       s.name = m.at("name").get<std::string>();
       s.engine = m.at("engine").get<std::string>();
-      s.path = abs(m.at("path").get<std::string>());
+      s.path = under(modelsRoot.empty() ? root : modelsRoot, m.at("path").get<std::string>());
       s.grammarFile = abs(m.value("grammarFile", ""));
       s.promptFile = abs(m.value("promptFile", ""));
       s.note = m.value("note", "");

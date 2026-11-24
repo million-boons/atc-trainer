@@ -7,19 +7,26 @@
 #include <sstream>
 
 #include "bench/Scoring.h"
+#include "core/PathResolver.h"
 #include "phraseology/Phraseology.h"
 #include "phraseology/ScriptGen.h"
 using namespace atc;
 
 namespace {
+std::string phraseologyFile() {
+  Paths p;
+  std::string e;
+  EXPECT_TRUE(resolvePaths(systemPathInputs(), p, e)) << e;
+  return p.data + "/phraseology/placeholder.json";
+}
 Phraseology real() {
   Phraseology p;
   std::string e;
-  EXPECT_TRUE(loadPhraseology(ATC_ROOT "/data/phraseology/placeholder.json", p, e)) << e;
+  EXPECT_TRUE(loadPhraseology(phraseologyFile(), p, e)) << e;
   return p;
 }
 std::string loadChanged(const std::string& from, const std::string& to) {
-  std::ifstream f(ATC_ROOT "/data/phraseology/placeholder.json");
+  std::ifstream f(phraseologyFile());
   std::stringstream s;
   s << f.rdbuf();
   std::string t = s.str();

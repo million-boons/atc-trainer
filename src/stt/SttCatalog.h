@@ -13,9 +13,11 @@ struct SttModel {
   bool installed = false;        // path and referenced files exist
 };
 
-// Reads config/stt_models.json. Relative paths are taken from root.
+// Reads config/stt_models.json. Relative paths are taken from root; with modelsRoot set, only "path" is
+// taken from there (§4.1: models may be in another folder), prompt and grammar files stay under root.
 // On error returns false and names the model and field.
-bool loadSttCatalog(const std::string& jsonFile, const std::string& root, std::vector<SttModel>& out, std::string& error);
+bool loadSttCatalog(const std::string& jsonFile, const std::string& root, std::vector<SttModel>& out, std::string& error,
+                    const std::string& modelsRoot = "");
 
 // The exact model and settings, as JSON, for every result and log entry (D-39). Includes a
 // content hash of the model, grammar and prompt files, so an edited file is visible later.

@@ -8,6 +8,7 @@
 #include <thread>
 
 #include "audio/PrerollRing.h"
+#include "core/PathResolver.h"
 #include "stt/SttCatalog.h"
 #include "stt/SttService.h"
 using namespace atc;
@@ -302,6 +303,34 @@ TEST(SttCatalog, ReadsAndChecksFiles) {
   EXPECT_EQ(v[1].threads, 2);
 }
 
+TEST(SttCatalog, ModelsFolderMovesOnlyThePath) {
+  namespace fs = std::filesystem;
+  const fs::path base = fs::path(testing::TempDir()) / "atc_catalog_models";
+  fs::remove_all(base);
+  fs::create_directories(base / "root");
+  fs::create_directories(base / "models");
+  const auto put = [&](const std::string& rel, const std::string& text) { std::ofstream(base / rel) << text; };
+  put("root/p.txt", "p");
+  put("root/g.txt", "g");
+  put("list.json", R"({"models":[{"id":"x","name":"X","engine":"whisper","path":"m.bin","promptFile":"p.txt","grammarFile":"g.txt"},
+    {"id":"y","name":"Y","engine":"whisper","path":"/elsewhere/m.bin"}]})");
+  const std::string list = (base / "list.json").string(), root = (base / "root").string(), models = (base / "models").string();
+  std::vector<SttModel> v;
+  std::string e;
+  ASSERT_TRUE(loadSttCatalog(list, root, v, e)) << e;  // empty: everything under root
+  EXPECT_EQ(v[0].path, root + "/m.bin");
+  EXPECT_FALSE(v[0].installed);
+  put("models/m.bin", "m");
+  ASSERT_TRUE(loadSttCatalog(list, root, v, e, models)) << e;
+  EXPECT_EQ(v[0].path, models + "/m.bin");
+  EXPECT_EQ(v[0].promptFile, root + "/p.txt");
+  EXPECT_EQ(v[0].grammarFile, root + "/g.txt");
+  EXPECT_TRUE(v[0].installed);
+  EXPECT_EQ(v[1].path, "/elsewhere/m.bin");
+  EXPECT_FALSE(v[1].installed);
+  fs::remove_all(base);
+}
+
 TEST(SttCatalog, NamesTheProblem) {
   const std::string head = R"({"models":[{"id":"x","name":"X","engine":"vosk","path":"/"},)";
   for (const std::string bad : {R"({"id":"x","name":"X","engine":"vosk","path":"/"}]})", R"({"id":"y","name":"Y","engine":"cloud","path":"/"}]})",
@@ -324,7 +353,9 @@ TEST(SttCatalog, NamesTheProblem) {
 TEST(SttCatalog, ShippedFileIsValid) {
   std::vector<SttModel> v;
   std::string e;
-  ASSERT_TRUE(loadSttCatalog(ATC_ROOT "/config/stt_models.json", ATC_ROOT, v, e)) << e;
+  Paths p;
+  ASSERT_TRUE(resolvePaths(systemPathInputs(), p, e)) << e;
+  ASSERT_TRUE(loadSttCatalog(p.config + "/stt_models.json", p.root, v, e)) << e;
   EXPECT_GE(v.size(), 2u);
 }
 

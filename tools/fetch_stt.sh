@@ -41,9 +41,13 @@ if [ ! -d third_party/whisper.cpp ]; then
   mv third_party/whisper.part third_party/whisper.cpp
 fi
 # P-03: baseline plus separate CPU variants chosen at run time. Nothing needs AVX2.
+# D-410: no build path in the libraries (assert file names). third_party is a link in a worktree, so both forms are mapped.
+# Applies to a new build only: an existing whisper-install is not rebuilt.
+MAP="-ffile-prefix-map=$PWD=. -ffile-prefix-map=$(realpath third_party)=third_party"
 if [ ! -f third_party/whisper-install/lib/libwhisper.so ]; then
   cmake -S third_party/whisper.cpp -B third_party/whisper-build -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="$PWD/third_party/whisper-install" -DCMAKE_INSTALL_LIBDIR=lib \
+    -DCMAKE_C_FLAGS="$MAP" -DCMAKE_CXX_FLAGS="$MAP" -DCMAKE_ASM_FLAGS="$MAP" \
     -DBUILD_SHARED_LIBS=ON -DGGML_NATIVE=OFF -DGGML_BACKEND_DL=ON -DGGML_CPU_ALL_VARIANTS=ON \
     -DGGML_OPENMP=OFF -DWHISPER_BUILD_TESTS=OFF -DWHISPER_BUILD_EXAMPLES=OFF -DWHISPER_BUILD_SERVER=OFF
   cmake --build third_party/whisper-build -j"${JOBS:-2}"

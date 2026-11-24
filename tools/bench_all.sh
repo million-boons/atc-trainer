@@ -8,7 +8,7 @@ R="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$1"; shift
 mkdir -p "$OUT"
 M=(); for m in "$@"; do M+=(--manifest "$m"); done
-B="$R/build/stt_bench"; T="$R/third_party"; A="$T/archives"
+B="$R/build/bin/stt_bench"; T="$R/third_party"; A="$T/archives"
 V="$T/vosk-model-small-en-in-0.4"
 P="$(cat "$R/data/bench/placeholder_prompt.txt")"   # vocabulary bias; placeholder, not phraseology
 run() { local n="$1"; shift; echo "=== $n"; "$B" "${M[@]}" --out "$OUT/$n" "$@" | tee "$OUT/$n.txt"; }

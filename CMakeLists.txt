@@ -10,6 +10,15 @@ endif()
 # P-03: the panel CPU has no AVX2/FMA.
 add_compile_options(-march=x86-64-v2 -Wall -Wextra -Wpedantic)
 
+# D-410: no compiled-in absolute paths. The build tree has the installed layout (bin, lib, share),
+# so the rule "<prefix>/bin -> <prefix>/share/atc-trainer" serves both.
+add_compile_options(-ffile-prefix-map=${CMAKE_SOURCE_DIR}=. -ffile-prefix-map=${CMAKE_BINARY_DIR}=build)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_INSTALL_RPATH "\$ORIGIN/../lib")
+set(CMAKE_BUILD_WITH_INSTALL_RPATH ON)
+file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/share ${CMAKE_BINARY_DIR}/lib/ggml)
+file(CREATE_LINK ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR}/share/atc-trainer SYMBOLIC)
+
 option(ATC_BUILD_TESTS "Build unit tests" ON)
 find_package(Threads REQUIRED)
 
@@ -17,6 +26,7 @@ find_package(Threads REQUIRED)
 add_library(atc_logic STATIC
   src/ptt/PttInputManager.cpp
   src/core/TransmissionController.cpp
+  src/core/PathResolver.cpp
   src/audio/PrerollRing.cpp
   src/audio/UtteranceChecks.cpp
   src/audio/WavFile.cpp
@@ -69,6 +79,19 @@ if(EXISTS ${TP}/vosk/libvosk.so AND EXISTS ${TP}/whisper-install/lib/libwhisper.
   file(GLOB_RECURSE GGML_CPU_SO ${TP}/whisper-install/libggml-cpu-*.so ${TP}/whisper-install/*/libggml-cpu-*.so)
   list(GET GGML_CPU_SO 0 GGML_CPU_ONE)
   get_filename_component(GGML_DIR ${GGML_CPU_ONE} DIRECTORY)
+  file(GLOB GGML_PLUGINS ${GGML_DIR}/libggml-cpu-*.so)
+  file(GLOB ENGINE_LIBS ${TP}/whisper-install/lib/libwhisper.so* ${TP}/whisper-install/lib/libggml*.so*)
+  list(APPEND ENGINE_LIBS ${TP}/vosk/libvosk.so)
+  foreach(L ${ENGINE_LIBS})
+    get_filename_component(N ${L} NAME)
+    file(CREATE_LINK ${L} ${CMAKE_BINARY_DIR}/lib/${N} SYMBOLIC)
+  endforeach()
+  foreach(L ${GGML_PLUGINS})
+    get_filename_component(N ${L} NAME)
+    file(CREATE_LINK ${L} ${CMAKE_BINARY_DIR}/lib/ggml/${N} SYMBOLIC)
+  endforeach()
+  install(FILES ${ENGINE_LIBS} DESTINATION lib)
+  install(FILES ${GGML_PLUGINS} DESTINATION lib/ggml)
   add_library(atc_stt STATIC src/stt/VoskStt.cpp src/stt/WhisperStt.cpp src/stt/SttCatalog.cpp src/stt/SttFactory.cpp)
   target_include_directories(atc_stt PUBLIC src)
   target_include_directories(atc_stt SYSTEM PUBLIC ${TP}/json PRIVATE ${TP}/vosk ${TP}/whisper-install/include)
@@ -83,11 +106,9 @@ if(EXISTS ${TP}/vosk/libvosk.so AND EXISTS ${TP}/whisper-install/lib/libwhisper.
   add_executable(script_gen tools/script_gen.cpp)
   target_link_libraries(script_gen PRIVATE atc_phraseology)
   add_executable(stt_bench tools/stt_bench.cpp)
-  target_compile_definitions(stt_bench PRIVATE ATC_GGML_DIR="${GGML_DIR}")
   target_link_libraries(stt_bench PRIVATE atc_logic atc_stt Threads::Threads)
   if(TARGET atc_pulse AND TARGET atc_evdev)
     add_executable(ptt_text tools/ptt_text.cpp)
-    target_compile_definitions(ptt_text PRIVATE ATC_GGML_DIR="${GGML_DIR}" ATC_ROOT="${CMAKE_SOURCE_DIR}")
     target_link_libraries(ptt_text PRIVATE atc_pulse atc_evdev atc_logic atc_stt)
   endif()
 else()
@@ -111,7 +132,7 @@ if(ATC_BUILD_TESTS)
   find_package(GTest REQUIRED)
   add_executable(logic_tests
     tests/test_ptt.cpp tests/test_tx.cpp tests/test_tx_display.cpp tests/test_ring.cpp tests/test_checks.cpp
-    tests/test_audio_files.cpp tests/test_bench.cpp tests/test_sidetone.cpp)
+    tests/test_audio_files.cpp tests/test_bench.cpp tests/test_sidetone.cpp tests/test_paths.cpp)
   target_link_libraries(logic_tests PRIVATE atc_logic GTest::gtest_main Threads::Threads)
   include(GoogleTest)
   gtest_discover_tests(logic_tests)
@@ -122,8 +143,17 @@ if(ATC_BUILD_TESTS)
   endif()
   if(TARGET atc_stt)
     add_executable(stt_tests tests/test_stt.cpp tests/test_phraseology.cpp)
-    target_compile_definitions(stt_tests PRIVATE ATC_ROOT="${CMAKE_SOURCE_DIR}")
     target_link_libraries(stt_tests PRIVATE atc_phraseology atc_logic atc_stt GTest::gtest_main Threads::Threads)
     gtest_discover_tests(stt_tests)
   endif()
 endif()
+
+# cmake --install build --prefix DIR --strip. Models and audio are copied by rsync, never from here (D-31).
+foreach(T atc_trainer ptt_monitor audio_probe ptt_record ptt_text stt_bench phrase_gen script_gen
+        logic_tests storage_tests stt_tests)
+  if(TARGET ${T})
+    install(TARGETS ${T} RUNTIME DESTINATION bin)
+  endif()
+endforeach()
+install(DIRECTORY config data DESTINATION share/atc-trainer
+        PATTERN "*.wav" EXCLUDE PATTERN "*.flac" EXCLUDE PATTERN "*.bin" EXCLUDE)
