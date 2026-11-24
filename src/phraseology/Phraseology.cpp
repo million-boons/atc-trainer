@@ -107,6 +107,15 @@ bool loadPhraseology(const std::string& file, Phraseology& out, std::string& err
     Phraseology::Intent in{i["id"], {}};
     if (!ids.insert(in.id).second) return fail("intents/" + in.id + ": used twice");
     if (!i.contains("examples") || !strings(i["examples"], in.examples)) return fail("intents/" + in.id + ": no examples");
+    const auto v = i.value("validation", json::object());
+    const auto text = [&](const char* k) { return v.is_object() && v.contains(k) && v[k].is_string() ? v[k].get<std::string>() : std::string(); };
+    const std::string status = v.empty() ? "draft" : text("status");
+    if (status != "draft" && status != "validated") return fail("intents/" + in.id + ": validation/status must be draft or validated");
+    in.validated = status == "validated";
+    if (in.validated)
+      for (const char* k : {"sopRef", "validated_by", "validated_at"})
+        if (text(k).empty()) return fail("intents/" + in.id + ": Validated needs " + k);
+    if (in.validated && !p.validated) return fail("intents/" + in.id + ": Validated in a placeholder file");
     for (const auto& e : in.examples)
       for (const auto& w : split(e))
         if (w.find('{') != std::string::npos && (!isRef(w) || (!p.slots.count(refName(w)) && !p.pools.count(refName(w)))))
@@ -146,6 +155,7 @@ std::vector<std::string> expandPhrases(const Phraseology& full, const ExpandOpti
   std::mt19937 g(o.seed);
   std::vector<std::string> out;
   for (const auto& in : p.intents) {
+    if (o.validatedOnly && !in.validated) continue;
     const int times = o.perExample * (in.id == o.boostIntent ? std::max(1, o.boost) : 1);
     for (const auto& e : in.examples)
       for (int n = 0; n < times; ++n) {

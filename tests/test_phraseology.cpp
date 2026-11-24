@@ -120,3 +120,15 @@ TEST(Phraseology, ExcludeRemovesTheFormNotTheDigit) {
   o.exclude = {"decimal"};
   EXPECT_TRUE(expandPhrases(p, o, &e).empty());
 }
+
+TEST(Phraseology, ValidationIsPerIntent) {
+  const auto p = real();
+  for (const auto& i : p.intents) EXPECT_FALSE(i.validated) << i.id;
+  ExpandOptions o;
+  o.validatedOnly = true;
+  EXPECT_TRUE(expandPhrases(p, o).empty());
+  EXPECT_NE(loadChanged("\"draft\"", "\"validated\"").find("intents/TAXI_INSTRUCTION: Validated needs sopRef"), std::string::npos);
+  EXPECT_NE(loadChanged("\"status\": \"draft\"", "\"status\": \"validated\", \"sopRef\": \"x\", \"validated_by\": \"y\", \"validated_at\": \"z\"")
+                .find("Validated in a placeholder file"), std::string::npos);
+  EXPECT_NE(loadChanged("\"draft\"", "\"done\"").find("status must be draft or validated"), std::string::npos);
+}

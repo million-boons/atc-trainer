@@ -12,8 +12,9 @@ struct Phraseology {
   struct Intent {
     std::string id;
     std::vector<std::string> examples;
+    bool validated = false;  // D-25: needs sopRef, validated_by and validated_at
   };
-  bool validated = false;
+  bool validated = false;  // file level: false = placeholder text anywhere
   std::map<std::string, std::vector<std::vector<std::string>>> pools;  // values -> spoken forms; includes "digit", "letter"
   std::map<std::string, std::vector<std::string>> slots;               // forms, e.g. "{digit} {digit}"
   std::vector<Intent> intents;
@@ -25,6 +26,7 @@ bool loadPhraseology(const std::string& file, Phraseology& out, std::string& err
 struct ExpandOptions {
   std::uint32_t seed = 1;
   int perExample = 200;        // random sentences per example
+  bool validatedOnly = false;  // only Validated intents (locked test set, assessed use)
   int unkEvery = 0;            // every Nth sentence gets one [unk] at a random place; 0 = never
   std::vector<std::string> exclude;  // words the recogniser lacks: forms using them are not generated
   std::string boostIntent;     // expected intent: weighted, the others stay complete
