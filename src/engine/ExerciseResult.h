@@ -10,14 +10,19 @@
 
 namespace atc {
 
+struct MissedResponse {
+  Ns at = 0;      // since the start of the exercise
+  Ns waited = 0;  // silence before it counted as missed
+};
+
 struct StepResult {
   std::string id, label;
   bool reached = false, completed = false;
   int attempts = 0;                // transmissions judged in this step
   std::map<Outcome, int> errors;   // counted against the trainee
   int suspectedStt = 0;            // not counted
-  int timeouts = 0;
-  std::optional<Ns> responseTime;  // pilot end to key-down, first attempt
+  std::vector<MissedResponse> missed;  // one per timeout
+  std::optional<Ns> responseTime;  // pilot end to key-down, first attempt; from the first call left unanswered
 };
 
 struct PttResult {

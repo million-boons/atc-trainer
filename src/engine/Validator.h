@@ -41,8 +41,9 @@ struct Verdict {
 };
 
 struct ValidatorRules {
-  // 03 section 3: a clipped transmission gets "say again", whatever was recognised.
-  bool clippedIsUnintelligible = true;
+  // D-422: a clipped transmission is judged normally, unless it was released early and a value is
+  // incomplete at the end. True: every clipped transmission gets "say again".
+  bool clippedIsUnintelligible = false;
 };
 
 // The checks of 03 section 2, in that order. No value is ever corrected: fields are compared

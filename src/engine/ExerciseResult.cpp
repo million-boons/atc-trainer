@@ -1,6 +1,7 @@
 #include "engine/ExerciseResult.h"
 
 #include <algorithm>
+#include <set>
 
 namespace atc {
 namespace {
@@ -12,6 +13,7 @@ struct Builder {
   std::map<std::uint64_t, Ns> response;            // per transmission
   std::map<std::uint64_t, SuspectedStt> heard;     // per transmission
   std::vector<int> keyToSpeech;
+  std::set<std::uint64_t> repeats;                 // pilot calls after a missed response
 
   StepResult* step(const std::string& id) {
     for (auto& s : r.steps)
@@ -48,11 +50,13 @@ struct Builder {
   void on(const in::PilotEnded& x) {
     if (x.end == in::PilotEnd::Interrupted) ++r.ptt.keyedOverPilot;
     if (x.end == in::PilotEnd::TimedOut) ++r.pilotFaults;
-    if (x.end == in::PilotEnd::Completed) pilotEnd = now;
+    // A call repeated because nobody answered does not restart the clock.
+    if (x.end == in::PilotEnd::Completed && !(repeats.count(x.utterance) && pilotEnd)) pilotEnd = now;
   }
   void on(const in::TimerFired&) {}
   void on(const in::PttPresence&) {}
   void on(const in::InstructorStop&) {}
+  void on(const in::InstructorContinue&) {}
 
   void on(const out::StepEntered& x) {
     if (auto* s = step(x.step)) s->reached = true;
@@ -61,7 +65,7 @@ struct Builder {
     auto* s = step(x.step);
     if (!s) return;
     if (x.outcome == Outcome::Timeout) {
-      ++s->timeouts;
+      s->missed.push_back({now - started, x.waited});
       return;
     }
     if (++s->attempts == 1)
@@ -80,7 +84,9 @@ struct Builder {
       ++s->errors[x.outcome];
     }
   }
-  void on(const out::PilotRequested&) {}
+  void on(const out::PilotRequested& x) {
+    if (x.utterance.cause == Outcome::Timeout) repeats.insert(x.utterance.id);
+  }
   void on(const out::NoReply&) {}
   void on(const out::TimerSet&) {}
   void on(const out::TimerCancelled&) {}

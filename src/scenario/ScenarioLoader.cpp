@@ -368,6 +368,7 @@ void loadStep(const Node& n, const Exercise& e, const Scenario& s, const std::se
     // Only CORRECT advances; anything else is a separate, explicit branch.
     if (*o != Outcome::Correct && !t.errorBranch) x.fail("a transition on " + on + " must say errorBranch: true");
     if (*o == Outcome::Correct && t.errorBranch) x.fail("CORRECT is not an error branch");
+    if (*o == Outcome::Timeout) x.fail("no transition on TIMEOUT: the instructor continues or ends (D-424)");
     st.transitions.push_back(std::move(t));
   });
   st.timeout = static_cast<Ns>(n.number("timeoutSeconds", 1, 0, true)) * ms(1000);
@@ -387,7 +388,6 @@ void loadStep(const Node& n, const Exercise& e, const Scenario& s, const std::se
     const bool needed = o == Outcome::Timeout ? st.timeout > 0 : o != Outcome::Unsafe;
     if (needed && n.has("responses") && !st.responses.count(o)) n.child("responses").fail("missing " + std::string(name));
   }
-  if (ons.count(Outcome::Timeout) && st.timeout == 0) n.fail("a transition on TIMEOUT needs timeoutSeconds");
   if (st.timeout > 0 && !n.has("maxPilotCalls")) n.fail("timeoutSeconds needs maxPilotCalls");
 }
 

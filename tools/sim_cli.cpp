@@ -5,6 +5,7 @@
 //   unclear                      not recognised (the pilot says again)
 //   wait SECONDS
 //   stop                         instructor stop
+//   continue                     instructor continues after missed responses
 // Free text instead of INTENT needs the parser (package 2e).
 #include <cstdio>
 #include <cstdlib>
@@ -112,6 +113,8 @@ int main(int argc, char** argv) {
       sim.transmit(ParsedInstruction{});
     } else if (cmd == "stop") {
       sim.stop();
+    } else if (cmd == "continue") {
+      sim.resume();
     } else {
       return bad("unknown command");
     }
@@ -145,7 +148,7 @@ int main(int argc, char** argv) {
     }
   }
   for (const auto& s : buildResult(exercise->scenario, log.events).steps)
-    std::printf("%-8s %s, attempts %d, suspected recognition errors %d, timeouts %d\n", s.id.c_str(),
-                s.completed ? "completed" : s.reached ? "not completed" : "not reached", s.attempts, s.suspectedStt, s.timeouts);
+    std::printf("%-8s %s, attempts %d, suspected recognition errors %d, missed responses %zu\n", s.id.c_str(),
+                s.completed ? "completed" : s.reached ? "not completed" : "not reached", s.attempts, s.suspectedStt, s.missed.size());
   return sim.reason() == out::EndReason::Completed ? 0 : 1;
 }

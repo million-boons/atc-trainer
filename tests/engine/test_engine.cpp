@@ -300,22 +300,85 @@ TEST_F(Engine, ConflictWithAClearanceIsChallenged) {
   EXPECT_EQ(lastJudged().outcome, Outcome::Unexpected);
 }
 
-TEST_F(Engine, ClippedTransmissionIsNotAccepted) {
+// D-422: judged normally, and always counted under PTT discipline.
+TEST_F(Engine, ClippedButCompleteIsJudgedNormally) {
+  for (const bool early : {true, false}) {
+    auto r = Simulator::goodReport();
+    r.releasedEarly = early;
+    r.spokeBeforeKeying = !early;
+    make();
+    sim->start();
+    sim->wait(ms(6000));
+    auto wrong = taxi();
+    wrong.fields["runway"].value = otherRunway();
+    sim->transmit(wrong, r);
+    EXPECT_EQ(lastJudged().outcome, Outcome::Incorrect);
+    sim->transmit(taxi(), r);
+    EXPECT_EQ(lastJudged().outcome, Outcome::Correct);
+    const auto res = buildResult(ex->scenario, log.events);
+    EXPECT_EQ(res.ptt.releasedEarly, early ? 2 : 0);
+    EXPECT_EQ(res.ptt.spokeBeforeKeying, early ? 0 : 2);
+  }
+}
+TEST_F(Engine, ReleasedEarlyWithAnIncompleteValueGetsSayAgain) {
   auto r = Simulator::goodReport();
   r.releasedEarly = true;
+  const auto cut = [&](ParsedInstruction p, const std::string& field) {
+    make();
+    sim->start();
+    sim->wait(ms(6000));
+    sim->transmit(std::move(p), r);
+    EXPECT_EQ(lastJudged().outcome, Outcome::Unintelligible);
+    EXPECT_EQ(lastJudged().problems, (std::vector<std::string>{"clipped end", field}));
+    EXPECT_FALSE(lastJudged().suspectedStt);
+    EXPECT_FALSE(lastJudged().advanced);
+    EXPECT_EQ(lastPilot().find("say again,"), 0u) << lastPilot();
+    EXPECT_EQ(step(), "TAXI");
+  };
+  auto p = taxi();  // "... runway zero"
+  p.cls = RecognitionClass::Ambiguous;
+  p.fields["runway"] = {"", "zero", true, -1};
+  p.normalisedText = "eagle four two one taxi via alpha three runway zero";
+  cut(p, "runway");
+  p = taxi();  // "... runway"
+  p.cls = RecognitionClass::Partial;
+  p.fields.erase("runway");
+  p.missing = {"runway"};
+  cut(p, "runway");
+  // The same without the early release: the recogniser or the trainee, as before.
+  expectStays(p, Outcome::MissingInfo, "runway");
+  // An uncertain value before the end is not explained by the release.
+  p = taxi();
+  p.cls = RecognitionClass::Ambiguous;
+  p.fields["taxiway"] = {"", "alpha", true, -1};
+  p.normalisedText = "eagle four two one taxi via alpha runway zero nine";
+  make();
   sim->start();
   sim->wait(ms(6000));
-  sim->transmit(taxi(), r);
-  EXPECT_EQ(lastJudged().outcome, Outcome::Unintelligible);
-  EXPECT_FALSE(lastJudged().suspectedStt);  // PTT discipline, not the recogniser
-  EXPECT_EQ(step(), "TAXI");
+  sim->transmit(p, r);
+  EXPECT_EQ(lastJudged().outcome, Outcome::Ambiguous);
+  // Another callsign still gets silence.
+  p = taxi();
+  p.fields.erase("runway");
+  p.fields["callsign"].value = "HAWK-999";
+  make();
+  sim->start();
+  sim->wait(ms(6000));
+  sim->transmit(p, r);
+  EXPECT_EQ(lastJudged().outcome, Outcome::WrongCallsign);
+}
+TEST_F(Engine, StrictSettingGivesSayAgainForEveryClippedTransmission) {
+  auto r = Simulator::goodReport();
+  r.releasedEarly = true;
   EngineConfig cfg;
-  cfg.rules.clippedIsUnintelligible = false;
+  cfg.rules.clippedIsUnintelligible = true;
   make(7, cfg);
   sim->start();
   sim->wait(ms(6000));
   sim->transmit(taxi(), r);
-  EXPECT_EQ(lastJudged().outcome, Outcome::Correct);
+  EXPECT_EQ(lastJudged().outcome, Outcome::Unintelligible);
+  EXPECT_FALSE(lastJudged().suspectedStt);
+  EXPECT_EQ(step(), "TAXI");
 }
 TEST_F(Engine, WordsFromSilenceAreNotAccepted) {
   auto r = Simulator::goodReport();
@@ -362,8 +425,35 @@ TEST_F(Engine, NoCallMakesThePilotCallAgainThenAlerts) {
   EXPECT_EQ(timeouts, 3);  // two calls again, then the alert
   EXPECT_EQ(outputs<out::PilotRequested>().size(), 3u);
   ASSERT_EQ(outputs<out::InstructorAlert>().size(), 1u);
+  EXPECT_TRUE(outputs<out::InstructorAlert>()[0].choice);
   EXPECT_EQ(step(), "TAXI");
   EXPECT_FALSE(sim->ended());
+}
+// D-424: each one logged with its timing, nothing moves on by itself, the instructor chooses.
+TEST_F(Engine, MissedResponsesAreTimedAndTheInstructorChooses) {
+  sim->start();
+  sim->wait(ms(200'000));
+  for (const auto& j : outputs<out::Judged>()) EXPECT_EQ(j.waited, ms(30'000));
+  auto res = buildResult(ex->scenario, log.events);
+  ASSERT_EQ(res.steps[0].missed.size(), 3u);
+  EXPECT_EQ(res.steps[0].missed[0].at, ms(34'500));  // own call ends at 4.5 s
+  EXPECT_EQ(res.steps[0].missed[1].at, ms(67'000));  // 2.5 s of call and 30 s later
+  EXPECT_EQ(res.steps[0].missed[0].waited, ms(30'000));
+  const auto calls = outputs<out::PilotRequested>().size();
+  sim->resume();
+  sim->wait(ms(31'000));
+  EXPECT_EQ(outputs<out::PilotRequested>().size(), calls + 1);  // the pilot calls again
+  EXPECT_EQ(step(), "TAXI");
+  sim->resume();  // not waiting for a choice: no effect
+  sim->transmit(taxi());
+  EXPECT_EQ(lastJudged().outcome, Outcome::Correct);
+  // The response time counts from the first unanswered call, not from the last repeat.
+  res = buildResult(ex->scenario, log.events);
+  EXPECT_EQ(res.steps[0].missed.size(), 4u);
+  ASSERT_TRUE(res.steps[0].responseTime);
+  EXPECT_GT(*res.steps[0].responseTime, ms(200'000));
+  sim->stop();
+  EXPECT_EQ(sim->reason(), out::EndReason::InstructorStop);
 }
 TEST_F(Engine, TooManySayAgainsAlertTheInstructorOnce) {
   sim->start();
@@ -552,9 +642,11 @@ TEST_F(Engine, ResultSeparatesTraineeErrorsFromSuspectedRecognitionErrors) {
   sim->transmit(wrong);
   sim->transmit(ParsedInstruction{});
   auto r = Simulator::goodReport();
+  r.empty = true;
+  sim->transmit(taxi(), r);
+  r = Simulator::goodReport();
   r.spokeBeforeKeying = true;
   sim->transmit(taxi(), r);
-  sim->transmit(taxi());
   sim->waitForPilot();
   sim->stop();
   const auto res = buildResult(ex->scenario, log.events);
@@ -562,7 +654,7 @@ TEST_F(Engine, ResultSeparatesTraineeErrorsFromSuspectedRecognitionErrors) {
   EXPECT_TRUE(res.steps[0].completed);
   EXPECT_EQ(res.steps[0].attempts, 4);
   EXPECT_EQ(res.steps[0].errors.at(Outcome::Incorrect), 1);
-  EXPECT_EQ(res.steps[0].errors.at(Outcome::Unintelligible), 1);  // the clipped one
+  EXPECT_EQ(res.steps[0].errors.at(Outcome::Unintelligible), 1);  // the silent one
   EXPECT_EQ(res.steps[0].suspectedStt, 1);
   ASSERT_EQ(res.suspectedStt.size(), 1u);
   EXPECT_EQ(res.suspectedStt[0].step, "TAXI");

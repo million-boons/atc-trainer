@@ -117,4 +117,6 @@ void Simulator::transmit(ParsedInstruction p, const UtteranceReport& report, TxE
 
 void Simulator::stop() { apply(in::InstructorStop{}); }
 
+void Simulator::resume() { apply(in::InstructorContinue{}); }
+
 }  // namespace atc

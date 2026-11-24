@@ -144,6 +144,13 @@ void SequenceEngine::on(Ns, const in::InstructorStop&, Outputs& o) {
   if (running()) finish(out::EndReason::InstructorStop, o);
 }
 
+// The pilot's calls start again; the step is unchanged.
+void SequenceEngine::on(Ns, const in::InstructorContinue&, Outputs&) {
+  if (!running() || !callsExhausted_) return;
+  callsExhausted_ = false;
+  pilotCalls_ = 0;
+}
+
 void SequenceEngine::setTimer(in::Timer k, Ns delay, Ns t, Outputs& o) {
   TimerState& s = timer(k);
   s.active = true;
@@ -207,6 +214,7 @@ void SequenceEngine::stepTimedOut(Outputs& o) {
   out::Judged j;
   j.step = st.id;
   j.outcome = Outcome::Timeout;
+  j.waited = st.timeout;  // time without PTT does not count: the timer was paused
   o.push_back(std::move(j));
   if (pilotCalls_ < st.maxPilotCalls) {
     ++pilotCalls_;
@@ -215,8 +223,8 @@ void SequenceEngine::stepTimedOut(Outputs& o) {
     return;
   }
   callsExhausted_ = true;
-  o.push_back(out::InstructorAlert{st.id + ": no ATC call after " + std::to_string(pilotCalls_) + " pilot calls"});
-  takeBranch(Outcome::Timeout, o);
+  o.push_back(out::InstructorAlert{st.id + ": no ATC call after " + std::to_string(pilotCalls_) + " pilot calls", true});
+  // Never moves on by itself (D-424): the instructor continues or ends.
 }
 
 void SequenceEngine::finish(out::EndReason why, Outputs& o) {

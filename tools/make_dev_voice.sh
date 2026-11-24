@@ -4,6 +4,7 @@
 #   tools/make_dev_voice.sh fetch              download Piper and the voice, pinned checksums (network)
 #   tools/make_dev_voice.sh make BIN [FOLDER]  BIN: folder with voice_tool; FOLDER: the voices folder,
 #                                              default ~/.local/share/atc-trainer/voices
+#   tools/make_dev_voice.sh trim BIN [FOLDER]  trim again from the kept raw files, without Piper
 # Raw Piper files are kept in FOLDER/../voices-raw; the trimmed clips and manifest go to FOLDER.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -33,27 +34,31 @@ fetch)
   fi
   echo "Piper ready"
   ;;
-make)
+make|trim)
   BIN=${2:?folder with voice_tool}
   OUT=${3:-$HOME/.local/share/atc-trainer/voices}
   RAW=$(dirname "$OUT")/voices-raw/$VOICE
-  for x in "$BIN/voice_tool" third_party/piper/piper "$A/$VOICE.onnx"; do
+  [ "$1" = make ] || { [ -d "$RAW" ] && [ -x "$BIN/voice_tool" ]; } || { echo "missing: $RAW or $BIN/voice_tool" >&2; exit 1; }
+  [ "$1" = trim ] || for x in "$BIN/voice_tool" third_party/piper/piper "$A/$VOICE.onnx"; do
     [ -e "$x" ] || { echo "missing: $x (run fetch, or build voice_tool)" >&2; exit 1; }
   done
   # voice_tool checks this too, but only after Piper has run.
   if git -C "$(dirname "$(realpath -m "$OUT")")" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "$OUT is inside a git working copy" >&2; exit 1
   fi
-  rm -rf "$RAW.part"
-  mkdir -p "$RAW.part"
-  "$BIN/voice_tool" list --out "$RAW.part/clips.jsonl"
-  # One process for all clips. Low priority: the panel stays usable.
-  LIST=$(realpath "$RAW.part/clips.jsonl"); PIPER=$(realpath third_party/piper/piper); MODEL=$(realpath "$A/$VOICE.onnx")
-  (cd "$RAW.part" && nice -n 10 "$PIPER" --model "$MODEL" --json-input --quiet < "$LIST" > piper.out)
-  [ ! -d "$RAW" ] || mv "$RAW" "$RAW.$(date +%Y%m%d-%H%M%S)"   # raw takes are never deleted
-  mv "$RAW.part" "$RAW"
-  "$BIN/voice_tool" build --raw "$RAW" --out "$OUT/$VOICE" --voice $VOICE
+  if [ "$1" = make ]; then
+    rm -rf "$RAW.part"
+    mkdir -p "$RAW.part"
+    "$BIN/voice_tool" list --out "$RAW.part/clips.jsonl"
+    # One process for all clips. Low priority: the panel stays usable.
+    LIST=$(realpath "$RAW.part/clips.jsonl"); PIPER=$(realpath third_party/piper/piper); MODEL=$(realpath "$A/$VOICE.onnx")
+    (cd "$RAW.part" && nice -n 10 "$PIPER" --model "$MODEL" --json-input --quiet < "$LIST" > piper.out)
+    [ ! -d "$RAW" ] || mv "$RAW" "$RAW.$(date +%Y%m%d-%H%M%S)"   # raw takes are never deleted
+    mv "$RAW.part" "$RAW"
+  fi
+  # Longer pads than the default: Piper starts and ends words with a faint f or s, and its silence is clean.
+  "$BIN/voice_tool" build --raw "$RAW" --out "$OUT/$VOICE" --voice $VOICE --pad-before 60 --pad-after 100
   ;;
 *)
-  sed -n 2,7p "$0"; exit 2 ;;
+  sed -n 2,9p "$0"; exit 2 ;;
 esac

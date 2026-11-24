@@ -79,6 +79,21 @@ TEST(ClipTrim, LevelsToTheTargetAndNeverAboveThePeakLimit) {
   for (const int x : r.samples) peak = std::max(peak, std::abs(x));
   EXPECT_LE(peak, static_cast<int>(32768 * std::pow(10.0, -1 / 20.0)) + 1);
 }
+// "Falcon": a faint f, far below the threshold, before the loud part.
+TEST(ClipTrim, AFaintStartNeedsALongerPad) {
+  const Samples raw = join({silence(16000, 100), tone(16000, 3000, 60, 60), tone(16000, 400, 500, 8000), silence(16000, 200)});
+  TrimConfig cfg;
+  TrimResult r;
+  std::string error;
+  ASSERT_TRUE(trimClip(raw, 16000, cfg, r, error));
+  EXPECT_EQ(r.start, 16000u * 140 / 1000);  // the faint part is mostly cut
+  cfg.padBeforeMs = 80;
+  ASSERT_TRUE(trimClip(raw, 16000, cfg, r, error));
+  EXPECT_EQ(r.start, 16000u * 80 / 1000);  // all of it kept
+  cfg.padBeforeMs = 1000;
+  ASSERT_TRUE(trimClip(raw, 16000, cfg, r, error));
+  EXPECT_EQ(r.start, 0u);
+}
 TEST(ClipTrim, AClickIsNotSpeech) {
   Samples raw = silence(16000, 1000);
   for (int i = 0; i < 160; ++i) raw[static_cast<std::size_t>(1600 + i)] = 20000;  // one 10 ms frame

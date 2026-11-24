@@ -1,8 +1,10 @@
 // Makes a voice bank offline. Two steps, with the dev voice (or a speaker) in between:
 //   voice_tool list  [--data DIR] [--out FILE]               one JSON line per clip: text, output_file, words
 //   voice_tool build --raw DIR --out DIR --voice NAME [--data DIR] [--real] [--noise DBFS] [--target DBFS]
+//                   [--pad-before MS] [--pad-after MS]
 // build trims and levels DIR/<clip>.wav, writes 16 kHz WAV and manifest.json, loads the result and
-// checks coverage. Raw files are only read. Audio never goes into a git working copy (D-31, D-418).
+// checks coverage. Nothing is written unless every clip is good; an existing bank is rebuilt in place,
+// file by file, so its folder never goes missing (a missing voices folder stops every program). Raw files are only read. Audio never goes into a git working copy (D-31, D-418).
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -28,7 +30,8 @@ namespace {
 int usage() {
   std::fprintf(stderr,
                "usage: voice_tool list [--data DIR] [--out FILE]\n"
-               "       voice_tool build --raw DIR --out DIR --voice NAME [--data DIR] [--real] [--noise DBFS] [--target DBFS]\n");
+               "       voice_tool build --raw DIR --out DIR --voice NAME [--data DIR] [--real] [--noise DBFS] [--target DBFS]\n"
+               "                  [--pad-before MS] [--pad-after MS]\n");
   return 2;
 }
 
@@ -79,6 +82,8 @@ int main(int argc, char** argv) {
     else if (command == "build" && k == "--voice") voice = v;
     else if (command == "build" && k == "--noise") trim.noiseFloorDb = std::strtod(v.c_str(), nullptr);
     else if (command == "build" && k == "--target") trim.targetDb = std::strtod(v.c_str(), nullptr);
+    else if (command == "build" && k == "--pad-before") trim.padBeforeMs = std::atoi(v.c_str());
+    else if (command == "build" && k == "--pad-after") trim.padAfterMs = std::atoi(v.c_str());
     else return usage();
   }
   if (command == "build" && (raw.empty() || out.empty() || voice.empty())) return usage();
@@ -152,7 +157,7 @@ int main(int argc, char** argv) {
     std::fprintf(stderr, "--raw and --out must be different folders\n");
     return 1;
   }
-  fs::remove(fs::path(out) / "manifest.json", ec);  // until every clip is there
+  std::map<std::string, TrimResult> made;
   json list = json::array();
   int warnings = 0;
   for (const auto& [id, c] : clips) {
@@ -169,17 +174,20 @@ int main(int argc, char** argv) {
       ++warnings;
       std::printf("warning: %s: %s\n", id.c_str(), w.c_str());
     }
-    if (!writeWav((fs::path(out) / c.file()).string(), VoiceBank::kRate, r.samples)) {
-      ok = false;
-      std::fprintf(stderr, "cannot write %s\n", c.file().c_str());
-      continue;
-    }
     json take = {{"file", c.file()}, {"take", "primary"}, {"durationMs", r.samples.size() * 1000 / VoiceBank::kRate},
                  {"trimStart", r.start}, {"trimEnd", r.end}, {"speechDb", tenth(r.speechDb)}, {"gainDb", tenth(r.gainDb)}};
     list.push_back({{"id", id}, {"words", c.words}, {"takes", json::array({take})}});
+    made.emplace(c.file(), std::move(r));
   }
-  // No manifest: a bank with a gap cannot be loaded.
-  if (!ok) return 1;
+  if (!ok) {
+    std::fprintf(stderr, "nothing written\n");
+    return 1;
+  }
+  for (const auto& [file, r] : made)
+    if (!writeWav((fs::path(out) / file).string(), VoiceBank::kRate, r.samples)) {
+      std::fprintf(stderr, "cannot write %s\n", file.c_str());
+      return 1;
+    }
   const json manifest = {{"schemaVersion", 1}, {"voice", voice}, {"sampleRate", VoiceBank::kRate}, {"placeholder", !real}, {"clips", list}};
   if (!writeText(fs::path(out) / "manifest.json", manifest.dump(1) + "\n")) {
     std::fprintf(stderr, "cannot write manifest.json\n");

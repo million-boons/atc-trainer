@@ -158,6 +158,10 @@ TEST_F(Departure, WrongOutcomeNeedsAnErrorBranch) {
   step(0)["transitions"][1]["errorBranch"] = true;
   EXPECT_TRUE(load()) << all();
 }
+TEST_F(Departure, NoTransitionOnTimeout) {  // D-424
+  step(0)["transitions"].push_back({{"on", "TIMEOUT"}, {"to", "DONE"}, {"errorBranch", true}});
+  expectError(kFile, "/steps/0/transitions/1", "TIMEOUT");
+}
 TEST_F(Departure, StepWithoutCorrectIsRefused) {
   step(2)["transitions"] = json::array();
   expectError(kFile, "/steps/2", "no transition on CORRECT");

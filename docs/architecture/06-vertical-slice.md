@@ -1,6 +1,6 @@
 # 06 Vertical slice: departure (taxi, line up, takeoff)
 
-Status: **APPROVED with changes, 2026-11-23** (D-400 to D-409); amended 2026-11-24 (D-410 to D-416, package 1c). §4.1 is approved in part; what still waits for A-3 is marked there. "A-n" are the open questions in `docs/status/briefs-2026-11-24.md` (branch `audit`). All phraseology is PLACEHOLDER. Hours are estimates.
+Status: **APPROVED with changes, 2026-11-23** (D-400 to D-409); amended 2026-11-24 (D-410 to D-425, package 1c). §4.1 is approved; A-3 is closed (D-308). "A-n" are the open questions in `docs/status/briefs-2026-11-24.md` (branch `audit`). All phraseology is PLACEHOLDER. Hours are estimates.
 
 Goal: one departure scenario working end to end on real components, after the Speech Lab and Dashboard run on real backends.
 
@@ -22,7 +22,7 @@ Sessions: b2 = `runtime`, 93 = `stt`, 31 = `ui`, 8d = `engine`.
 | 0a | Finish D-300 tests; adapt `MockBackend` and `LiveBackend` to the new TransmissionController callbacks; merge to `main`; repo sync (§4) | b2 | – | 3–5, sync extra |
 | 0b | Commit current STT and phraseology work; b2 merges | 93 | 0a | 1 |
 | 0c | Contracts and CMake stubs; event log header with exercise mode, trainee ID code, model id and configuration (D-416, D-39); b2 merges | 8d | 0a | 2 |
-| 0d | Location-independent paths (D-410, §4.1): resolver, relative library paths, tests; b2 merges | b2 | 0a, 0b; §4.1 (core approved, A-3 for the rest); before the first PC-built binary goes to the panel | 2–4 |
+| 0d | Location-independent paths (D-410, §4.1): resolver, relative library paths, tests; b2 merges | b2 | 0a, 0b; §4.1 (approved; A-3 closed, D-308); before the first PC-built binary goes to the panel | 2–4 |
 | 1a | `RadioCore`, `PulsePlayer`, Lab playback, speaker check, `StatusController`. Export stays off (D-407) | b2 | 0a, 0c | 7–9 |
 | 1b | Dashboard wireframe, user OK, QML; remaining Lab controls. Start disabled until 3b | 31 | 0c; 1a to connect | 4–5 |
 | 1c | Recordings: speaker ID and consent required before saving, saving wired to RadioCore, off switch in Settings, list, instructor-only logged delete, low-space warning (D-101, D-102, 04 §5b). Speakers are added by the instructor role only. | 31 | 1a; role mechanism (A-4) | to be estimated by 31 |
@@ -75,12 +75,12 @@ Panel measurement rule: no Claude session, browser, build or sync running; recor
 
 ### 4.1 Location-independent paths (task 0d, APPROVED IN PART)
 
-Approved per Q-3 (ruling 2026-11-24) as: install prefix + config file / executable-relative paths, with **no compiled-in absolute paths**. Parts marked *waiting for A-3* go beyond that wording and are not built until the user answers. b2 records the approval as D-305.
+Approved per Q-3 (ruling 2026-11-24) as: install prefix + config file / executable-relative paths, with **no compiled-in absolute paths**. A-3 is closed (D-308): `--root` is kept; no `ATC_ROOT` variable and no developer fallback. The approval is D-305.
 
 Found 2026-11-24 in the code: `ATC_ROOT` in `src/app/main.cpp`, `tools/ptt_text.cpp`, `tests/test_stt.cpp`, `tests/test_phraseology.cpp`; `ATC_GGML_DIR` in `src/app/main.cpp`, `tools/ptt_text.cpp`, `tools/stt_bench.cpp`; absolute RUNPATH to `third_party/vosk` and `third_party/whisper-install/lib` in `atc_trainer`, `ptt_text`, `stt_bench`, `stt_tests`. Model paths in `config/stt_models.json` are already relative.
 
 1. One Qt-free `PathResolver` (`src/core/`) gives the config, data, models, voices and engine folders. Nothing else builds a path from a compiled-in constant.
-2. Root, first match wins: `--root` option (*waiting for A-3*); `ATC_ROOT` environment variable (*waiting for A-3*); `root=` in the config file (`~/.config/atc-trainer/paths.conf`, then `/etc/atc-trainer/paths.conf`); relative to the executable (`/proc/self/exe`): `<prefix>/bin` → `<prefix>/share/atc-trainer`, or the project folder above a build folder (developer fallback, *waiting for A-3*). The config file may also set the models and voices folders separately.
+2. Root, first match wins: `--root` option, which replaces the config files, so models and voices come from it too (D-308); `root=` in the config file (`~/.config/atc-trainer/paths.conf`, then `/etc/atc-trainer/paths.conf`); relative to the executable (`/proc/self/exe`): `<prefix>/bin` → `<prefix>/share/atc-trainer`. The config file may also set the models and voices folders separately. The voices folder **is** the bank: it holds `manifest.json` (D-420); without a `voices=` line it is `root/voices`.
 3. A location that was set explicitly but is missing is an error that names it. It never falls through to the next one. If nothing matches, the error lists every place tried.
 4. Vosk, whisper and ggml libraries: `$ORIGIN`-relative RUNPATH, and the ggml plugin folder found from the engine folder. `cmake --install` gives `bin/`, `lib/`, `share/atc-trainer/`.
 5. Files the program writes (logs, results, recordings) go to a separate writable folder, never under the prefix.
@@ -127,6 +127,7 @@ Modes (ruling 2026-11-24): Practice shows the live verdict; Assessed hides it un
 |---|---|---|
 | O-1 | Pilot readback of a wrong value that **exists in the airfield pools** should become possible, so readback errors can be trained. Values outside the pools: challenge or say again. | Later; not in the slice (D-409) |
 | O-2 | Approved line-up wording | Placeholder "line up runway {runway}" confirmed 2026-11-24 until the user supplies wording, if unclassified (D-403) |
+| O-3 | A step that requires hold short | Deferred until the user supplies approved readback wording. Needs a small scenario-format addition; until then hold short is UNEXPECTED (D-417, D-419) |
 | Q-1 | May voice recordings be copied to the PC? | **Closed:** yes, LAN only, one-way (D-412) |
 | Q-2 | PC operating system, LAN address, user name, GPU. SSH server is installed; the user name no longer has to match the panel (D-410). | **Closed 2026-11-24** (D-418): Piper runs on the panel, offline. The PC values stay blank |
-| Q-3 | Approve §4.1 (0d design) | **Closed 2026-11-24:** approved as install prefix + config file / executable-relative, no compiled-in absolute paths. The extra lookups in §4.1 point 2 wait for A-3 |
+| Q-3 | Approve §4.1 (0d design) | **Closed 2026-11-24:** approved as install prefix + config file / executable-relative, no compiled-in absolute paths. A-3 (extra lookups) closed by D-308 |
