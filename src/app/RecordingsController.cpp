@@ -47,7 +47,7 @@ QString RecordingsController::speakerText() const {
   return access_ && access_->trainee() ? tr("Speaker %1").arg(access_->personId()) : tr("No speaker");
 }
 
-int RecordingsController::lineLevel() const { return rule() == SaveRule::Save && error_.isEmpty() && b_.save ? L::Ok : L::Caution; }
+int RecordingsController::lineLevel() const { return rule() == SaveRule::Save && error_.isEmpty() && b_.save && connected_ ? L::Ok : L::Caution; }
 
 QString RecordingsController::lineText() const {
   switch (rule()) {
@@ -57,6 +57,7 @@ QString RecordingsController::lineText() const {
     case SaveRule::Save: break;
   }
   if (!b_.save) return tr("Not saved: no recording store");
+  if (!connected_) return tr("Not saved: not connected yet");
   return error_.isEmpty() ? tr("Saved on this machine only") : tr("Not saved: %1").arg(error_);
 }
 

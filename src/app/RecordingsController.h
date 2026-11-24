@@ -41,6 +41,11 @@ class RecordingsController : public QObject {
   RecordingsController(LabController* lab, AccessController* access, SettingsController* settings, QObject* parent = nullptr);
   ~RecordingsController() override;
   void setBackend(RecordingBackend b) { b_ = std::move(b); }
+  // The radio calls offer(). Until then the screen never says that anything is saved.
+  void setConnected() {
+    connected_ = true;
+    emit changed();
+  }
   // For the store: may be called on any thread.
   std::function<void(const std::string& key, bool ok, const std::string& why)> savedCallback();
 
@@ -70,6 +75,7 @@ class RecordingsController : public QObject {
   QPointer<AccessController> access_;
   QPointer<SettingsController> settings_;
   std::map<int, std::string> keys_;  // saved transmissions of this run
+  bool connected_ = false;
   QString error_, message_;
   RowModel stored_;
   RecordingBackend b_;  // last: the store finishes its work before the rest goes

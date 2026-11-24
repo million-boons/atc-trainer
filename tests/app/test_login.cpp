@@ -50,6 +50,7 @@ struct Login : testing::Test {
       done(removeAnswer);
     };
     r->setBackend(rb);
+    r->setConnected();
   }
   void TearDown() override {
     r.reset();
@@ -154,6 +155,18 @@ TEST_F(Login, SavedOnlyForAConsentingTrainee) {
   people[0].consent = false;  // withdrawn while logged in
   offer(5);
   EXPECT_EQ(saved.size(), 1u);
+}
+
+TEST_F(Login, NeverClaimsToSaveBeforeTheRadioIsConnected) {
+  RecordingsController fresh(&lab, a.get(), settings.get());
+  RecordingBackend rb;
+  rb.save = [](StoredRecording, std::vector<std::int16_t>) {};
+  fresh.setBackend(rb);
+  a->loginTrainee("S01");
+  EXPECT_TRUE(fresh.lineText().startsWith("Not saved"));
+  EXPECT_EQ(fresh.lineLevel(), int(LabController::Caution));
+  fresh.setConnected();
+  EXPECT_EQ(fresh.lineText(), "Saved on this machine only");
 }
 
 TEST_F(Login, ResultsFollowOnlySavedTransmissions) {

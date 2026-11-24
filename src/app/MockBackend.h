@@ -36,7 +36,11 @@ class MockBackend : public QObject {
   StatusFeed* status() { return &status_; }
   ExerciseController* exercise() { return &exercise_; }
   QVariantList exerciseScripts() const;
-  void attach(AccessController* a, RecordingsController* r) { access_ = a; recordings_ = r; }
+  void attach(AccessController* a, RecordingsController* r) {
+    access_ = a;
+    recordings_ = r;
+    r->setConnected();
+  }
   void setAssessed(bool on);
   void setConsent(bool on);
   // Fast-forwards a scripted case and freezes it there until the next press.
