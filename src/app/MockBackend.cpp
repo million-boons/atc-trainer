@@ -2,6 +2,7 @@
 
 #include "app/ExerciseMock.h"
 
+#include <QDateTime>
 #include <QTime>
 #include <algorithm>
 #include <cmath>
@@ -133,6 +134,7 @@ QVariantList MockBackend::scripts() const {
       {"queued", "WAIT (rule queue)"}, {"queueopen", "Queued, then TX"}, {"queuedrop", "Queued, dropped"}, {"queuetalk", "Queued, talked too soon"}, {"ptimeout", "Pilot voice timeout"},
       {"mloading", "Model LOADING"}, {"mfailed", "Model FAILED"}, {"mother", "Other model selected"}, {"mlocked", "Model locked"},
       {"vloaded", "Bank loaded"}, {"vchecking", "Bank checking"}, {"vok", "Bank coverage OK"}, {"vmissing", "Bank missing clips"}, {"vfailed", "Bank failed"},
+      {"login", "Login dialog"}, {"savyes", "Trainee, consent"}, {"savno", "Trainee, no consent"}, {"setoff", "Settings: not logged in"}, {"setinstr", "Settings: instructor"},
       {"dash", "Dashboard: not ready"}, {"dashready", "Dashboard: all ready"}, {"dashrun", "Dashboard: running"},
       {"dashfault", "Dashboard: faults"}};
   QVariantList l;
@@ -361,12 +363,21 @@ void MockBackend::run(const QString& id) {
   }
   advanceTo(Ns(freeze * 1e6));
   current_ = id;
+  loginCase(id);
   if (ex) exercise_mock::show(exercise_, id, assessed_, consent_);
   else if (exercise_.phase() != ExerciseController::Idle) {
     exercise_.begin({}, false, false);
     emit exercise_.screenRequested(id.startsWith("dash") ? "dash" : "lab");
   }
   emit currentChanged();
+}
+
+void MockBackend::loginCase(const QString& id) {
+  if (!access_) return;
+  if (id == "login" || id == "setoff") access_->logout();
+  else if (id == "savyes") access_->loginTrainee("S01");
+  else if (id == "savno") access_->loginTrainee("S02");
+  else if (id == "setinstr") access_->loginInstructor("123456");  // the mock's PIN
 }
 
 void MockBackend::goLive() {
@@ -548,6 +559,18 @@ void MockBackend::finish(std::uint64_t id, Ns from, Ns to, TxEnd end) {
   if (openT_ == from) rec.startLabel = tr("TX OPEN");  // queued: no pre-roll
   rec.endLabel = end == TxEnd::Stuck ? tr("30 s LIMIT") : end == TxEnd::DeviceLost ? tr("LOST") : tr("RELEASE");
   rec.tailLabel = end == TxEnd::Stuck ? tr("no tail") : tr("tail");
+  if (recordings_ && !frozen_) {
+    StoredRecording s;
+    s.startedMs = QDateTime::currentMSecsSinceEpoch() - (now_ - openT_) / ms(1);
+    s.tx = rec.id;
+    s.pttSource = owner_;
+    s.end = end == TxEnd::Stuck ? "stuck" : end == TxEnd::DeviceLost ? "lost" : "normal";
+    s.rate = kRate;
+    s.pressSample = int(rec.pressFrac * double(rec.audio.size()));
+    s.endSample = int(rec.endFrac * double(rec.audio.size()));
+    s.report = checks.report;
+    recordings_->offer(std::move(s), rec.audio);
+  }
   lab_->addRecording(std::move(rec), QTime::currentTime().toString("HH:mm:ss"));
 
   if (end == TxEnd::Stuck) {
@@ -588,6 +611,13 @@ void MockBackend::showFinal(std::uint64_t id, const QString& text, const QString
     lab_->setWords(words, conf);
   }
   lab_->setResult(int(id) + kIdOffset, text, info, config);
+  if (recordings_ && !frozen_) {
+    StoredResult r;
+    r.modelId = kScriptModel;
+    r.modelConfig = config.toStdString();
+    r.text = text.toStdString();
+    recordings_->addResult(int(id) + kIdOffset, std::move(r));
+  }
   tx_->onProcessed(id, std::nullopt, now_);
 }
 

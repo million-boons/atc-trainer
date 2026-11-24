@@ -37,6 +37,12 @@ void DashboardController::setStt(SttController* s) {
   refresh();
 }
 
+void DashboardController::setPttFallback(bool on) {
+  if (fallback_ == on) return;
+  fallback_ = on;
+  refresh();
+}
+
 void DashboardController::setLab(LabController* l) {
   if (lab_ == l) return;
   if (lab_) disconnect(lab_.data(), nullptr, this, nullptr);
@@ -94,7 +100,7 @@ void DashboardController::refresh() {
   const StatusInputs& in = feed_->inputs();
   const ModelReady model = modelState();
   const Readiness r = readiness({.mic = in.mic, .speaker = in.speaker, .ptt = in.ptt, .model = model, .bank = in.bank,
-                                 .storage = in.storage, .pttMissingBlocks = in.pttMissingBlocks});
+                                 .storage = in.storage, .pttMissingBlocks = in.pttMissingBlocks && !fallback_});
   QStringList blockers;
   const auto add = [&](ReadyTile t, const QString& title, const QString& state, const QString& line1, const QString& line2,
                        const QString& action, bool actionEnabled, const QString& action2 = {}, bool action2Enabled = false) {

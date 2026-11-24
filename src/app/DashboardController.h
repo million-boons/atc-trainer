@@ -24,6 +24,7 @@ class DashboardController : public QObject {
   Q_PROPERTY(QString readyText READ readyText NOTIFY changed)
   Q_PROPERTY(QString blockText READ blockText NOTIFY changed)
   Q_PROPERTY(QStringList reasons READ reasons NOTIFY changed)  // why Start is disabled
+  Q_PROPERTY(bool pttFallback READ pttFallback WRITE setPttFallback NOTIFY changed)  // instructor option (D-116)
   Q_PROPERTY(bool startEnabled READ startEnabled NOTIFY changed)
   Q_PROPERTY(bool running READ running NOTIFY changed)
   Q_PROPERTY(QString modelName READ modelName NOTIFY changed)
@@ -45,6 +46,8 @@ class DashboardController : public QObject {
   void setStt(SttController* s);
   QString exerciseModel() const { return model_; }
   void setExerciseModel(const QString& id);
+  bool pttFallback() const { return fallback_; }
+  void setPttFallback(bool on);
   LabController* lab() const { return lab_; }
   void setLab(LabController* l);
   ExerciseController* exercise() const { return exercise_; }
@@ -89,7 +92,7 @@ class DashboardController : public QObject {
   QVariantList tiles_, chips_;
   QString readyText_, blockText_;
   QStringList reasons_;
-  bool startEnabled_ = false;
+  bool startEnabled_ = false, fallback_ = false;
   int readyLevel_ = 0, alertLevel_ = 0;
   QString readyAlert_, alert_;
 };

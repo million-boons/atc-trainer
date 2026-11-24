@@ -172,6 +172,18 @@ void LabController::setResult(int id, const QString& text, const QString& result
   }
 }
 
+void LabController::dropRecording(int id) {
+  for (int i = 0; i < int(recs_.size()); ++i) {
+    if (recs_[i].id != id) continue;
+    recs_.erase(recs_.begin() + i);
+    recModel_.remove(i);
+    if (sel_ == i) sel_ = -1;
+    else if (sel_ > i) --sel_;
+    emit recordingChanged();
+    return;
+  }
+}
+
 void LabController::showRecording(int row) {
   if (row >= int(recs_.size())) return;
   sel_ = row;

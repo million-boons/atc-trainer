@@ -6,12 +6,14 @@
 #include <span>
 
 #include "app/LabController.h"
+#include "audio/UtteranceChecks.h"
 #include "core/TransmissionController.h"
 
 // The four checks shown for a recording: start, end, level, key to speech.
 struct LabChecks {
   QVariantList list;
   bool noSpeech = false;
+  atc::UtteranceReport report;
   struct Issue { LabController::Level level; QString title, notice; };
   std::optional<Issue> issue;  // the most important one
 };

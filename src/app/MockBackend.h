@@ -11,6 +11,7 @@
 #include "app/ExerciseController.h"
 #include "app/LabChecks.h"
 #include "app/LabController.h"
+#include "app/RecordingsController.h"
 #include "app/StatusFeed.h"
 #include "app/SttController.h"
 #include "ptt/PttInputManager.h"
@@ -35,6 +36,7 @@ class MockBackend : public QObject {
   StatusFeed* status() { return &status_; }
   ExerciseController* exercise() { return &exercise_; }
   QVariantList exerciseScripts() const;
+  void attach(AccessController* a, RecordingsController* r) { access_ = a; recordings_ = r; }
   void setAssessed(bool on);
   void setConsent(bool on);
   // Fast-forwards a scripted case and freezes it there until the next press.
@@ -54,6 +56,7 @@ class MockBackend : public QObject {
   void statusTick();                      // 100 ms, running tests only
   void testEdge(bool down);
   void exerciseEdge(bool down);
+  void loginCase(const QString& id);
   void endPttTest(const QString& note);
   struct Speech { double startMs = 320, endBeforeReleaseMs = 350, gain = 0.292  /* about -12 dBFS */; };
   void goLive();
@@ -73,6 +76,8 @@ class MockBackend : public QObject {
 
   LabController* lab_;
   SttController* stt_;
+  QPointer<AccessController> access_;
+  QPointer<RecordingsController> recordings_;
   std::uint64_t epoch_ = 0;   // results from before a restart are ignored
   bool sttOpen_ = false;      // the service accepted this transmission
   int pilotCutMs_;

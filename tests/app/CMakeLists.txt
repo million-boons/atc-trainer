@@ -10,6 +10,13 @@ if(Qt6_FOUND)
   target_include_directories(dashboard_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${APP})
   target_link_libraries(dashboard_tests PRIVATE atc_logic Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
   gtest_discover_tests(dashboard_tests)
+  add_executable(login_tests test_login.cpp ${APP}/AccessController.h ${APP}/AccessController.cpp
+    ${APP}/SettingsController.h ${APP}/SettingsController.cpp ${APP}/RecordingsController.h ${APP}/RecordingsController.cpp
+    ${APP}/RowModel.h ${APP}/LabController.h ${APP}/LabController.cpp)
+  set_target_properties(login_tests PROPERTIES AUTOMOC ON)
+  target_include_directories(login_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${APP})
+  target_link_libraries(login_tests PRIVATE atc_logic Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
+  gtest_discover_tests(login_tests)
   add_executable(exercise_tests test_exercise.cpp ${APP}/ExerciseController.h ${APP}/ExerciseController.cpp
     ${APP}/ExerciseMock.h ${APP}/ExerciseMock.cpp ${APP}/RowModel.h ${APP}/LabController.h ${APP}/LabController.cpp)
   set_target_properties(exercise_tests PROPERTIES AUTOMOC ON)

@@ -22,14 +22,18 @@ qt_add_qml_module(atc_trainer
     components/ModelSelector.qml
     components/DangerButton.qml components/StatusTile.qml components/ConfirmDialog.qml
     components/RadioBar.qml components/ModalPanel.qml components/OptionButton.qml components/ParamChip.qml
+    components/TextEntry.qml components/ChoiceButton.qml components/SwitchRow.qml components/LoginDialog.qml
+    components/PersonDialog.qml components/RecordingsCard.qml
     components/TranscriptEntry.qml components/StepRow.qml components/SectionHeader.qml
-    screens/SpeechLab.qml screens/Dashboard.qml screens/Exercise.qml screens/Result.qml
+    screens/SpeechLab.qml screens/Dashboard.qml screens/Exercise.qml screens/Result.qml screens/Settings.qml
     mock/MockPanel.qml
   SOURCES
     ${APP}/RowModel.h ${APP}/LabController.h ${APP}/LabController.cpp
     ${APP}/SttController.h ${APP}/SttController.cpp
     ${APP}/StatusFeed.h ${APP}/StatusWords.h ${APP}/DashboardController.h ${APP}/DashboardController.cpp
     ${APP}/ExerciseController.h ${APP}/ExerciseController.cpp ${APP}/ExerciseMock.h ${APP}/ExerciseMock.cpp
+    ${APP}/AccessController.h ${APP}/AccessController.cpp ${APP}/SettingsController.h ${APP}/SettingsController.cpp
+    ${APP}/RecordingsController.h ${APP}/RecordingsController.cpp ${APP}/AccessBackends.h ${APP}/AccessBackends.cpp
     ${APP}/LabChecks.h ${APP}/LabChecks.cpp
     ${APP}/Painted.h ${APP}/Painted.cpp ${APP}/MockBackend.h ${APP}/MockBackend.cpp)
 
@@ -38,6 +42,14 @@ qt_add_resources(atc_trainer fonts PREFIX /Atc FILES
   fonts/JetBrainsMono-Regular.ttf fonts/JetBrainsMono-Bold.ttf)
 
 target_link_libraries(atc_trainer PRIVATE atc_logic Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick)
+if(TARGET atc_storage)
+  target_link_libraries(atc_trainer PRIVATE atc_storage)
+  target_compile_definitions(atc_trainer PRIVATE ATC_HAVE_STORAGE)
+endif()
+if(TARGET atc_pin)
+  target_link_libraries(atc_trainer PRIVATE atc_pin)
+  target_compile_definitions(atc_trainer PRIVATE ATC_HAVE_PIN)
+endif()
 if(TARGET atc_stt)
   target_link_libraries(atc_trainer PRIVATE atc_stt)
   target_compile_definitions(atc_trainer PRIVATE ATC_HAVE_STT)

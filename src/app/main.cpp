@@ -13,12 +13,14 @@
 #include <QTimer>
 #include <memory>
 
+#include "app/AccessBackends.h"
 #include "app/LabController.h"
 #include "app/MockBackend.h"
 #ifdef ATC_HAVE_LIVE
 #include "app/LiveBackend.h"
 #include "stt/SttFactory.h"
 #endif
+#include "app/SettingsController.h"
 #include "app/SttController.h"
 #include "core/PathResolver.h"
 #ifdef ATC_HAVE_STT
@@ -99,10 +101,18 @@ int main(int argc, char** argv) {
 #else
   stt.setCatalogError("built without the speech engines (tools/fetch_stt.sh)");
 #endif
+  // Login, trainee records, settings and recordings (1c). Before the backends, which use them.
+  AccessController access(useMock ? mockAccess() : realAccess(paths.writable));
+  access.setLab(&lab);
+  SettingsController settings(&access, useMock ? QString() : at(paths.writable) + "/settings.json");
+  RecordingsController recordings(&lab, &access, &settings);
+  recordings.setBackend(useMock ? mockRecordings(recordings)
+                                : realRecordings(paths.writable, cfg["recordingsMinFreeMb"].toInt(200), recordings));
   std::unique_ptr<MockBackend> mockBackend;
   if (useMock) {
     stt.start(std::move(models), MockBackend::fakeEngine, [](const atc::SttModel& m) { return "{\"mock\":\"" + m.id + "\"}"; });
     mockBackend = std::make_unique<MockBackend>(&lab, &stt, cfg["pilotCutNoticeMs"].toInt(2000));
+    mockBackend->attach(&access, &recordings);
   }
 #ifdef ATC_HAVE_LIVE
   std::unique_ptr<LiveBackend> live;
@@ -158,6 +168,9 @@ int main(int argc, char** argv) {
                                {"mock", QVariant::fromValue(mockBackend.get())},
                                {"stt", QVariant::fromValue(&stt)},
                                {"feed", QVariant::fromValue(feed)},
+                               {"access", QVariant::fromValue(&access)},
+                               {"settings", QVariant::fromValue(&settings)},
+                               {"recordings", QVariant::fromValue(&recordings)},
                                {"exerciseModel", cfg["exerciseModel"].toString("whisper-tiny-genprompt")},  // D-414
                                {"themeMode", cli.isSet(theme) ? cli.value(theme) : cfg["theme"].toString("dark")},
                                {"reduceMotion", cfg["reduceMotion"].toBool(false)}});

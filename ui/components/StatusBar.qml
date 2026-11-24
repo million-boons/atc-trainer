@@ -2,12 +2,16 @@ import QtQuick
 import Atc
 
 // chips: list of {name, value, level}. scenario: active scenario name; it is shortened when the chips
-// need the space. mock: show MOCK.
+// need the space. mock: show MOCK. login: who is logged in, short; loginAsked(): its button.
 Rectangle {
     id: bar
     property var chips: []
     property string scenario
     property bool mock: false
+    property string login
+    property string loginLong
+    property bool loginEnabled: true
+    signal loginAsked()
     color: Theme.surface
     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: Theme.line; color: Theme.border }
 
@@ -33,8 +37,18 @@ Rectangle {
         Tag { id: mockTag; visible: bar.mock; text: qsTr("MOCK"); anchors.verticalCenter: parent.verticalCenter }
         Label { text: bar.scenario; color: Theme.textSecondary; font.pixelSize: Theme.caption
                 width: Math.max(0, Math.min(implicitWidth, bar.width - chipRow.x - chipRow.width - clock.width
-                       - (bar.mock ? mockTag.width + Theme.s8 : 0) - Theme.s12 - 2 * Theme.s8))
+                       - (bar.mock ? mockTag.width + Theme.s8 : 0) - loginBtn.width - Theme.s12 - 3 * Theme.s8))
                 anchors.verticalCenter: parent.verticalCenter }
+        BaseButton {
+            id: loginBtn
+            width: Math.max(Theme.touch, loginText.implicitWidth + 2 * Theme.s8)
+            enabled: bar.loginEnabled
+            focusPolicy: Qt.NoFocus
+            onClicked: bar.loginAsked()
+            Accessible.name: qsTr("Login: %1").arg(bar.loginLong)
+            contentItem: Label { id: loginText; text: bar.login; color: bar.loginEnabled ? Theme.textPrimary : Theme.textMuted; horizontalAlignment: Text.AlignHCenter
+                                 font { pixelSize: Theme.caption; weight: Font.DemiBold } }
+        }
         Label {
             id: clock
             mono: true

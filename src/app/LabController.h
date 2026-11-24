@@ -93,6 +93,7 @@ class LabController : public QObject {
   void setWords(const QStringList& words, const QList<double>& conf);
   void addRecording(LabRecording rec, const QString& time);
   void setResult(int id, const QString& text, const QString& resultInfo, const QString& modelConfig);
+  void dropRecording(int id);  // the stored copy was deleted
   void clear();
   void showRecording(int row);  // -1: none
 
