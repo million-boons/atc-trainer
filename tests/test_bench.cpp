@@ -180,6 +180,8 @@ TEST(Action, SeesASwappedClearance) {
   EXPECT_EQ(a("eagle turn left heading zero nine zero"), "turn_left");
   EXPECT_EQ(a("eagle turn right heading zero nine zero"), "turn_right");
   EXPECT_EQ(a("eagle taxi via alpha three"), "");
+  EXPECT_EQ(a("eagle four two one line up runway zero nine"), "line_up");
+  EXPECT_EQ(a("line up cleared for takeoff"), "conflict");
   EXPECT_EQ(a("climb descend"), "conflict");
   EXPECT_EQ(a("runway zero nine left"), "");  // a runway side is not a turn
 }

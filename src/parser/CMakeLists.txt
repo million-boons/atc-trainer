@@ -1,4 +1,10 @@
-# Text to ParsedInstruction (2e, session 93).
-# No sources yet: turn INTERFACE into STATIC with the first .cpp. Qt-free.
-add_library(atc_parser INTERFACE)
-target_link_libraries(atc_parser INTERFACE atc_logic)
+# Text to ParsedInstruction (2e, session 93). Qt-free.
+if(EXISTS ${TP}/json/nlohmann/json.hpp)
+  add_library(atc_parser STATIC Parser.cpp)
+  target_include_directories(atc_parser SYSTEM PRIVATE ${TP}/json)
+  target_link_libraries(atc_parser PUBLIC atc_logic)
+  add_executable(parse_cli ${CMAKE_SOURCE_DIR}/tools/parse_cli.cpp)
+  target_include_directories(parse_cli SYSTEM PRIVATE ${TP}/json)
+  target_link_libraries(parse_cli PRIVATE atc_parser)
+  install(TARGETS parse_cli RUNTIME DESTINATION bin)
+endif()
