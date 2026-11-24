@@ -6,6 +6,7 @@
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
 
+#include "app/ExerciseController.h"
 #include "app/LabController.h"
 #include "app/StatusFeed.h"
 #include "app/SttController.h"
@@ -30,8 +31,9 @@ class DashboardController : public QObject {
   Q_PROPERTY(QStringList missingClips READ missingClips NOTIFY changed)
   Q_PROPERTY(bool pttTesting READ pttTesting NOTIFY changed)
   Q_PROPERTY(LabController* lab READ lab WRITE setLab NOTIFY alertChanged)  // radio alerts; may be null
+  Q_PROPERTY(ExerciseController* exercise READ exercise WRITE setExercise NOTIFY alertChanged)  // may be null
   Q_PROPERTY(QVariantList chips READ chips NOTIFY chipsChanged)     // 5 x {name, value, level}
-  // Footer: the radio alert, then the tiles. Its level is the worse of the two, on every screen.
+  // Footer: the radio alert, the exercise alert, then the tiles. Its level is the worst of them, on every screen.
   Q_PROPERTY(int alertLevel READ alertLevel NOTIFY alertChanged)    // LabController.Level
   Q_PROPERTY(QString alert READ alert NOTIFY alertChanged)
  public:
@@ -45,6 +47,8 @@ class DashboardController : public QObject {
   void setExerciseModel(const QString& id);
   LabController* lab() const { return lab_; }
   void setLab(LabController* l);
+  ExerciseController* exercise() const { return exercise_; }
+  void setExercise(ExerciseController* e);
 
   QVariantList tiles() const { return tiles_; }
   QString readyText() const { return readyText_; }
@@ -79,6 +83,7 @@ class DashboardController : public QObject {
   QPointer<StatusFeed> feed_;
   QPointer<SttController> stt_;
   QPointer<LabController> lab_;
+  QPointer<ExerciseController> exercise_;
   QString model_ = QStringLiteral("whisper-tiny-genprompt");  // D-414
   QVariantList tiles_, chips_;
   QString readyText_, blockText_;

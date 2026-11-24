@@ -106,6 +106,23 @@ TEST_F(Dash, RadioAlertNeverHidesABlockingTile) {
   EXPECT_TRUE(d.alert().contains("PTT missing"));
 }
 
+TEST_F(Dash, ExerciseAlertJoinsTheFooter) {
+  ExerciseController ex;
+  d.setExercise(&ex);
+  ex.begin({}, false, false);
+  ex.setPhase(ExerciseController::Running);
+  ex.setAlert(LabController::Ok, "Text appears after release");
+  EXPECT_EQ(d.alert(), "Text appears after release");
+  ex.setAlert(LabController::Caution, "Line up: attempt 1 INCORRECT");
+  EXPECT_EQ(d.alertLevel(), int(LabController::Caution));
+  in.ptt = PttReady::Missing;
+  in.running = true;
+  send();
+  EXPECT_EQ(d.alertLevel(), int(LabController::Fault));
+  EXPECT_TRUE(d.alert().startsWith("Line up: attempt 1 INCORRECT"));
+  EXPECT_TRUE(d.alert().contains("PTT missing"));
+}
+
 TEST_F(Dash, LevelMeterDoesNotRedrawTheChips) {
   int n = 0;
   QObject::connect(&d, &DashboardController::chipsChanged, [&n] { ++n; });

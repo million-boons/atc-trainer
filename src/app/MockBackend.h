@@ -8,6 +8,7 @@
 #include <optional>
 #include <vector>
 
+#include "app/ExerciseController.h"
 #include "app/LabChecks.h"
 #include "app/LabController.h"
 #include "app/StatusFeed.h"
@@ -23,11 +24,19 @@ class MockBackend : public QObject {
   Q_PROPERTY(QVariantList scripts READ scripts CONSTANT)
   Q_PROPERTY(QString current READ current NOTIFY currentChanged)
   Q_PROPERTY(StatusFeed* status READ status CONSTANT)
+  Q_PROPERTY(ExerciseController* exercise READ exercise CONSTANT)
+  Q_PROPERTY(QVariantList exerciseScripts READ exerciseScripts CONSTANT)
+  Q_PROPERTY(bool assessed MEMBER assessed_ WRITE setAssessed NOTIFY currentChanged)  // Exercise cases only
+  Q_PROPERTY(bool consent MEMBER consent_ WRITE setConsent NOTIFY currentChanged)
  public:
   MockBackend(LabController* lab, SttController* stt, int pilotCutMs, QObject* parent = nullptr);
   QVariantList scripts() const;
   QString current() const { return current_; }
   StatusFeed* status() { return &status_; }
+  ExerciseController* exercise() { return &exercise_; }
+  QVariantList exerciseScripts() const;
+  void setAssessed(bool on);
+  void setConsent(bool on);
   // Fast-forwards a scripted case and freezes it there until the next press.
   Q_INVOKABLE void run(const QString& id);
   // Live: the mock pilot starts speaking now under this rule (interrupt, block, queue).
@@ -44,6 +53,7 @@ class MockBackend : public QObject {
   void syncStatus();                      // PTT and microphone
   void statusTick();                      // 100 ms, running tests only
   void testEdge(bool down);
+  void exerciseEdge(bool down);
   void endPttTest(const QString& note);
   struct Speech { double startMs = 320, endBeforeReleaseMs = 350, gain = 0.292  /* about -12 dBFS */; };
   void goLive();
@@ -68,6 +78,9 @@ class MockBackend : public QObject {
   int pilotCutMs_;
   QTimer timer_;
   StatusFeed status_;
+  ExerciseController exercise_;
+  bool assessed_ = false, consent_ = false;
+  bool exPressed_ = false;    // a press in an Exercise case
   QTimer statusTimer_;
   QElapsedTimer testHold_;
   atc::PttReady pttBase_ = atc::PttReady::StandIn;

@@ -46,6 +46,15 @@ void DashboardController::setLab(LabController* l) {
   refreshAlert();
 }
 
+void DashboardController::setExercise(ExerciseController* e) {
+  if (exercise_ == e) return;
+  if (exercise_) disconnect(exercise_.data(), nullptr, this, nullptr);
+  exercise_ = e;
+  if (e) connect(e, &ExerciseController::changed, this, &DashboardController::refreshAlert);
+  emit alertChanged();
+  refreshAlert();
+}
+
 void DashboardController::setExerciseModel(const QString& id) {
   if (model_ == id) return;
   model_ = id;
@@ -161,11 +170,18 @@ void DashboardController::refresh() {
 }
 
 void DashboardController::refreshAlert() {
-  const int radio = lab_ ? int(lab_->alertLevel()) : 0;
-  const bool radioAlert = radio >= LabController::Caution;
-  const bool readyAlert = readyLevel_ >= LabController::Caution;
-  const int level = std::max(radioAlert ? radio : 0, readyLevel_);
-  const QString text = !radioAlert ? readyAlert_ : !readyAlert ? lab_->alert() : tr("%1  |  %2").arg(lab_->alert(), readyAlert_);
+  QStringList parts;
+  int level = readyLevel_;
+  const auto add = [&](int l, const QString& text) {
+    if (l < LabController::Caution) return;
+    level = std::max(level, l);
+    parts.append(text);
+  };
+  if (lab_) add(lab_->alertLevel(), lab_->alert());
+  const bool exercise = exercise_ && exercise_->phase() != ExerciseController::Idle;
+  if (exercise) add(exercise_->alertLevel(), exercise_->alert());
+  if (readyLevel_ >= LabController::Caution) parts.append(readyAlert_);
+  const QString text = !parts.isEmpty() ? parts.join("  |  ") : exercise ? exercise_->alert() : readyAlert_;
   if (level == alertLevel_ && text == alert_) return;
   alertLevel_ = level;
   alert_ = text;

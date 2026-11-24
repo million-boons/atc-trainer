@@ -1,0 +1,125 @@
+#include <gtest/gtest.h>
+
+#include <QCoreApplication>
+
+#include "app/ExerciseController.h"
+#include "app/ExerciseMock.h"
+#include "app/LabController.h"
+using C = ExerciseController;
+
+namespace {
+QString all(C& c) {  // every text the Exercise screen can show
+  QString s = c.notice() + c.alert() + c.progressText() + c.missedText() + c.clearances().join(' ') + c.clearancesNote();
+  for (const QVariant& v : c.steps()) s += v.toMap()["note"].toString();
+  return s;
+}
+}  // namespace
+
+TEST(Exercise, PracticeShowsTheVerdict) {
+  C c;
+  exercise_mock::show(c, "exwrong", false, false);
+  EXPECT_TRUE(c.notice().contains("INCORRECT"));
+  EXPECT_TRUE(c.alert().contains("INCORRECT"));
+  EXPECT_EQ(c.progressText(), "1 of 3 done");
+  EXPECT_TRUE(all(c).contains("attempts"));
+  EXPECT_EQ(c.clearances().size(), 1);
+}
+
+TEST(Exercise, AssessedHidesItInEveryCase) {
+  for (const QVariant& v : exercise_mock::cases()) {
+    const QString id = v.toMap()["id"].toString();
+    if (id.startsWith("exresult")) continue;
+    C c;
+    exercise_mock::show(c, id, true, false);
+    const QString s = all(c);
+    for (const char* w : {"INCORRECT", "WRONG", "attempt", "not counted", "Not counted", "Suspected", " of 3 done", "Done", "Cleared"})
+      EXPECT_FALSE(s.contains(w)) << id.toStdString() << ": " << w;
+    EXPECT_EQ(c.missedText(), "-");
+    EXPECT_TRUE(c.clearances().isEmpty());
+    for (const QVariant& st : c.steps()) EXPECT_EQ(st.toMap()["state"].toInt(), int(C::Hidden));
+  }
+}
+
+TEST(Exercise, AssessedStillShowsPttAndFaultNotices) {
+  C c;
+  exercise_mock::show(c, "exwd", true, false);
+  EXPECT_EQ(c.noticeLevel(), int(LabController::Fault));
+  EXPECT_EQ(c.alertLevel(), int(LabController::Fault));
+  exercise_mock::show(c, "excut", true, false);
+  EXPECT_FALSE(c.notice().isEmpty());
+}
+
+TEST(Exercise, ResultIsFullInBothModes) {
+  for (bool assessed : {false, true}) {
+    C c;
+    exercise_mock::show(c, "exresult", assessed, false);
+    EXPECT_EQ(c.result()["steps"].toList().size(), 3);
+    EXPECT_EQ(c.timeline()->rowCount(), 9);
+  }
+}
+
+TEST(Exercise, AssessedCannotStartOnPlaceholderText) {
+  C c;
+  int starts = 0;
+  QObject::connect(&c, &C::startRequested, [&](bool) { ++starts; });
+  exercise_mock::show(c, "exstart", false, false);
+  EXPECT_FALSE(c.assessedAvailable());
+  c.start(true);
+  EXPECT_EQ(starts, 0);
+  c.start(false);
+  EXPECT_EQ(starts, 1);
+  exercise_mock::show(c, "exwait", false, false);
+  c.start(false);  // already running
+  EXPECT_EQ(starts, 1);
+}
+
+TEST(Exercise, NoPlaybackWithoutConsent) {
+  C c;
+  int plays = 0;
+  QObject::connect(&c, &C::playRequested, [&](int) { ++plays; });
+  exercise_mock::show(c, "exresult", false, false);
+  c.play(0);
+  EXPECT_EQ(plays, 0);
+  EXPECT_TRUE(c.audioText().contains("no consent"));
+  exercise_mock::show(c, "exresult", false, true);
+  c.play(0);
+  c.play(99);
+  EXPECT_EQ(plays, 1);
+}
+
+TEST(Exercise, UncertainValueIsShownAsHeard) {
+  C c;
+  exercise_mock::show(c, "examb", false, false);
+  const auto* m = c.transcript();
+  const int chips = m->roleNames().key("chips");
+  const QVariantList l = m->data(m->index(1, 0), chips).toList();  // newest first: 0 is the pilot
+  ASSERT_EQ(l.size(), 2);
+  EXPECT_TRUE(l[1].toMap()["uncertain"].toBool());
+  EXPECT_TRUE(l[1].toMap()["value"].toString().contains("0.9"));
+}
+
+TEST(Exercise, TheTimerRedrawsNothingElse) {
+  C c;
+  exercise_mock::show(c, "exwait", false, false);
+  int changes = 0, phases = 0;
+  QObject::connect(&c, &C::changed, [&] { ++changes; });
+  QObject::connect(&c, &C::phaseChanged, [&] { ++phases; });
+  for (int i = 0; i < 10; ++i) c.setWaiting(QString::number(i));
+  EXPECT_EQ(changes + phases, 0);
+}
+
+TEST(Exercise, BeginClearsTheLastOne) {
+  C c;
+  exercise_mock::show(c, "exdone", false, true);
+  c.begin({}, false, false);
+  EXPECT_EQ(c.phase(), C::Idle);
+  EXPECT_EQ(c.transcript()->rowCount(), 0);
+  EXPECT_TRUE(c.clearances().isEmpty());
+  EXPECT_FALSE(c.active());
+}
+
+int main(int argc, char** argv) {
+  testing::InitGoogleTest(&argc, argv);
+  QCoreApplication app(argc, argv);
+  return RUN_ALL_TESTS();
+}

@@ -5,6 +5,7 @@ import Atc
 Rectangle {
     id: mp
     property MockBackend mock
+    property bool exercise: false   // Exercise cases instead of the Lab and Dashboard cases
     width: Theme.px(820); height: col.height + 2 * Theme.s12
     color: Theme.raised
     border { color: Theme.caution; width: 2 * Theme.line }
@@ -19,7 +20,7 @@ Rectangle {
             width: parent.width
             spacing: Theme.px(6)
             Repeater {
-                model: mp.mock.scripts
+                model: mp.exercise ? mp.mock.exerciseScripts : mp.mock.scripts
                 BaseButton { text: modelData.name; font.pixelSize: Theme.caption
                              tint: mp.mock.current === modelData.id ? Theme.caution : Theme.border
                              focusPolicy: Qt.NoFocus
@@ -27,6 +28,16 @@ Rectangle {
             }
         }
         Row {
+            spacing: Theme.px(6)
+            BaseButton { text: mp.exercise ? qsTr("Show Lab and Dashboard cases") : qsTr("Show Exercise cases"); font.pixelSize: Theme.caption
+                         tint: Theme.caution; focusPolicy: Qt.NoFocus; onClicked: mp.exercise = !mp.exercise }
+            BaseButton { visible: mp.exercise; text: mp.mock.assessed ? qsTr("Mode: Assessed (preview)") : qsTr("Mode: Practice")
+                         font.pixelSize: Theme.caption; focusPolicy: Qt.NoFocus; onClicked: mp.mock.assessed = !mp.mock.assessed }
+            BaseButton { visible: mp.exercise; text: mp.mock.consent ? qsTr("Consent on record") : qsTr("No consent")
+                         font.pixelSize: Theme.caption; focusPolicy: Qt.NoFocus; onClicked: mp.mock.consent = !mp.mock.consent }
+        }
+        Row {
+            visible: !mp.exercise
             spacing: Theme.px(6)
             Label { text: qsTr("Live, pilot speaks:"); font.pixelSize: Theme.caption; height: Theme.touch }
             Repeater {
