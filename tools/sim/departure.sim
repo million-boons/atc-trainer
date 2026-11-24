@@ -1,0 +1,8 @@
+# Departure, every instruction correct. Values in {} are the exercise's own.
+wait 6
+say TAXI_INSTRUCTION callsign={callsign} taxiway={taxiway} runway={runway}
+wait 8
+say LINE_UP callsign={callsign} runway={runway}
+wait 4
+say TAKEOFF_CLEARANCE callsign={callsign} runway={runway}
+wait 5

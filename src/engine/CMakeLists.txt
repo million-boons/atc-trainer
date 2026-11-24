@@ -1,4 +1,12 @@
-# Validator, sequence engine, pilot behaviour, result metrics (2b, session 8d).
-# No sources yet: turn INTERFACE into STATIC with the first .cpp. Qt-free.
-add_library(atc_engine INTERFACE)
-target_link_libraries(atc_engine INTERFACE atc_scenario)
+# Validator, sequence engine, pilot behaviour, result metrics (2b, session 8d). Qt-free.
+if(EXISTS ${TP}/json/nlohmann/json.hpp)
+  add_library(atc_engine STATIC Validator.cpp SequenceEngine.cpp ExerciseResult.cpp EventJson.cpp Simulator.cpp)
+  target_include_directories(atc_engine SYSTEM PRIVATE ${TP}/json)
+  target_link_libraries(atc_engine PUBLIC atc_scenario)
+  add_executable(sim_cli ${CMAKE_SOURCE_DIR}/tools/sim_cli.cpp)
+  target_link_libraries(sim_cli PRIVATE atc_engine)
+  install(TARGETS sim_cli RUNTIME DESTINATION bin)
+else()
+  add_library(atc_engine INTERFACE)
+  target_link_libraries(atc_engine INTERFACE atc_scenario)
+endif()
