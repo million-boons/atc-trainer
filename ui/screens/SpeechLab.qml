@@ -6,6 +6,9 @@ Item {
     id: s
     property LabController lab
     property SttController stt
+    property RecordingsController recs
+    property int deleteRow: -1        // waits for confirmation
+    property string deleteWhat
     readonly property int gap: Theme.s12
     readonly property int barH: Theme.px(128)
     readonly property int leftW: Math.round(width * 0.262)
@@ -164,65 +167,10 @@ Item {
     }
 
     // ---- recordings
-    Card {
+    RecordingsCard {
         x: s.width - s.rightW - s.gap; y: s.gap; width: s.rightW; height: s.topH
-        title: qsTr("RECORDINGS")
-        headerItems: Label { anchors.fill: parent; horizontalAlignment: Text.AlignRight
-                             text: qsTr("%1 shown").arg(recList.count); font.pixelSize: Theme.caption }
-        ListView {
-            id: recList
-            anchors { fill: parent; bottomMargin: Theme.px(65) }
-            clip: true
-            reuseItems: true
-            boundsBehavior: Flickable.StopAtBounds
-            model: s.lab.recordings
-            delegate: Rectangle {
-                id: rec
-                required property int index
-                required property int recId
-                required property string time
-                required property string duration
-                required property string text
-                required property int level
-                required property string status
-                required property string result
-                width: recList.width; height: Theme.px(64)
-                color: index === s.lab.selectedRow ? Theme.raised : "transparent"
-                Rectangle { visible: rec.index === s.lab.selectedRow; width: 3 * Theme.line; height: parent.height; color: Theme.accent }
-                Label { x: Theme.s12; y: Theme.px(5); mono: true; font.pixelSize: Theme.caption; text: qsTr("TX %1  %2").arg(rec.recId).arg(rec.time) }
-                Label { anchors { right: parent.right; rightMargin: Theme.s12 } y: Theme.px(5); mono: true; font.pixelSize: Theme.caption
-                        text: rec.duration; color: Theme.textSecondary }
-                Label { x: Theme.s12; y: Theme.px(24); width: parent.width - 2 * x; text: rec.text; font.pixelSize: Theme.small }
-                Row {
-                    x: Theme.s12; y: Theme.px(43)
-                    spacing: Theme.s4
-                    StateIcon { level: rec.level; size: Theme.px(11); anchors.verticalCenter: parent.verticalCenter }
-                    Label { id: recStatus; text: rec.status; color: Theme.levelColor(rec.level); font.pixelSize: Theme.caption }
-                }
-                Label { anchors { right: parent.right; rightMargin: Theme.s12 } y: Theme.px(43)
-                        width: Math.min(implicitWidth, parent.width - recStatus.width - Theme.px(48))
-                        text: rec.result; elide: Text.ElideMiddle; color: Theme.textSecondary; font.pixelSize: Theme.caption }
-                Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: Theme.line; color: Theme.divider }
-                TapHandler { onTapped: s.lab.selectRecording(rec.index) }
-                Accessible.role: Accessible.ListItem
-                Accessible.name: qsTr("Transmission %1, %2").arg(rec.recId).arg(rec.status)
-            }
-        }
-        Rectangle { y: parent.height - Theme.px(65); width: parent.width; height: Theme.line; color: Theme.divider }
-        Row {
-            x: Theme.s12; y: parent.height - Theme.px(57)
-            spacing: Theme.s8
-            SecondaryButton {
-                width: (s.rightW - 2 * Theme.s12 - Theme.s8) / 2
-                text: qsTr("Older")
-                enabled: !recList.atYEnd
-                onClicked: recList.contentY = Math.min(recList.contentY + recList.height,
-                                                       Math.max(0, recList.contentHeight - recList.height))
-            }
-            SecondaryButton { width: (s.rightW - 2 * Theme.s12 - Theme.s8) / 2; text: qsTr("Export")
-                              enabled: false   // off for the slice (D-407)
-                              onClicked: s.lab.exportRequested() }
-        }
+        lab: s.lab; recs: s.recs
+        onDeleteAsked: (row, what) => { s.deleteRow = row; s.deleteWhat = what }
     }
 
     RadioBar {
@@ -230,5 +178,19 @@ Item {
         x: s.gap; y: s.height - height - s.gap; width: s.width - 2 * s.gap; height: s.barH
         lab: s.lab
         onPressing: selector.closeList()
+    }
+
+    Loader {
+        anchors.fill: parent
+        active: s.deleteRow >= 0
+        sourceComponent: Component {
+            ConfirmDialog {
+                title: qsTr("Delete this recording?")
+                text: qsTr("%1\nSound and text are removed from this machine and cannot be brought back. The deletion is logged.").arg(s.deleteWhat)
+                confirmText: qsTr("Delete recording")
+                onConfirmed: { const r = s.deleteRow; s.deleteRow = -1; s.recs.deleteStored(r) }
+                onClosed: s.deleteRow = -1
+            }
+        }
     }
 }

@@ -81,6 +81,18 @@ TEST_F(Dash, MissingPttIsNeverAGreenFooter) {
   EXPECT_TRUE(d.alert().startsWith("Exercise running"));
 }
 
+TEST_F(Dash, MissingPttOnlyWarnsWithTheInstructorOption) {  // D-116
+  in.ptt = PttReady::Missing;
+  send(); agree();
+  EXPECT_EQ(chip(2)["level"].toInt(), int(LabController::Fault));
+  d.setPttFallback(true);
+  agree();
+  EXPECT_EQ(chip(2)["level"].toInt(), int(LabController::Caution));
+  in.ptt = PttReady::NoHold;  // not covered by the option
+  send(); agree();
+  EXPECT_EQ(chip(2)["level"].toInt(), int(LabController::Fault));
+}
+
 TEST_F(Dash, ModelAndBankThatBlockStartAreFaultChips) {
   model(SttState::NotLoaded);
   in.bank = BankReady::NotLoaded;
@@ -154,6 +166,7 @@ TEST_F(Dash, ExerciseAlertJoinsTheFooter) {
   EXPECT_EQ(d.alertLevel(), int(LabController::Fault));
   EXPECT_TRUE(d.alert().startsWith("Line up: attempt 1 INCORRECT"));
   EXPECT_TRUE(d.alert().contains("PTT missing"));
+  EXPECT_FALSE(d.alert().contains("Exercise running"));  // it may be paused
 }
 
 TEST_F(Dash, LevelMeterDoesNotRedrawTheChips) {

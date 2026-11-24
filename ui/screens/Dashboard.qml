@@ -7,6 +7,7 @@ Item {
     property DashboardController dash
     property bool askStop: false
     property bool showClips: false
+    signal settingsAsked()
     readonly property int gap: Theme.s12
     readonly property int fullW: width - 2 * gap
     readonly property var scn: dash.scenario
@@ -116,7 +117,7 @@ Item {
                         font { pixelSize: Theme.h2; weight: Font.DemiBold } }
         DangerButton { width: start.small; height: parent.height; text: qsTr("STOP"); enabled: s.dash.running
                        focusPolicy: Qt.NoFocus; onClicked: s.askStop = true }
-        SecondaryButton { width: start.small; height: parent.height; text: qsTr("Settings (not built)"); enabled: false
+        SecondaryButton { width: start.small; height: parent.height; text: qsTr("Settings"); focusPolicy: Qt.NoFocus; onClicked: s.settingsAsked()
                           font.pixelSize: Theme.small }
         SecondaryButton { width: start.small; height: parent.height; text: qsTr("Last result (not built)"); enabled: false
                           font.pixelSize: Theme.small }

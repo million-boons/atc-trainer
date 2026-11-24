@@ -8,7 +8,7 @@ T.Button {
     property string title
     property string sub
     property bool selected: false
-    implicitHeight: Theme.px(64)
+    implicitHeight: Theme.px(80)   // two lines of sub-text: a reason is never cut off
     focusPolicy: Qt.NoFocus
     Accessible.role: Accessible.RadioButton
     Accessible.name: title
@@ -18,8 +18,8 @@ T.Button {
                     level: !o.enabled ? LabController.Fault : o.selected ? LabController.Ok : 0 }
         Label { x: ic.visible ? ic.x + ic.width + Theme.s8 : Theme.s12; y: Theme.px(8); height: Theme.px(24)
                 text: o.title; font.weight: Font.DemiBold; color: o.enabled ? Theme.textPrimary : Theme.textSecondary }
-        Label { x: Theme.s12; y: Theme.px(32); width: parent.width - 2 * x; height: Theme.px(24)
-                text: o.sub; color: Theme.textSecondary; font.pixelSize: Theme.small }
+        Label { x: Theme.s12; y: Theme.px(34); width: parent.width - 2 * x; height: Theme.px(38)
+                text: o.sub; wrapMode: Text.WordWrap; maximumLineCount: 2; verticalAlignment: Text.AlignTop; color: Theme.textSecondary; font.pixelSize: Theme.small }
     }
     background: Rectangle {
         radius: Theme.radius

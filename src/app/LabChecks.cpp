@@ -20,6 +20,7 @@ LabChecks labChecks(std::span<const std::int16_t> audio, int preRollSamples, TxE
   const QString peak = tr("peak %1 dBFS").arg(r.peakDbfs, 0, 'f', 1);
   LabChecks c;
   c.noSpeech = r.empty;
+  c.report = r;
   // Without pre-roll, speech in the first two frames means it had begun before TX opened (D-24).
   const bool startCut = preRollSamples == 0 && !r.empty && r.keyToSpeechMs && *r.keyToSpeechMs <= 20;
   c.list << (r.empty ? check(L::Caution, tr("No speech"), {})

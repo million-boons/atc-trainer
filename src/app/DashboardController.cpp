@@ -37,6 +37,12 @@ void DashboardController::setStt(SttController* s) {
   refresh();
 }
 
+void DashboardController::setPttFallback(bool on) {
+  if (fallback_ == on) return;
+  fallback_ = on;
+  refresh();
+}
+
 void DashboardController::setLab(LabController* l) {
   if (lab_ == l) return;
   if (lab_) disconnect(lab_.data(), nullptr, this, nullptr);
@@ -85,6 +91,7 @@ void DashboardController::refresh() {
   startEnabled_ = false;
   readyLevel_ = LabController::None;
   readyAlert_.clear();
+  readyShort_.clear();
   if (!feed_) {
     chips_.clear();
     emit changed();
@@ -94,7 +101,7 @@ void DashboardController::refresh() {
   const StatusInputs& in = feed_->inputs();
   const ModelReady model = modelState();
   const Readiness r = readiness({.mic = in.mic, .speaker = in.speaker, .ptt = in.ptt, .model = model, .bank = in.bank,
-                                 .storage = in.storage, .pttMissingBlocks = in.pttMissingBlocks});
+                                 .storage = in.storage, .pttMissingBlocks = in.pttMissingBlocks && !fallback_});
   QStringList blockers;
   const auto add = [&](ReadyTile t, const QString& title, const QString& state, const QString& line1, const QString& line2,
                        const QString& action, bool actionEnabled, const QString& action2 = {}, bool action2Enabled = false) {
@@ -159,6 +166,7 @@ void DashboardController::refresh() {
   const int blocks = r.count(StartEffect::Blocks), warns = r.count(StartEffect::Warns);
   readyLevel_ = status_words::level(blocks ? StartEffect::Blocks : warns ? StartEffect::Warns : StartEffect::Ready);
   const QString more = warns ? tr("; %1 warn").arg(warns) : QString();
+  readyShort_ = in.running && blocks ? blockers.join(", ") + more : in.running && warns ? tr("%1 warn").arg(warns) : QString();
   if (in.running)
     readyAlert_ = blocks ? tr("Exercise running: %1%2").arg(blockers.join(", "), more)
                   : warns ? tr("Exercise running; %1 warn").arg(warns) : tr("Exercise running");
@@ -183,7 +191,8 @@ void DashboardController::refreshAlert() {
   if (lab_) add(lab_->alertLevel(), lab_->alert());
   const bool exercise = exercise_ && exercise_->phase() != ExerciseController::Idle;
   if (exercise) add(exercise_->alertLevel(), exercise_->alert());
-  if (readyLevel_ >= LabController::Caution) parts.append(readyAlert_);
+  // Beside an alert of the exercise (it may be paused) "Exercise running" would be wrong.
+  if (readyLevel_ >= LabController::Caution) parts.append(parts.isEmpty() || readyShort_.isEmpty() ? readyAlert_ : readyShort_);
   const QString text = !parts.isEmpty() ? parts.join("  |  ") : exercise ? exercise_->alert() : readyAlert_;
   if (level == alertLevel_ && text == alert_) return;
   alertLevel_ = level;

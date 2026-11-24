@@ -35,6 +35,13 @@ class RowModel : public QAbstractListModel {
     rows_[row][col] = std::move(v);
     emit dataChanged(index(row), index(row));
   }
+  void remove(int row) {
+    if (row < 0 || row >= rows_.size()) return;
+    beginRemoveRows({}, row, row);
+    rows_.removeAt(row);
+    endRemoveRows();
+  }
+  const QVariantList& row(int i) const { return rows_[i]; }
   void reset(QList<QVariantList> rows = {}) {
     beginResetModel();
     rows_ = std::move(rows);

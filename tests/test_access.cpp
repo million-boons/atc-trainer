@@ -26,6 +26,7 @@ TEST(Access, GuardWaitsAfterFiveWrongPins) {
   for (int i = 0; i < 4; ++i) {
     g.failed(t);
     EXPECT_TRUE(g.allowed(t));
+    EXPECT_EQ(g.triesLeft(), 4 - i);
   }
   g.failed(t);
   EXPECT_FALSE(g.allowed(t));

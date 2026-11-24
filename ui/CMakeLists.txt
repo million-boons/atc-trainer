@@ -6,12 +6,7 @@ qt_add_executable(atc_trainer ${APP}/main.cpp)
 target_include_directories(atc_trainer PRIVATE ${CMAKE_SOURCE_DIR}/src ${APP})
 
 set_source_files_properties(theme/Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
-qt_add_qml_module(atc_trainer
-  URI Atc
-  VERSION 1.0
-  RESOURCE_PREFIX /
-  OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/qml/Atc
-  QML_FILES
+set(ATC_QML
     Main.qml
     theme/Theme.qml
     components/Label.qml components/StateIcon.qml components/Card.qml components/BaseButton.qml
@@ -22,22 +17,43 @@ qt_add_qml_module(atc_trainer
     components/ModelSelector.qml
     components/DangerButton.qml components/StatusTile.qml components/ConfirmDialog.qml
     components/RadioBar.qml components/ModalPanel.qml components/OptionButton.qml components/ParamChip.qml
+    components/TextEntry.qml components/KeyPad.qml components/ChoiceButton.qml components/SwitchRow.qml components/LoginDialog.qml
+    components/PersonDialog.qml components/RecordingsCard.qml
     components/TranscriptEntry.qml components/StepRow.qml components/SectionHeader.qml
-    screens/SpeechLab.qml screens/Dashboard.qml screens/Exercise.qml screens/Result.qml
-    mock/MockPanel.qml
-  SOURCES
+    screens/SpeechLab.qml screens/Dashboard.qml screens/Exercise.qml screens/Result.qml screens/Settings.qml
+    mock/MockPanel.qml)
+set(ATC_QML_SOURCES
     ${APP}/RowModel.h ${APP}/LabController.h ${APP}/LabController.cpp
     ${APP}/SttController.h ${APP}/SttController.cpp
     ${APP}/StatusFeed.h ${APP}/StatusWords.h ${APP}/DashboardController.h ${APP}/DashboardController.cpp
     ${APP}/ExerciseController.h ${APP}/ExerciseController.cpp ${APP}/ExerciseMock.h ${APP}/ExerciseMock.cpp
+    ${APP}/AccessController.h ${APP}/AccessController.cpp ${APP}/SettingsController.h ${APP}/SettingsController.cpp
+    ${APP}/RecordingsController.h ${APP}/RecordingsController.cpp ${APP}/AccessBackends.h ${APP}/AccessBackends.cpp
     ${APP}/LabChecks.h ${APP}/LabChecks.cpp
     ${APP}/Painted.h ${APP}/Painted.cpp ${APP}/MockBackend.h ${APP}/MockBackend.cpp)
-
-qt_add_resources(atc_trainer fonts PREFIX /Atc FILES
+set(ATC_FONTS
   fonts/Inter-Regular.otf fonts/Inter-SemiBold.otf fonts/Inter-Bold.otf
   fonts/JetBrainsMono-Regular.ttf fonts/JetBrainsMono-Bold.ttf)
 
+qt_add_qml_module(atc_trainer
+  URI Atc
+  VERSION 1.0
+  RESOURCE_PREFIX /
+  OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/qml/Atc
+  QML_FILES ${ATC_QML}
+  SOURCES ${ATC_QML_SOURCES})
+
+qt_add_resources(atc_trainer fonts PREFIX /Atc FILES ${ATC_FONTS})
+
 target_link_libraries(atc_trainer PRIVATE atc_logic Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick)
+if(TARGET atc_storage)
+  target_link_libraries(atc_trainer PRIVATE atc_storage)
+  target_compile_definitions(atc_trainer PRIVATE ATC_HAVE_STORAGE)
+endif()
+if(TARGET atc_pin)
+  target_link_libraries(atc_trainer PRIVATE atc_pin)
+  target_compile_definitions(atc_trainer PRIVATE ATC_HAVE_PIN)
+endif()
 if(TARGET atc_stt)
   target_link_libraries(atc_trainer PRIVATE atc_stt)
   target_compile_definitions(atc_trainer PRIVATE ATC_HAVE_STT)
@@ -52,4 +68,27 @@ if(TARGET atc_stt AND TARGET atc_pulse AND TARGET atc_evdev)
     ${APP}/StatusController.h ${APP}/StatusController.cpp)
   target_link_libraries(atc_trainer PRIVATE atc_devices)
   target_compile_definitions(atc_trainer PRIVATE ATC_HAVE_LIVE)
+endif()
+
+# The same QML with the mock backend, driven off-screen. Needs Qt6Test (C++); the QML module QtTest is not needed.
+if(ATC_BUILD_TESTS)
+  find_package(Qt6 6.2 QUIET COMPONENTS Test)
+  find_package(GTest REQUIRED)
+  if(Qt6Test_FOUND)
+    enable_testing()
+    include(GoogleTest)
+    qt_add_executable(ui_tests ${CMAKE_SOURCE_DIR}/tests/app/test_ui.cpp)
+    target_include_directories(ui_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${APP})
+    qt_add_qml_module(ui_tests
+      URI Atc
+      VERSION 1.0
+      RESOURCE_PREFIX /
+      OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/qml_test/Atc
+      NO_CACHEGEN
+      QML_FILES ${ATC_QML}
+      SOURCES ${ATC_QML_SOURCES})
+    qt_add_resources(ui_tests test_fonts PREFIX /Atc FILES ${ATC_FONTS})
+    target_link_libraries(ui_tests PRIVATE atc_logic Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Test GTest::gtest Threads::Threads)
+    gtest_discover_tests(ui_tests PROPERTIES TIMEOUT 180)
+  endif()
 endif()

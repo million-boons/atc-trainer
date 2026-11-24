@@ -21,6 +21,7 @@ class LoginGuard {
   explicit LoginGuard(int tries = 5, Ns wait = ms(60'000)) : tries_(tries), wait_(wait) {}
   Ns left(Ns now) const { return now < until_ ? until_ - now : 0; }
   bool allowed(Ns now) const { return left(now) == 0; }
+  int triesLeft() const { return tries_ - fails_; }
   void failed(Ns now) {
     if (++fails_ < tries_) return;
     fails_ = 0;

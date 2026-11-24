@@ -59,6 +59,11 @@ class ExerciseController : public QObject {
 
   // Setters for the backend. verdict: true for text that tells the trainee how the step was judged.
   void begin(ExerciseContext c, bool assessed, bool consent, const QString& preview = {});  // clears everything else
+  // Only from a backend that really stores the exercise audio. Before that the screens never claim it.
+  void setAudioConnected() {
+    audioConnected_ = true;
+    emit changed();
+  }
   void setPhase(Phase p);
   void setSteps(QList<ExerciseStep> s, int done);
   void setMissed(QStringList names);
@@ -82,8 +87,10 @@ class ExerciseController : public QObject {
   QString preview() const { return preview_; }
   bool assessedAvailable() const { return !ctx_.placeholder; }
   QString assessedNote() const;
-  bool audioSaved() const { return consent_; }
-  QString audioText() const { return consent_ ? tr("Saved on this machine only") : tr("Exercise audio not saved: no consent"); }
+  bool audioSaved() const { return consent_ && audioConnected_; }
+  QString audioText() const {
+    return audioSaved() ? tr("Saved on this machine only") : !consent_ ? tr("Exercise audio not saved: no consent") : tr("Exercise audio not saved: not connected yet");
+  }
   QStringList clearances() const { return hide() ? QStringList() : clearances_; }
   QString clearancesNote() const { return hide() ? tr("Shown in the debrief") : clearances_.isEmpty() ? tr("None yet") : QString(); }
   QVariantList steps() const;
@@ -133,7 +140,7 @@ class ExerciseController : public QObject {
 
   Phase phase_ = Idle;
   ExerciseContext ctx_;
-  bool assessed_ = false, consent_ = false;
+  bool assessed_ = false, consent_ = false, audioConnected_ = false;
   QString preview_, waiting_;
   QStringList clearances_, missed_;
   QList<ExerciseStep> steps_;

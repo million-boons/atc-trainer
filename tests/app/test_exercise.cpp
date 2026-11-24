@@ -73,7 +73,7 @@ TEST(Exercise, AssessedCannotStartOnPlaceholderText) {
   EXPECT_EQ(starts, 1);
 }
 
-TEST(Exercise, NoPlaybackWithoutConsent) {
+TEST(Exercise, NoPlaybackWithoutConsentOrStoredAudio) {
   C c;
   int plays = 0;
   QObject::connect(&c, &C::playRequested, [&](int) { ++plays; });
@@ -82,6 +82,12 @@ TEST(Exercise, NoPlaybackWithoutConsent) {
   EXPECT_EQ(plays, 0);
   EXPECT_TRUE(c.audioText().contains("no consent"));
   exercise_mock::show(c, "exresult", false, true);
+  c.play(0);  // consent, but nothing stores the audio
+  EXPECT_EQ(plays, 0);
+  EXPECT_FALSE(c.audioSaved());
+  EXPECT_TRUE(c.audioText().contains("not connected yet"));
+  c.setAudioConnected();
+  EXPECT_TRUE(c.audioSaved());
   c.play(0);
   c.play(99);
   EXPECT_EQ(plays, 1);
