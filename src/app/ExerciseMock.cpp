@@ -25,15 +25,15 @@ void lineUp(ExerciseController& c) {
   c.addPilot("10:43:08", "line up runway 09, EAGLE-421");
 }
 
-QVariantMap stepRow(const QString& name, int level, const QString& outcome, int attempts, const QString& errors, const QString& response, const QString& again) {
-  return {{"name", name}, {"level", level}, {"outcome", outcome}, {"attempts", attempts}, {"errors", errors}, {"response", response}, {"sayAgain", again}};
+QVariantMap stepRow(const QString& name, int level, const QString& outcome, int attempts, const QString& errors, const QString& response, const QString& again, const QString& missed = "0") {
+  return {{"name", name}, {"level", level}, {"outcome", outcome}, {"attempts", attempts}, {"errors", errors}, {"response", response}, {"sayAgain", again}, {"missed", missed}};
 }
 
 void result(ExerciseController& c, bool stopped) {
   const auto row = [](const QString& name, const QString& value) { return QVariantMap{{"name", name}, {"value", value}}; };
   QVariantList steps{stepRow("1 Taxi", L::Ok, t("Correct"), 1, t("none"), "4.1 s", "0")};
   if (stopped)
-    steps << stepRow("2 Line up", L::Caution, t("Not completed"), 2, t("INCORRECT runway"), "6.0 s", "1")
+    steps << stepRow("2 Line up", L::Caution, t("Not completed"), 2, t("INCORRECT runway"), "6.0 s", "1", "1, 30.0 s")
           << stepRow("3 Takeoff", L::None, t("Not reached"), 0, "-", "-", "0");
   else
     steps << stepRow("2 Line up", L::Ok, t("Correct"), 3, t("INCORRECT runway"), "5.2 s", "1")
@@ -55,8 +55,9 @@ void result(ExerciseController& c, bool stopped) {
   }
   c.setResult(QVariantMap{{"title", stopped ? t("STOPPED BY INSTRUCTOR") : t("COMPLETED")},
                {"level", int(stopped ? L::Caution : L::Ok)},
-               {"sub", t("Departure 01   EAGLE-421   24 Nov 10:41 to 10:44")},
+               {"sub", t("S01   Departure 01   EAGLE-421   24 Nov 10:41 to 10:44")},
                {"stepsDone", stopped ? t("1 of 3") : t("3 of 3")},
+               {"missed", stopped ? "1" : "0"},
                {"duration", "3:17"},
                {"steps", steps},
                {"ptt", ptt},
@@ -98,7 +99,7 @@ QVariantList cases() {
 void show(ExerciseController& c, const QString& id, bool assessed, bool consent) {
   using C = ExerciseController;
   c.begin({.scenario = t("Departure 01"), .callsign = "EAGLE-421", .runway = "09", .taxiway = "A3", .type = "C295",
-           .rule = t("interrupt"), .model = "Whisper tiny + generated prompt", .placeholder = true},
+           .rule = t("interrupt"), .model = "Whisper tiny + generated prompt", .trainee = "S01", .placeholder = true},
           assessed, consent, assessed ? t("PREVIEW: Assessed is off in the slice (placeholder text)") : QString());
   const auto steps = [&c](int done, int a, int b, int d) { c.setSteps({{t("Taxi"), a}, {t("Line up"), b}, {t("Takeoff"), d}}, done); };
   const QString cTaxi = t("Taxi via A3, runway 09"), cLine = t("Line up runway 09"), cGo = t("Cleared for takeoff 09");
@@ -162,7 +163,7 @@ void show(ExerciseController& c, const QString& id, bool assessed, bool consent)
     call(c); taxi(c);
     c.addNote(L::Caution, t("No ATC call for 30 s"));
     c.setWaiting({});
-    c.setChoice(t("Line up"), 2);
+    c.setChoice(t("No ATC call"), t("Line up: 2 pilot calls without an ATC call."));
   } else if (id == "excut") {
     call(c); taxi(c);
     c.setNotice(L::Caution, t("You keyed over the pilot. The reply will be repeated."));

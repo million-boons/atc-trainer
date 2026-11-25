@@ -116,6 +116,28 @@ TEST_F(Login, WithoutAPinThereIsNoInstructor) {
   EXPECT_EQ(a->role(), Role::None);
 }
 
+TEST_F(Login, ConfirmingWithThePinDoesNotLogIn) {  // D-125
+  int confirmed = 0, logins = 0;
+  QObject::connect(a.get(), &AccessController::confirmed, [&] { ++confirmed; });
+  QObject::connect(a.get(), &AccessController::loggedIn, [&] { ++logins; });
+  a->loginTrainee("S01");
+  lab.setTx(TxDisplay::Tx, 1);  // also during a transmission
+  a->confirmInstructor("111111");
+  drain();
+  EXPECT_EQ(confirmed, 0);
+  EXPECT_TRUE(a->message().contains("4 tries left"));
+  a->confirmInstructor("482913");
+  drain();
+  EXPECT_EQ(confirmed, 1);
+  EXPECT_EQ(logins, 1);  // the trainee
+  EXPECT_TRUE(a->trainee());
+  EXPECT_EQ(a->personId(), "S01");
+  for (int i = 0; i < 5; ++i) { a->confirmInstructor("111111"); drain(); }  // the same guard as the login
+  a->confirmInstructor("482913");
+  drain();
+  EXPECT_EQ(confirmed, 1);
+}
+
 TEST_F(Login, RefusedWhileTransmitting) {
   lab.setTx(TxDisplay::Tx, 1);
   EXPECT_FALSE(a->loginTrainee("S01"));

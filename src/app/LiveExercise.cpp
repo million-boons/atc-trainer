@@ -59,7 +59,8 @@ void LiveExercise::connectRadio(ExerciseRadio radio, ExerciseStatus status, Stat
   radio_ = std::move(radio);
   status_ = std::move(status);
   connect(feed, &StatusFeed::startExerciseRequested, this, &LiveExercise::prepare);
-  connect(feed, &StatusFeed::stopExerciseRequested, this, [this] { if (radio_.stop) radio_.stop(); });
+  connect(feed, &StatusFeed::stopExerciseRequested, &c_, &ExerciseController::stop);
+  if (access_) connect(access_.data(), &AccessController::confirmed, &c_, &ExerciseController::endConfirmed);
   if (cfg_.check) return checked(cfg_.check(cfg_.scenarioFile));
   check_ = std::make_unique<ExerciseCheck>(cfg_.data, cfg_.voices, [this](const CheckResult& r) { ui([this, r] { checked(r); }); });
   check_->select(cfg_.scenarioFile);
@@ -90,7 +91,8 @@ void LiveExercise::prepare() {
   const auto p = c_.phase();
   if (!ready_ || (p != ExerciseController::Idle && p != ExerciseController::Result)) return;
   view_.prepare({.exercise = ready_.exercise, .seed = seed_,
-                 .model = stt_ ? stt_->nameOf(cfg_.model) : q(cfg_.model), .consent = access_ && access_->consent()});
+                 .model = stt_ ? stt_->nameOf(cfg_.model) : q(cfg_.model), .trainee = access_ && access_->trainee() ? access_->personId() : QString(),
+                 .consent = access_ && access_->consent()});
   emit c_.screenRequested("ex");
 }
 

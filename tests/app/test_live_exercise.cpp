@@ -186,6 +186,35 @@ TEST_F(View, MissedCallsAskTheInstructorAndContinueCallsAgain) {  // D-125
   EXPECT_EQ(c.progressText(), "1 of 3 done");
 }
 
+TEST_F(View, MissedResponsesAreTheirOwnMetric) {  // D-127, D-424
+  go();
+  sim->wait(ms(70'000));  // two calls unanswered
+  say(right("TAXI"));
+  sim->stop();
+  finish();
+  const QVariantMap taxi = c.result()["steps"].toList()[0].toMap();
+  EXPECT_EQ(taxi["missed"].toString(), "2, 60.0 s");
+  EXPECT_EQ(taxi["errors"].toString(), "none");  // not an incorrect instruction
+  EXPECT_EQ(taxi["outcome"].toString(), "Correct");
+  const QString response = taxi["response"].toString();  // from the first unanswered call
+  EXPECT_GT(response.section(' ', 0, 0).toDouble(), 60.0) << response.toStdString();
+  EXPECT_EQ(c.result()["missed"].toString(), "2");
+  int rows = 0;
+  for (int i = 0; i < c.timeline()->rowCount(); ++i) rows += cell(c.timeline(), i, 3).toString() == "MISSED RESPONSE";
+  EXPECT_EQ(rows, 2);
+  EXPECT_TRUE(c.result()["sub"].toString().startsWith("Guest"));
+}
+
+TEST_F(View, AStepNeverAnsweredShowsAtLeastTheSilence) {
+  go();
+  sim->wait(ms(40'000));
+  sim->stop();
+  finish();
+  const QVariantMap taxi = c.result()["steps"].toList()[0].toMap();
+  EXPECT_EQ(taxi["missed"].toString(), "1, 30.0 s");
+  EXPECT_EQ(taxi["response"].toString(), "> 30.0 s");
+}
+
 TEST_F(View, WaitingCountsFromTheQuietChannel) {
   go();
   EXPECT_EQ(c.waitingText(), "00:00");
@@ -227,6 +256,10 @@ TEST_F(View, ARecogniserFaultIsASystemFaultCountedOnce) {
   v.output(sim->now(), j);
   EXPECT_TRUE(c.notice().contains("Not your error"));
   EXPECT_FALSE(c.notice().contains("Step not advanced"));
+  for (const QVariant& s : c.steps()) EXPECT_FALSE(s.toMap()["note"].toString().contains("attempts"));  // D-317
+  v.output(sim->now(), out::InstructorAlert{"system faults", true});
+  EXPECT_TRUE(c.choiceTitle().contains("Speech recognition")) << c.choiceTitle().toStdString();
+  v.input(sim->now(), in::InstructorContinue{});
   sim->stop();
   finish();
   EXPECT_EQ(c.result()["speech"].toList()[2].toMap()["value"].toString(), "1");

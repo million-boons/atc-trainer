@@ -410,6 +410,25 @@ TEST_F(Ui, InstructorChoiceLeavesTheRadioBarFree) {  // D-125
   EXPECT_FALSE(mock->exercise()->choice());
 }
 
+TEST_F(Ui, EndInAssessedNeedsTheInstructorPin) {  // D-125
+  load();
+  mock->setAssessed(true);
+  run("exchoice");
+  clickButton("End exercise");
+  EXPECT_TRUE(allText().contains("instructor PIN"));
+  pinWithKeypad("111111");
+  clickButton("End exercise");
+  waitLogin();
+  EXPECT_EQ(mock->exercise()->phase(), C::Running);
+  EXPECT_TRUE(allText().contains("4 tries left"));
+  pinWithKeypad("123456");
+  clickButton("End exercise");
+  waitLogin();
+  settle(200);
+  EXPECT_EQ(mock->exercise()->phase(), C::Result);
+  EXPECT_FALSE(access.instructor());
+}
+
 TEST_F(Ui, DashboardStartOpensTheDialog) {
   load();
   run("dashready");

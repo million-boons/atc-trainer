@@ -121,7 +121,7 @@ Window {
             anchors { top: status.bottom; bottom: alert.top; left: nav.right; right: parent.right }
             active: root.ex !== null && (root.screen_ === "ex" || root.exActive)   // stays loaded during an exercise
             visible: root.screen_ === "ex"
-            sourceComponent: Component { Exercise { lab: root.lab; ex: root.ex; canStart: root.mock !== null || dashCtl.startEnabled } }
+            sourceComponent: Component { Exercise { lab: root.lab; ex: root.ex; access: root.access; canStart: root.mock !== null || dashCtl.startEnabled } }
         }
         Loader {
             anchors { top: status.bottom; bottom: alert.top; left: nav.right; right: parent.right }

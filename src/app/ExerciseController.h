@@ -9,6 +9,7 @@
 
 struct ExerciseContext {
   QString scenario, callsign, runway, taxiway, type, rule, model;
+  QString trainee;  // ID; empty: guest, without history and audio (D-127)
   bool placeholder = true;  // some text is unvalidated: no Assessed mode (P-11)
 };
 
@@ -45,6 +46,7 @@ class ExerciseController : public QObject {
   Q_PROPERTY(QString notice READ notice NOTIFY changed)
   // The pilot's calls are used up and the instructor decides (D-424, D-125).
   Q_PROPERTY(bool choice READ choice NOTIFY changed)
+  Q_PROPERTY(QString choiceTitle READ choiceTitle NOTIFY changed)
   Q_PROPERTY(QString choiceText READ choiceText NOTIFY changed)
   Q_PROPERTY(QVariantMap result READ result NOTIFY resultChanged)
   Q_PROPERTY(QAbstractItemModel* transcript READ transcript CONSTANT)  // newest first
@@ -73,8 +75,9 @@ class ExerciseController : public QObject {
   void setWaiting(const QString& t);
   void setNotice(int level, const QString& t, bool verdict = false);
   void setAlert(int level, const QString& t, bool verdict = false);
-  void setChoice(const QString& step, int pilotCalls);  // also the trainee's "Instructor notified"
+  void setChoice(const QString& title, const QString& text);  // text is hidden in Assessed; also the trainee's "Instructor notified"
   void clearChoice();
+  void endConfirmed();  // the instructor's PIN was right (Assessed, D-125)
   // chips: list of {value, uncertain}. An uncertain value is passed as heard and never corrected.
   void addAtc(const QString& time, const QString& text, const QString& intent, const QVariantList& chips, const QString& cls, bool recognised, const QString& delay);
   void addPilot(const QString& time, const QString& text);
@@ -91,9 +94,10 @@ class ExerciseController : public QObject {
   QString preview() const { return preview_; }
   bool assessedAvailable() const { return !ctx_.placeholder; }
   QString assessedNote() const;
-  bool audioSaved() const { return consent_ && audioConnected_; }
+  QString who() const { return ctx_.trainee.isEmpty() ? tr("Guest") : ctx_.trainee; }
+  bool audioSaved() const { return consent_ && audioConnected_ && !ctx_.trainee.isEmpty(); }
   QString audioText() const {
-    return audioSaved() ? tr("Saved on this machine only") : !consent_ ? tr("Exercise audio not saved: no consent") : tr("Exercise audio not saved: not connected yet");
+    return audioSaved() ? tr("Saved on this machine only") : ctx_.trainee.isEmpty() ? tr("Exercise audio not saved: guest") : !consent_ ? tr("Exercise audio not saved: no consent") : tr("Exercise audio not saved: not connected yet");
   }
   QStringList clearances() const { return hide() ? QStringList() : clearances_; }
   QString clearancesNote() const { return hide() ? tr("Shown in the debrief") : clearances_.isEmpty() ? tr("None yet") : QString(); }
@@ -106,14 +110,15 @@ class ExerciseController : public QObject {
   int alertLevel() const;  // footer
   QString alert() const;
   bool choice() const { return choice_ && phase_ == Running; }
-  QString choiceText() const;
+  QString choiceTitle() const { return choiceTitle_; }
+  QString choiceText() const { return hide() ? QString() : choiceText_; }
   QVariantMap result() const { return phase_ == Result ? result_ : QVariantMap(); }
   QAbstractItemModel* transcript() { return &transcript_; }
   QAbstractItemModel* timeline() { return &timeline_; }
 
   Q_INVOKABLE void start(bool assessed);  // refused if the mode is not available
   Q_INVOKABLE void cancelStart() { emit cancelStartRequested(); }
-  Q_INVOKABLE void stop();
+  Q_INVOKABLE void stop();  // refused while a choice is open in Assessed: the PIN is needed
   Q_INVOKABLE void continueExercise();  // the pilot calls again
   Q_INVOKABLE void showResult();
   Q_INVOKABLE void useScreenPtt();
@@ -155,8 +160,7 @@ class ExerciseController : public QObject {
   int done_ = 0;
   Line notice_, alert_;
   bool choice_ = false;
-  QString choiceStep_;
-  int choiceCalls_ = 0;
+  QString choiceTitle_, choiceText_;
   QVariantMap result_;
   RowModel transcript_, timeline_;
 };

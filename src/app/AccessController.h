@@ -67,6 +67,8 @@ class AccessController : public QObject {
 
   Q_INVOKABLE bool loginTrainee(const QString& id);
   Q_INVOKABLE void loginInstructor(const QString& pin);  // answer: changed(), loggedIn()
+  // The PIN without a login, e.g. to end an assessed exercise (D-125): confirmed(). Also during a transmission.
+  Q_INVOKABLE void confirmInstructor(const QString& pin);
   Q_INVOKABLE bool logout();
   Q_INVOKABLE void clearMessage();
   // Instructor only. False: message says why.
@@ -76,13 +78,15 @@ class AccessController : public QObject {
  signals:
   void changed();
   void loggedIn();
+  void confirmed();
 
  private:
   bool refuse(const QString& why);
   bool onAir() const { return lab_ && (lab_->txTone() == LabController::Active || lab_->txTone() == LabController::Busy); }
   bool transmitting();  // true: refused, with the reason
   bool done(const std::string& why);
-  void pinChecked(bool ok);
+  void checkPin(const QString& pin, bool login);
+  void pinChecked(bool ok, bool login);
 
   AccessBackend b_;
   std::function<atc::Ns()> clock_;

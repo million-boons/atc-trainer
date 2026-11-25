@@ -38,6 +38,7 @@ class MockBackend : public QObject {
   QVariantList exerciseScripts() const;
   void attach(AccessController* a, RecordingsController* r) {
     access_ = a;
+    connect(a, &AccessController::confirmed, &exercise_, &ExerciseController::endConfirmed);
     recordings_ = r;
     r->setConnected();
     r->setPlayer([this](std::vector<std::int16_t>, int) { lab_->setNotice(LabController::Caution, tr("Mock backend: no audio playback.")); });
