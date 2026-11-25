@@ -53,7 +53,7 @@ Stop in Assessed needs the PIN (D-129): built in `ExerciseController`, a rule an
 
 ## 5 Phraseology Studio
 
-Instructor only (D-25). Logic is engine's (`atc-scenario-pilot-engine`); the list is for whoever builds it.
+Instructor only (D-25). Built first, after 3b (D-136): screens and tests ui, backend b2, manifest fields engine.
 
 | Need | Fields or action | Exists |
 |---|---|---|
@@ -70,11 +70,37 @@ Speakers (D-132): only a person with a record and consent "yes"; the instructor 
 
 Consent withdrawn (D-133), or "re-consent needed" (D-135): the bank, the coverage check and the player must leave those takes out **at once**: a clip with no other take is then missing, and Start is blocked. The running program must notice the change (P: LiveExercise asks for a new check when an answer changes; not during an exercise, where no record can be changed). The Studio lists them "Consent withdrawn – delete or replace"; deletion by the instructor is logged first.
 
+### Studio interface (proposed, for b2)
+
+As with login and recordings: `StudioController` (ui, GUI thread, state and texts) and `StudioBackend` (b2, a struct of `std::function`), so that the screens and tests run on a mock. Every action answers with an empty text or the reason; slow ones through a callback queued to the GUI thread. Names are proposals.
+
+| Function | Does | Refuses |
+|---|---|---|
+| `load()` | replies and intents with status, sopRef, validated_by, validated_at, "used by"; scenarios; pools; people who may record | – |
+| `preview(replyId, text)` | segments, lint, "say this", and which clips become missing or unused. Pure, no writing | unreadable template |
+| `saveReply(reply)`, `addReply`, `saveIntent` | writes the file in one step, keeps its order; a change of text returns the entry to Draft | placeholder file and Validated; Validated without sopRef; not the instructor; the file changed on disk since `load()` |
+| `clips(scenario)` | needed and unused clips: id, words of the data, words of the manifest, state M / P / A, takes (id, file, take, speaker, duration, level, warnings, trim, state: active, pending, consent withdrawn) | – |
+| `startSession(speaker)`, `endSession()` | recording mode of RadioCore: the microphone is used, no transmission can open | not the instructor; `mayRecordPilot` false (D-132, D-133, D-135); an exercise or a transmission is open; no microphone |
+| `record(clipId)`, `stopRecord()` | raw take at 16 kHz into `pending`, trimmed by SilenceTrimmer (`trimClip`): kept part, level, warnings. With "Pedal" on, the pedal starts and stops it; it never transmits | no session; consent changed since the start (checked again **before the take is saved**); disk below the limit |
+| `setTrim(take, start, end)` | trim again from the raw samples | – |
+| `play(take, raw / trimmed / radio / sentence)`, `stopPlay()` | `playLocal` | the radio is in use |
+| `accept(take, primary / alternate)` | pending → bank, manifest written in one step, at most one primary | consent not valid now; role |
+| `reject(take)`, `deleteTake(take)` | reject keeps the file; delete is logged first (D-133) | role; the log cannot be written |
+
+Events from the backend: level (at most 25 per second), elapsed, recording stopped (also by: microphone lost, time limit, log-out, window closed), take ready, session ended with the reason, clips changed (so that Dashboard and Start check again).
+
+Rules to keep in the backend, not only on the screen:
+- A session ends when the instructor logs out (also after 10 min idle, D-120) or an answer changes. Idle log-out during a take: the take is stopped and kept as pending (P).
+- The session's speaker is chosen in the session; nobody's login changes.
+- **PTT is never blocked by the Studio:** outside a session the pedal transmits nothing on this screen but stays alive; in a session with "Pedal" off a press does nothing; leaving the screen ends the session.
+- The waveform gets peaks (at most 1000 pairs), not samples.
+- Nothing the Studio writes is in git: audio outside the work tree (D-31, D-418). `data/phraseology` **is** in git: in an installed program it is read-only, so saving needs a writable copy. Open question G-3.
+
 ## Order and dependencies
 
-1. 5d: folder scan and the three kept fields (engine's loader), the rest is mine.
-2. 5e: log reader, store with H-1 and guests, review file, delete.
-3. 5f: device lists, learning, PIN change, About.
-4. Studio: writing, pending folder, record mode.
+1. Studio (D-136): writing, pending folder, record mode, consent checks.
+2. 5d: folder scan and the three kept fields (engine's loader), the rest is mine.
+3. 5e: log reader, store with H-1 and guests, review file, delete.
+4. 5f: device lists, learning, PIN change, About.
 
 Until a backend exists a screen runs on the mock, and a live build says in its navigation entry why it is off.
