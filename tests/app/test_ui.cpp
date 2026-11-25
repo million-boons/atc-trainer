@@ -830,7 +830,11 @@ TEST_F(Ui, ADialogIsClosedWhenTheInstructorLogsOut) {
 TEST_F(Ui, SomebodyElseIsWarnedInTheStartDialog) {  // D-142
   load();
   run("dashready");
-  mock->exercise()->begin({.scenario = "Departure 01", .trainee = "S01", .plan = ExercisePlan{"Departure S02", "S02", false, 2}}, false, false);
+  ExerciseContext x;
+  x.scenario = "Departure 01";
+  x.trainee = "S01";
+  x.plan = ExercisePlan{"Departure S02", "S02", false, 2};
+  mock->exercise()->begin(x, false, false);
   mock->exercise()->setPhase(C::Starting);
   emit mock->exercise()->screenRequested("ex");
   settle();

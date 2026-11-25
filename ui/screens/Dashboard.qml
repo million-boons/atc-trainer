@@ -162,7 +162,7 @@ Item {
                                          selected: modelData.id === s.scn.plan; onClicked: s.planner.choose(modelData.id) }
             }
             Row {
-                height: Theme.px(22)
+                width: parent.width; height: Theme.px(22)
                 spacing: Theme.s8
                 StateIcon { level: s.planner.messageLevel; anchors.verticalCenter: parent.verticalCenter }
                 Label { height: parent.height; text: s.planner.message; font.pixelSize: Theme.small }

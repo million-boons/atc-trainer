@@ -37,7 +37,7 @@ Item {
                      tint: pk.bad ? Theme.fault : Theme.border; leftPadding: pk.bad ? Theme.px(22) : 0
                      onClicked: pk.asked()
                      StateIcon { x: Theme.s8; anchors.verticalCenter: parent.verticalCenter; level: pk.bad ? LabController.Fault : 0 } }
-        Label { visible: pk.noted; height: Theme.px(18); text: pk.bad ? qsTr("does not fit") : ""; font.pixelSize: Theme.caption }
+        Label { visible: pk.noted; width: pk.width; height: Theme.px(18); text: pk.bad ? qsTr("does not fit") : ""; font.pixelSize: Theme.caption }
     }
     component Head: Label { height: Theme.px(22); color: Theme.textSecondary; font { pixelSize: Theme.caption; weight: Font.DemiBold; letterSpacing: Theme.px(1) } }
     component Line: Rectangle { width: parent.width; height: Theme.line; color: Theme.divider }
@@ -169,7 +169,7 @@ Item {
                                 Choice { text: qsTr("Assessed"); selected: s.p.assessed === true; enabled: s.p.assessedOn === true; onClicked: { s.free(); s.planner.setAssessed(true) } }
                             }
                             Row {
-                                height: Theme.px(18)
+                                width: Theme.px(300); height: Theme.px(18)
                                 spacing: Theme.s4
                                 StateIcon { level: s.p.assessedNote ? LabController.Caution : 0; anchors.verticalCenter: parent.verticalCenter }
                                 Label { height: parent.height; text: s.p.assessedNote || ""; font.pixelSize: Theme.caption; color: Theme.textSecondary }
@@ -216,7 +216,7 @@ Item {
                         }
                     }
                     Row {
-                        height: Theme.px(18)
+                        width: parent.width; height: Theme.px(18)   // always there: a positioner skips an item without width
                         spacing: Theme.s4
                         StateIcon { level: s.p.presetChanged ? LabController.Caution : 0; anchors.verticalCenter: parent.verticalCenter }
                         Label { height: parent.height; text: s.p.presetChanged ? qsTr("Preset changed. This plan keeps the values below.") : ""; font.pixelSize: Theme.caption }
@@ -389,7 +389,7 @@ Item {
                     }
                 }
                 Row {
-                    height: Theme.px(22)
+                    width: parent.width; height: Theme.px(22)
                     spacing: Theme.s8
                     StateIcon { level: s.planner.messageLevel; anchors.verticalCenter: parent.verticalCenter }
                     Label { height: parent.height; text: s.planner.message; font.pixelSize: Theme.small }

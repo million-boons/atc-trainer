@@ -299,7 +299,7 @@ Item {
                         text: form.add ? qsTr("A new reply is a Draft. A scenario must name it before the pilot can say it.")
                                        : qsTr("Texts only, no audio. The changes are for review into the project by the user.") }
                 Row {
-                    height: Theme.px(22)
+                    width: parent.width; height: Theme.px(22)
                     spacing: Theme.s8
                     StateIcon { level: s.studio.messageLevel; anchors.verticalCenter: parent.verticalCenter }
                     Label { height: parent.height; text: s.studio.message; font.pixelSize: Theme.small }

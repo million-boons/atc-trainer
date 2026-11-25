@@ -108,6 +108,31 @@ Rules to keep in the backend, not only on the screen:
 - The header of the log needs plan id, name, run number, exact values and difficulty (08 section 3).
 - `setEvents(plansChanged)`: after a run is counted, or the file was replaced.
 
+## Every backend call of 5d, 5e and 5f (as written on the mocks, 2026-11-26; proposals for runtime)
+
+Form as for the Studio: a struct of `std::function` per screen (`ScenarioBackend.h`, `HistoryBackend.h`, `SetupBackend.h`), known only to its controller, its mock and a backend. Each call answers exactly once, with an empty text or the reason; any thread. Role, "no exercise" and ranges are checked again in the backend. Live, the three pointers of `Main.qml` (`scenarios`, `history`, `setup`) are null and the screens are off with their reason; `main.cpp` sets them when a backend exists.
+
+| Call | Does | Refuses | Exists today |
+|---|---|---|---|
+| **5d** `load()` | every file of `data/scenarios`: id, name, category, difficulty, airfield, sopRef, half-duplex rule, placeholder, objectives, steps (name, intent, wait, pilot calls), number of values per pool, errors with file and path | – | loader; **missing:** folder scan, keeping objectives, difficulty and sopRef |
+| `coverage(id)` | coverage check in the background: checking, ok with clip count, missing with IDs, failed with the reason. May answer more than once | – | `ExerciseCheck` (one scenario at a time); **missing:** a check that does not change the selected exercise |
+| `select(id)` | scenario on the Dashboard: values drawn and shown (D-321), check runs (D-115), a chosen plan is replaced. Kept for the session only (C-3) | file has errors; during an exercise | **missing:** `LiveExercise` has one fixed file |
+| **5e** `list(person)` | results of one person, or all for the instructor; **never guests** (D-127, D-131): id, trainee, scenario, plan, run, mode, placeholder, start, end, how it ended, steps, errors, missed responses, response median, suspected STT, PTT notes, number reclassified. Facts of the log, without the instructor's changes | a trainee for somebody else (H-1) | `JsonlEventLog`, `buildResult`; **missing:** reader of a folder, list, plan and run in the header |
+| `open(id)` | head, missed steps, PTT notes, suspected STT, timeline entries with heard, parsed, expected, outcome, class, delay, audio saved or not, reviews. A log that stops early: "fault" and what is there | as `list` | **missing** |
+| `reclassify(id, entry, class, note)` | appended to `<session>.review.jsonl`; the log itself is never changed | not the instructor; not an ATC entry; file not writable | **missing** |
+| `remove(id)` | a line in the deletion log first, then log and review file (H-3) | not the instructor; the deletion log cannot be written | **missing** |
+| `play(id, entry, keyedOnly)`, `stopPlay()` | audio of one transmission, only if saved with consent | no audio; consent withdrawn (P); the radio is in use | **missing** (D-314) |
+| **5f** `load()` | numbers (value, starting value, range, step, unit, "set by user", when it applies), choices with options (a missing device is "off"), facts, number of guest results | – | `SettingsController` has two switches; `ui.json` the starting values |
+| `setNumber(key, value)`, `setChoice(key, id)`, `restore(page)` | stored in `settings.json`, over `ui.json`; `restore` removes them. Keys: tap, preroll, tail, longest, debounce, settle, cut, toneMs, toneHz, toneDb, free, idle; theme, motion, clock, mic, out, ptt, sidetone, model, bank, radio | not the instructor (theme, motion, clock: everybody); out of range; tail not below longest; during an exercise or a transmission | **missing:** device lists, change of device, values into a running core (P: next transmission or next start, as each row says); each change of a timing into the next log header (E-2) |
+| theme, motion at the start | the stored value must reach `main.cpp` as the starting mode: the screen changes it only when somebody chooses | – | **missing** |
+| `startLearn(report)`, `stopLearn()` | every device that reports presses: id, name, VID:PID and type, held ms, down, reason if it may not be used. Never transmits; ends with the screen, the login and an exercise | a transmission is open; no right to read the devices | **missing** (D-310) |
+| `changePin(old, new)` | on a worker, through the same try limit as the login (P); never logged | old PIN wrong; not 6 to 12 digits | **missing** (E-3) |
+| `testSentence()` | one sentence with the bank and radio effect chosen | the radio is in use; clips missing | `playLocal`; **missing:** the call |
+| `deleteGuests(expected)` | deletes all guest results, each a line in the deletion log first; answers the count that is left | not the instructor; not exactly `expected` (then nothing is deleted and the new count comes back) (D-131) | **missing** |
+| **login** `marked()`, `setWider(pilotVoice, wider)` | consent versions with the instructor's marks (D-137), kept in `people.json` | the text has replaced no approved one; "wider" is not taken back (assumed) | exists (`PeopleStore`, D-139, ui) |
+
+Already there and used as they are: Dashboard tiles for microphone, speaker, PTT, model, bank and storage with their tests; save switch, PTT fallback (D-116), trainee records; the PIN before the end of an assessed exercise (D-125, D-129, in `ExerciseController`).
+
 ## Order and dependencies
 
 1. Studio (D-136): writing, pending folder, record mode, consent checks.
