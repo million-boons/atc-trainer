@@ -232,6 +232,9 @@ Item {
             id: sd
             property bool assessed: false
             title: qsTr("Start %1").arg(s.ex.context.scenario)
+            // The same values as on the Dashboard's card (D-321).
+            Label { objectName: "startValues"; width: parent.width; mono: true; font.weight: Font.DemiBold
+                    text: qsTr("%1   %2   RWY %3   TWY %4").arg(s.ex.context.callsign || "-").arg(s.ex.context.type || "-").arg(s.ex.context.runway || "-").arg(s.ex.context.taxiway || "-") }
             Label { text: qsTr("Mode (cannot change during the exercise)"); color: Theme.textSecondary }
             OptionButton { width: parent.width; selected: !sd.assessed
                            title: selected ? qsTr("Practice, selected") : qsTr("Practice")

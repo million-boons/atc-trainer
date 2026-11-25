@@ -462,6 +462,29 @@ TEST_F(Ui, StopInAssessedNeedsTheInstructorPin) {  // D-129
   }
 }
 
+TEST_F(Ui, NamesAndTitlesAreWholeAt1280) {
+  const auto whole = [this](const char* name) {
+    int n = 0;
+    walk(win->contentItem(), [&](QQuickItem* x) {
+      if (x->objectName() != name) return;
+      ++n;
+      EXPECT_FALSE(x->property("truncated").toBool()) << name << ": " << x->property("text").toString().toStdString();
+      EXPECT_LE(x->property("contentWidth").toDouble(), x->width()) << name;
+      EXPECT_LE(x->property("contentHeight").toDouble(), x->height()) << name;
+    });
+    EXPECT_GT(n, 0) << name;
+  };
+  load();
+  run("exresulta");
+  whole("stepHead");
+  EXPECT_TRUE(allText().contains("Fallback PTT used"));
+  run("idle");
+  whole("selectedModel");
+  run("exstart");
+  whole("startValues");
+  EXPECT_TRUE(allText().contains("EAGLE-421   C295   RWY 09   TWY A3"));
+}
+
 TEST_F(Ui, DashboardStartOpensTheDialog) {
   load();
   run("dashready");

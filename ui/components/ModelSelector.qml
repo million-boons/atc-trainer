@@ -30,9 +30,9 @@ Item {
                 border { color: popup.visible ? Theme.accent : Theme.border; width: Theme.line }
             }
             contentItem: Item {
-                Label { x: Theme.s8; y: Theme.px(4); text: qsTr("Model"); color: Theme.textSecondary; font.pixelSize: Theme.caption }
-                Label { x: Theme.s8; y: Theme.px(22); width: parent.width - Theme.px(34)
-                        text: ms.stt.selectedName; font.pixelSize: Theme.small }
+                // The whole name: two lines at 1280x800.
+                Label { objectName: "selectedModel"; x: Theme.s8; width: parent.width - Theme.px(34); height: parent.height
+                        text: ms.stt.selectedName; font.pixelSize: Theme.small; wrapMode: Text.WordWrap; maximumLineCount: 2; lineHeight: 0.95 }
                 IconItem { width: Theme.px(14); height: width; x: parent.width - width - Theme.s8
                            anchors.verticalCenter: parent.verticalCenter
                            path: "M 4 7 L 10 13 L 16 7"; color: Theme.textSecondary }

@@ -57,7 +57,8 @@ Item {
             x: Theme.s12; width: parent.width - 2 * x; height: Theme.px(30)
             Repeater {
                 model: [qsTr("Step"), qsTr("Outcome"), qsTr("Attempts"), qsTr("Trainee errors"), qsTr("Missed responses"), qsTr("Response"), qsTr("Say again")]
-                Label { width: parent.width * steps.cols[index]; height: parent.height; text: modelData
+                Label { objectName: "stepHead"; width: parent.width * steps.cols[index]; height: parent.height; text: modelData
+                        rightPadding: Theme.s8; wrapMode: Text.WordWrap; maximumLineCount: 2; lineHeight: 0.9
                         color: Theme.textSecondary; font.pixelSize: Theme.caption }
             }
         }

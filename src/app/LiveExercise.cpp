@@ -25,10 +25,7 @@ LiveExercise::LiveExercise(LiveExerciseConfig cfg, SttController* stt, LabContro
   connect(&c_, &C::continueRequested, this, [this] { if (radio_.resume) radio_.resume(); });
   connect(&c_, &C::screenPttRequested, this, [this] { if (radio_.useFallback) radio_.useFallback(); });
   connect(&c_, &C::resultRequested, this, [this] { view_.showResult(); });
-  connect(&c_, &C::runAgainRequested, this, [this] {
-    newSeed();
-    prepare();
-  });
+  connect(&c_, &C::runAgainRequested, this, &LiveExercise::prepare);  // with the values drawn at the end, which the card shows (D-321)
   connect(&c_, &C::leaveRequested, this, &LiveExercise::leave);
   second_.setInterval(1000);
   connect(&second_, &QTimer::timeout, this, [this] { view_.tick(monotonicNow()); });
