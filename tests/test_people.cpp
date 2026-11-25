@@ -129,6 +129,13 @@ TEST_F(People, DraftAnswersCountUntilAnApprovedTextIsInPlace) {  // D-135
   EXPECT_FALSE(mayRecord(*s.find("S02"), approved));
 }
 
+TEST_F(People, AnotherApprovedTextCountsAsWiderUntilItIsMarked) {  // D-137, the mark is not built
+  Person p{"S01", "", "", true, kToday};
+  p.consentVersion = "approved-1";
+  EXPECT_TRUE(mayRecord(p, {"approved-1", "draft-1"}));
+  EXPECT_FALSE(mayRecord(p, {"approved-2", "draft-1"}));
+}
+
 TEST_F(People, AnAnswerWithoutAVersionIsADraftAnswer) {
   fs::create_directories(dir / "state");
   std::ofstream(file) << "{\"format\":1,\"people\":[{\"id\":\"S01\",\"consent\":true,\"consent_date\":\"2026-11-01\"}]}";

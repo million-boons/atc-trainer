@@ -12,9 +12,10 @@ struct ConsentVersions {
 };
 // An answer without a version is from before versions were stored.
 constexpr bool isDraftConsent(std::string_view version) { return version.empty() || version.starts_with("draft"); }
-// A draft answer is valid only until an approved text is in place; then the person is asked again once.
+// A draft answer is valid only until an approved text is in place; then the person is asked again once. An answer to
+// another approved text counts as no as well, the safe side: the instructor's "wider use: yes/no" (D-137) is not built.
 constexpr bool reconsentNeeded(std::string_view answered, std::string_view current) {
-  return !isDraftConsent(current) && isDraftConsent(answered);
+  return !isDraftConsent(current) && answered != current;
 }
 
 }  // namespace atc
