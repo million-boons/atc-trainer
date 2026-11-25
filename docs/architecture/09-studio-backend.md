@@ -104,9 +104,9 @@ Accepted as it is, with these changes (only `StudioController`, `StudioMock` and
 | # | Point | Wanted |
 |---|---|---|
 | 1 | `StudioClip.takes[].peaks` | not in the list: with many takes every raw file would be read at each refresh. Own function `peaks(take, callback)` |
-| 2 | `startSession` | `Done` comes after the room tone (about 2 s). New event `roomTone(dbfs)`, with a warning if it is loud |
+| 2 | `startSession` | `Done` comes after the room tone (about 2 s). New event `roomTone(dbfs)`, with a warning if it is loud. `endSession` during the room tone: `Done` answers with a refusal, and no session is open; a second `endSession` is harmless (ui) |
 | 3 | `play(take, "sentence")` | the backend plays the same reply and values that `sayBefore` and `sayAfter` show. Missing clips: a short beep, and the text says which |
-| 4 | `deleteTake` | refused for an active take (primary, alternate) unless consent is withdrawn: reject it first |
+| 4 | `deleteTake` | refused for an active take (primary, alternate) unless consent is withdrawn: reject it first. ui's screen is stricter: a pending take is rejected before it can be deleted |
 | 5 | `accept` | `Done` may carry a refusal "manifest changed on disk" |
 | 6 | Role | not a parameter: calls come on the GUI thread, the backend asks `AccessController` itself |
 | 7 | `StudioContent.voice` | the bank that is recorded (ST-2), which need not be the one of the exercise: add `activeVoice` |
