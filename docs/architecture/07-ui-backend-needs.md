@@ -53,7 +53,7 @@ Stop in Assessed needs the PIN (D-129): built in `ExerciseController`, a rule an
 
 ## 5 Phraseology Studio
 
-Instructor only (D-25). Built first, after 3b (D-136): screens and tests ui, backend and manifest fields b2 (engine reviews the fields later, D-138).
+Instructor only (D-25). Built first, after 3b (D-136): screens and tests ui, backend and manifest fields b2 (engine reviews the fields later, D-319).
 
 | Need | Fields or action | Exists |
 |---|---|---|
@@ -66,13 +66,13 @@ Instructor only (D-25). Built first, after 3b (D-136): screens and tests ui, bac
 | Pending (S-1) | undecided takes in a separate `pending` folder, never read by bank, check or player; Accept moves to the bank as primary or alternate and writes the manifest; Reject keeps the file as rejected | **Missing** |
 | Coverage | per scenario: needed, primary, missing, unused | `checkCoverage` and the above |
 
-Speakers (D-132): only a person with a record and consent "yes"; the instructor starts the session and chooses the speaker; the ID (never name or rank) is stored with each take, also in `pending` and in the manifest. Consent (recording and pilot voice) is checked when the session starts and before each take is saved. D-31 applies: never in git. **Missing:** speaker ID and pilot-voice consent per take in the manifest (b2 adds them, engine reviews later, D-138).
+Speakers (D-132): only a person with a record and consent "yes"; the instructor starts the session and chooses the speaker; the ID (never name or rank) is stored with each take, also in `pending` and in the manifest. Consent (recording and pilot voice) is checked when the session starts and before each take is saved. D-31 applies: never in git. **Missing:** speaker ID and pilot-voice consent per take in the manifest (b2 adds them, engine reviews later, D-319).
 
 Consent withdrawn (D-133), or "re-consent needed" (D-135): the bank, the coverage check and the player must leave those takes out **at once**: a clip with no other take is then missing, and Start is blocked. The running program must notice the change (P: LiveExercise asks for a new check when an answer changes; not during an exercise, where no record can be changed). The Studio lists them "Consent withdrawn – delete or replace"; deletion by the instructor is logged first.
 
 ### Studio interface (proposed, for b2)
 
-As with login and recordings: `StudioController` (ui, GUI thread, state and texts) and `StudioBackend` (b2, a struct of `std::function`), so that the screens and tests run on a mock. Every action answers with an empty text or the reason; slow ones through a callback queued to the GUI thread. Names are proposals.
+As with login and recordings: `StudioController` (ui, GUI thread, state and texts) and `StudioBackend` (b2, a struct of `std::function`), so that the screens and tests run on a mock. Include rule for Qt files: engine, scenario, parser and PhraseTemplate headers only through `src/app/EngineHeaders.h` (Qt's `slots` macro). Every action answers with an empty text or the reason; slow ones through a callback queued to the GUI thread. Names are proposals.
 
 | Function | Does | Refuses |
 |---|---|---|
@@ -84,7 +84,7 @@ As with login and recordings: `StudioController` (ui, GUI thread, state and text
 | `record(clipId)`, `stopRecord()` | raw take at 16 kHz into `pending`, trimmed by SilenceTrimmer (`trimClip`): kept part, level, warnings. With "Pedal" on, the pedal starts and stops it; it never transmits | no session; consent changed since the start (checked again **before the take is saved**); disk below the limit |
 | `setTrim(take, start, end)` | trim again from the raw samples | – |
 | `play(take, raw / trimmed / radio / sentence)`, `stopPlay()` | `playLocal` | the radio is in use |
-| `exportChanges(folder)` | writes the changed files for review into git by the user (D-138) | not the instructor; folder not writable |
+| `exportChanges(file)` | writes the changes to a file, for review into git by the user (D-318) | not the instructor; file not writable |
 | `accept(take, primary / alternate)` | pending → bank, manifest written in one step, at most one primary | consent not valid now; role |
 | `reject(take)`, `deleteTake(take)` | reject keeps the file; delete is logged first (D-133) | role; the log cannot be written |
 
@@ -95,7 +95,7 @@ Rules to keep in the backend, not only on the screen:
 - The session's speaker is chosen in the session; nobody's login changes.
 - **PTT is never blocked by the Studio:** outside a session the pedal transmits nothing on this screen but stays alive; in a session with "Pedal" off a press does nothing; leaving the screen ends the session.
 - The waveform gets peaks (at most 1000 pairs), not samples.
-- Nothing the Studio writes is in git: audio outside the work tree (D-31, D-418). `data/phraseology` **is** in git and read-only in an installed program: the Studio saves into a writable copy outside the repository and the installation, with Export; changed intents become Draft (G-3, D-138). To settle by b2 (P): the copy is in the writable folder; once it exists every program reads it instead of the installed data (loader, parser, coverage check), and the screen says "changed on this machine"; if the installed data is newer than the copy's origin, the Studio says so and never merges by itself; Export writes a folder that the user chooses and never into a work tree by itself.
+- Nothing the Studio writes is in git: audio outside the work tree (D-31, D-418). `data/phraseology` **is** in git and read-only in an installed program: the Studio saves into a writable copy outside the repository and the installation, with Export; changed intents become Draft (G-3, D-318). To settle by b2 (P): the copy is in the writable folder; once it exists every program reads it instead of the installed data (loader, parser, coverage check), and the screen says "changed on this machine"; if the installed data is newer than the copy's origin, the Studio says so and never merges by itself; Export writes a file at a place that the user chooses, never into a work tree by itself.
 
 ## Order and dependencies
 
