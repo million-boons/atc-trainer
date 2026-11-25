@@ -8,3 +8,4 @@ User rulings D-132 and D-133. Nothing of this is built in the voice code. Beside
 4. **S-2 (D-123):** review of 8a2df27 (`data/phraseology/placeholder.json`, `src/voice/ClipList.h`, `tests/voice/test_clips.cpp`). The clips are not regenerated yet (D-130): bank "nine", data "niner", and the coverage check does not compare words. Proposed: it does.
 5. **Loader:** `Scenario` should keep objectives, difficulty and sopRef (5d, `07-ui-backend-needs.md`).
 6. Writing phraseology files uses `validated_by` and `validated_at` (S-3).
+7. **D-140 (user ruling), for D-317:** a recogniser failure (`Recognised` with `sttFault`) ends the wait for the instructor, as `SequenceEngine` does today: the trainee did respond, and the pilot says "say again". So it does not leave the Continue / End dialog open. Repeated failures are handled by the fault count: 2 in a row on a step give the same dialog again (`InstructorAlert` with `choice`). The screen (`ExerciseView`) already closes on it.
