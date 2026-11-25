@@ -13,7 +13,7 @@ Common rules: file work never on the GUI thread or RadioCore's thread; answers a
 | Value pools | count of callsigns, types, runways, taxiways | Yes |
 | Coverage per card | Checking, Covered, Missing (clip IDs), Failed (errors) | `ExerciseCheck::select`, one scenario. (P) the opened card only, so that 4 GB is not used for several banks |
 | Select | scenario file; result goes to the Dashboard tile; kept for the session only (C-3) | `ExerciseCheck`; `LiveExercise` takes one fixed file today: I add `select()` |
-| Fixed seed | number, or random; instructor only, Practice only | `ExerciseOptions::seed`; I add the choice |
+| Fixed seed | Dropped (user's answer to b2): plans hold exact values, `04-ui.md` §5g | – |
 | C-1 | Practice: steps for everybody. Assessed: instructor only | Screen, role from `AccessController` |
 
 ## 5e Assessment and Debrief

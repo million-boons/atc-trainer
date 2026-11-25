@@ -21,3 +21,9 @@ Branch and worktree `ui`, everything committed. Next free decision number: D-141
 - Re-consent at login and the "wider use" mark (D-137, D-139): before a second approved consent text.
 - Consent texts are drafts until the user confirms the unit's approval (D-134): then the version in `src/core/Consent.h`.
 - Engine: `brief-engine-from-ui-2026-11-25.md` and b2's brief.
+
+## Resumed 2026-11-25, 17:38
+- `main` fabbaa1 taken in; b2's changes in ui's files read and kept.
+- b2's screenshots were gone (restart). New ones by ui from b2's finished 10:53 program, mock, off-screen, no build: 11 cases at 1280x800 (9 opened), 5 at 1920x1080 (4 opened, on sheets at 3/4 size). Fixed in 44ecc8a, not built: Result titles ran together; selected model name cut off in the Lab; mock result without "Fallback PTT used"; D-321 (Run again drew a second seed, the Start dialog did not show the values).
+- Seen and left: in the Lab's recording list the model name is shortened in the middle at 1280x800 ("Whisper tiny...ompt"), so two models can look the same; the full name is in the stored result.
+- Not seen: the Lab with another model loaded than selected (no mock case).
