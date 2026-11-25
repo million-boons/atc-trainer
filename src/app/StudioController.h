@@ -211,8 +211,9 @@ class StudioController : public QObject {
   StudioEntry draft_;          // what is on the screen
   std::optional<StudioPreview> preview_;
   int example_ = 0, segment_ = -1, waiting_ = 0, elapsedMs_ = 0, messageLevel_ = 0;
+  unsigned startNo_ = 0;       // a session start that was left is not taken over
   unsigned previewNo_ = 0, loadNo_ = 0, clipsNo_ = 0;  // answers to older questions are ignored
-  bool session_ = false, recording_ = false, pedal_ = false, trainerBusy_ = false;
+  bool session_ = false, starting_ = false, recording_ = false, pedal_ = false, trainerBusy_ = false;
   double level_ = -120;
   std::string draftRevision_;  // of the data the edit started from
   StudioBackend b_;            // last: it finishes its work before the rest goes

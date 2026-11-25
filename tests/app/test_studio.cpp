@@ -224,6 +224,25 @@ TEST_F(Studio, OnlyASpeakerWithBothAnswersMayRecord) {  // D-132, D-133
   EXPECT_EQ(a->personId(), "");  // nobody's login changes
 }
 
+TEST_F(Studio, ASessionThatIsLeftWhileItStartsIsNotOpened) {
+  login();
+  StudioBackend::Done late;
+  StudioBackend x = b;
+  x.startSession = [&late](const std::string&, StudioBackend::Done done) { late = std::move(done); };
+  s->setBackend(x);
+  s->startSession("S01");
+  s->leave();
+  EXPECT_EQ(ended, 1);
+  late("");
+  drain();
+  EXPECT_FALSE(s->session());
+  EXPECT_EQ(ended, 2);  // it had started after all
+  EXPECT_FALSE(s->busy());
+  EXPECT_FALSE(s->message().contains("started"));
+  s->setBackend(b);
+  startS01();  // and can be started again
+}
+
 TEST_F(Studio, TheBackendsRefusalIsShown) {
   login();
   startAnswer = "no microphone";

@@ -173,7 +173,7 @@ void StudioController::accessChanged() {
     if (now) {
       reload();
     } else {
-      if (session_) dropSession(tr("The instructor logged out: the recording session has ended."), true);
+      if (session_ || starting_) dropSession(tr("The instructor logged out: the recording session has ended."), true);
       stopPlay();
       loaded_ = false;
     }
@@ -190,12 +190,13 @@ void StudioController::accessChanged() {
 void StudioController::setTrainerBusy(bool on) {
   if (trainerBusy_ == on) return;
   trainerBusy_ = on;
-  if (on && session_) dropSession(tr("An exercise has started: the recording session has ended."), true);
+  if (on && (session_ || starting_)) dropSession(tr("An exercise has started: the recording session has ended."), true);
   emit sessionChanged();
 }
 
 void StudioController::dropSession(const QString& why, bool tellBackend) {
-  session_ = recording_ = pedal_ = false;
+  ++startNo_;
+  session_ = starting_ = recording_ = pedal_ = false;
   level_ = -120;
   speaker_.clear();
   if (tellBackend && b_.endSession) b_.endSession();  // keeps an open take as pending
@@ -212,9 +213,7 @@ void StudioController::enter() {
 }
 
 void StudioController::leave() {
-  if (session_) {
-    dropSession({}, true);
-  }
+  if (session_ || starting_) dropSession({}, true);
   stopPlay();
 }
 
@@ -641,24 +640,37 @@ QVariantMap StudioController::take() const {
 // ---- recording
 
 void StudioController::startSession(const QString& speaker) {
-  if (session_ || !allowed() || !b_.startSession) return;
+  if (session_ || starting_ || !allowed() || !b_.startSession) return;
   if (trainerBusy_) return void(say(L::Caution, tr("Not during an exercise.")));
   if (const QString why = refusal(speaker); !why.isEmpty()) return void(say(L::Caution, tr("%1 may not record: %2.").arg(speaker, why)));
-  b_.startSession(speaker.toStdString(), answer([this, speaker] {
+  const unsigned n = ++startNo_;
+  starting_ = true;
+  b_.startSession(speaker.toStdString(), [this, n, done = answer([this, speaker, n] {
+                    if (n != startNo_) return;
+                    starting_ = false;
                     // The answer may have changed while the backend worked.
                     if (!instructor() || trainerBusy_ || !refusal(speaker).isEmpty()) {
-                      if (b_.endSession) b_.endSession();
-                      say(L::Caution, tr("The recording session was not started."));
+                      dropSession(tr("The recording session was not started."), true);
                       return;
                     }
                     session_ = true;
                     speaker_ = speaker;
+                    say(L::Ok, tr("Recording session started."));
                     emit sessionChanged();
-                  }, tr("Recording session started.")));
+                  })](const std::string& why) {
+    queued([this, n, why] {
+      if (n == startNo_) {
+        if (!why.empty()) starting_ = false;
+      } else if (why.empty() && !session_ && b_.endSession) {
+        b_.endSession();  // started after it had been left
+      }
+    });
+    done(why);
+  });
 }
 
 void StudioController::endSession() {
-  if (session_) dropSession({}, true);
+  if (session_ || starting_) dropSession({}, true);
 }
 
 void StudioController::setPedal(bool on) {
