@@ -91,8 +91,9 @@ struct Live : testing::Test {
     if (pid == 0) {
       for (const char* v : {"PULSE_RUNTIME_PATH", "PULSE_STATE_PATH", "HOME"}) setenv(v, (dir / "pa").c_str(), 1);
       setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent", 1);
+      // norewinds: otherwise the null sink ends a sound up to 2 s late, which the pilot-speech watchdog rightly cuts.
       execl("/usr/bin/pulseaudio", "pulseaudio", "-n", "--daemonize=no", "--use-pid-file=no", "--exit-idle-time=-1", "--disable-shm=yes", "--log-level=error",
-            "-L", "module-null-sink sink_name=out", "-L", "module-null-sink sink_name=m", "-L", "module-remap-source source_name=mic master=m.monitor",
+            "-L", "module-null-sink sink_name=out norewinds=1", "-L", "module-null-sink sink_name=m norewinds=1", "-L", "module-remap-source source_name=mic master=m.monitor",
             "-L", mod.c_str(), nullptr);
       _exit(127);
     }
@@ -407,6 +408,7 @@ TEST_F(LiveDeparture, ByVoiceFromStartToResult) {
   EXPECT_TRUE(l.first().contains("counting"));
   EXPECT_EQ(l.filter("fallback_ptt_used").size(), 3);
   EXPECT_EQ(l.filter("\"ended\"").size(), 1);
+  EXPECT_TRUE(l.filter("timed_out").isEmpty());
   // The Lab is the radio's client again.
   c().leaveResult();
   transmit();

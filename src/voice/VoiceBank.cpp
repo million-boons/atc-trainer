@@ -1,5 +1,6 @@
 #include "voice/VoiceBank.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -30,9 +31,31 @@ bool safeName(const std::string& f) {
   return true;
 }
 
+// As a person's ID in the trainee records: no name fits into it by accident with a space or a dot.
+bool validSpeaker(const std::string& s) {
+  const auto ok = [](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-' || c == '_'; };
+  return !s.empty() && s.size() <= 16 && std::all_of(s.begin(), s.end(), ok);
+}
+
+// Empty, or what is wrong. speaker stays empty for a synthetic take.
+std::string voiceOf(const json& t, bool placeholderBank, std::string& speaker, bool& consent) {
+  const auto synthetic = t.find("synthetic"), who = t.find("speaker"), answer = t.find("pilotVoice");
+  if (synthetic != t.end() && *synthetic != json(true)) return "synthetic must be true or left out";
+  if (synthetic != t.end()) return who == t.end() && answer == t.end() ? "" : "synthetic has no speaker and no consent";
+  if (who == t.end()) return answer == t.end() && placeholderBank ? "" : "needs synthetic, or speaker and pilotVoice";
+  speaker = text(t, "speaker");
+  if (!validSpeaker(speaker)) return "speaker must be an ID code";
+  if (answer == t.end() || !answer->is_object()) return "needs pilotVoice with consent, date and version";
+  const auto yes = answer->find("consent");
+  if (yes == answer->end() || !yes->is_boolean() || text(*answer, "date").empty() || text(*answer, "version").empty())
+    return "needs pilotVoice with consent, date and version";
+  consent = yes->get<bool>();
+  return "";
+}
+
 }  // namespace
 
-bool VoiceBank::load(const std::string& dir, std::vector<LoadError>& errors) {
+bool VoiceBank::load(const std::string& dir, std::vector<LoadError>& errors, const MayUse& mayUse) {
   errors.clear();
   const std::string file = (fs::path(dir) / "manifest.json").string();
   const auto fail = [&](const std::string& path, const std::string& what) { errors.push_back({file, path, what}); };
@@ -87,6 +110,16 @@ bool VoiceBank::load(const std::string& dir, std::vector<LoadError>& errors) {
       if (!safeName(name)) {
         fail(at, id + ": file must be inside the voice folder");
         continue;
+      }
+      std::string speaker;
+      bool consent = false;
+      if (const std::string wrong = voiceOf(t, b.placeholder_, speaker, consent); !wrong.empty()) {
+        fail(at, id + ": " + wrong);
+        continue;
+      }
+      if (!speaker.empty() && !(consent && mayUse && mayUse(speaker))) {
+        b.withheld_.push_back({id, name, speaker});
+        continue;  // not even read
       }
       auto wav = readWav((fs::path(dir) / name).string());
       if (!wav)

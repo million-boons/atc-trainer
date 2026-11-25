@@ -87,6 +87,10 @@ int main(int argc, char** argv) {
     else return usage();
   }
   if (command == "build" && (raw.empty() || out.empty() || voice.empty())) return usage();
+  if (real) {  // a person's take needs the speaker and the consent in the manifest (D-132, D-319)
+    std::fprintf(stderr, "--real is not available: a person's clips are recorded in the Phraseology Studio, with speaker and consent\n");
+    return 1;
+  }
   std::string error;
   if (data.empty()) {
     Paths p;
@@ -174,7 +178,7 @@ int main(int argc, char** argv) {
       ++warnings;
       std::printf("warning: %s: %s\n", id.c_str(), w.c_str());
     }
-    json take = {{"file", c.file()}, {"take", "primary"}, {"durationMs", r.samples.size() * 1000 / VoiceBank::kRate},
+    json take = {{"file", c.file()}, {"take", "primary"}, {"synthetic", true}, {"durationMs", r.samples.size() * 1000 / VoiceBank::kRate},
                  {"trimStart", r.start}, {"trimEnd", r.end}, {"speechDb", tenth(r.speechDb)}, {"gainDb", tenth(r.gainDb)}};
     list.push_back({{"id", id}, {"words", c.words}, {"takes", json::array({take})}});
     made.emplace(c.file(), std::move(r));

@@ -186,6 +186,70 @@ TEST_F(Voice, AClipWithOnlyRejectedTakesIsMissing) {
   ASSERT_TRUE(load()) << all();
   EXPECT_FALSE(checkCoverage(exercise(), bank, errors));
 }
+// D-132 to D-135, D-319: a person's take is used only while the manifest and the answer today say yes.
+TEST_F(Voice, TakesOfAPersonNeedConsentThenAndNow) {
+  const std::string id = manifest["clips"][0]["id"];
+  auto& take = manifest["clips"][0]["takes"][0];
+  take["speaker"] = "S01";
+  take["pilotVoice"] = {{"consent", true}, {"date", "2026-11-25"}, {"version", "draft-1"}};
+  std::ofstream(dir / "manifest.json") << manifest.dump();
+  const auto yes = [](const std::string& s) { return s == "S01"; };
+  const auto no = [](const std::string&) { return false; };
+  ASSERT_TRUE(bank.load(dir.string(), errors, yes)) << all();
+  EXPECT_TRUE(bank.find(id));
+  EXPECT_TRUE(bank.withheld().empty());
+  EXPECT_TRUE(checkCoverage(exercise(), bank, errors)) << all();
+  // Withdrawn, or nobody to ask: at once missing, and the file is not read.
+  fs::rename(dir / "c0.wav", dir / "gone.wav");
+  for (const VoiceBank::MayUse& m : {VoiceBank::MayUse(no), VoiceBank::MayUse()}) {
+    ASSERT_TRUE(bank.load(dir.string(), errors, m)) << all();
+    EXPECT_FALSE(bank.find(id));
+    ASSERT_EQ(bank.withheld().size(), 1u);
+    EXPECT_EQ(bank.withheld()[0].clipId, id);
+    EXPECT_EQ(bank.withheld()[0].speaker, "S01");
+    EXPECT_FALSE(checkCoverage(exercise(), bank, errors));
+    EXPECT_NE(all().find(id), std::string::npos);
+  }
+  fs::rename(dir / "gone.wav", dir / "c0.wav");
+  take["pilotVoice"]["consent"] = false;  // recorded without consent: today's answer does not help
+  std::ofstream(dir / "manifest.json") << manifest.dump();
+  ASSERT_TRUE(bank.load(dir.string(), errors, yes)) << all();
+  EXPECT_FALSE(bank.find(id));
+}
+TEST_F(Voice, AWithdrawnPrimaryLeavesTheOtherTakes) {
+  auto& takes = manifest["clips"][0]["takes"];
+  json other = takes[0];
+  other["take"] = "alternate";
+  other["synthetic"] = true;
+  takes[0]["speaker"] = "S01";
+  takes[0]["pilotVoice"] = {{"consent", true}, {"date", "2026-11-25"}, {"version", "draft-1"}};
+  takes.push_back(other);
+  ASSERT_TRUE(load()) << all();
+  ASSERT_TRUE(bank.find(manifest["clips"][0]["id"]));
+  EXPECT_EQ(bank.find(manifest["clips"][0]["id"])->takes.size(), 1u);
+  EXPECT_EQ(bank.withheld().size(), 1u);
+}
+TEST_F(Voice, NoSpeakerIsNeverConsent) {
+  ASSERT_TRUE(load()) << all();  // a placeholder bank from before D-319
+  manifest["placeholder"] = false;
+  EXPECT_FALSE(load());
+  EXPECT_NE(all().find("needs synthetic, or speaker"), std::string::npos) << all();
+  for (auto& c : manifest["clips"]) c["takes"][0]["synthetic"] = true;
+  EXPECT_TRUE(load()) << all();
+  const json good = manifest;
+  const std::vector<json> bad = {{{"synthetic", false}}, {{"synthetic", true}, {"speaker", "S01"}}, {{"speaker", "S01"}},
+                                 {{"speaker", "Name Surname"}, {"pilotVoice", {{"consent", true}, {"date", "d"}, {"version", "v"}}}},
+                                 {{"speaker", "S01"}, {"pilotVoice", {{"consent", "yes"}, {"date", "d"}, {"version", "v"}}}},
+                                 {{"speaker", "S01"}, {"pilotVoice", {{"consent", true}, {"version", "v"}}}},
+                                 {{"pilotVoice", {{"consent", true}, {"date", "d"}, {"version", "v"}}}}};
+  for (const json& b : bad) {
+    manifest = good;
+    auto& t = manifest["clips"][0]["takes"][0];
+    t.erase("synthetic");
+    t.update(b);
+    EXPECT_FALSE(load()) << b;
+  }
+}
 TEST_F(Voice, MissingFileIsRefused) {
   fs::remove(dir / "c0.wav");
   EXPECT_FALSE(load());
