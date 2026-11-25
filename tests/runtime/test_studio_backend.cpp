@@ -343,6 +343,40 @@ TEST(Takes, DeletingIsLoggedFirstAndNeverForATakeInUse) {
   EXPECT_FALSE(s.s.find(b.id));  // pending: allowed
 }
 
+// A power cut at any point: no voice stays that is not listed, and deleting the take deletes all of it.
+TEST(Takes, NothingOfATakeIsLeftWhenItIsDeleted) {
+  Store s;
+  const Take a = s.add(), other = s.add("PH_X@final");
+  ASSERT_EQ(s.s.accept(other.id, true, "x"), "");
+  const int rest = files(s.t.path);
+  fs::create_directories(s.bank + "/manifest.json.part/x");
+  EXPECT_NE(s.s.accept(a.id, true, "x"), "");  // interrupted: ID.wav is in the bank
+  fs::remove_all(s.bank + "/manifest.json.part");
+  put(s.bank + "/" + a.id + "-2.wav", "x");
+  put(s.bank + "/" + a.id + "-3.wav.part", "x");
+  put(s.pending + "/" + a.id + ".wav.part", "x");
+  ASSERT_EQ(s.s.remove(a.id, false, "instructor", "2026-11-26"), "");
+  EXPECT_EQ(files(s.t.path), rest - 2 + 1);  // raw and description gone, the log is new
+  EXPECT_TRUE(s.s.cut(other.id));            // a neighbour whose name begins the same is untouched
+  // The audio cannot be written: nothing stays. Description without audio (power cut): listed, and it can be deleted.
+  fs::create_directories(s.pending + "/PH_Y@final__001.wav.part/x");
+  NewTake n;
+  n.clipId = "PH_Y@final";
+  n.speaker = s.who;
+  n.raw = tone();
+  Take out;
+  EXPECT_NE(s.s.add(n, out), "");
+  EXPECT_FALSE(fs::exists(s.pending + "/PH_Y@final__001.json"));
+  fs::remove_all(s.pending + "/PH_Y@final__001.wav.part");
+  ASSERT_EQ(s.s.add(n, out), "");
+  fs::remove(s.pending + "/" + out.id + ".wav");
+  ASSERT_EQ(s.s.load(), "");
+  ASSERT_TRUE(s.s.find(out.id));
+  EXPECT_NE(s.s.accept(out.id, true, ""), "");
+  EXPECT_EQ(s.s.remove(out.id, false, "instructor", "2026-11-26"), "");
+  EXPECT_FALSE(s.s.find(out.id));
+}
+
 TEST(Takes, RejectedStaysOnDiskAndMayBeAcceptedLater) {
   Store s;
   const Take a = s.add();

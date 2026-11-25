@@ -300,10 +300,11 @@ std::string TakeStore::add(NewTake n, Take& out) {
     (void)cutOf(n.raw, t, cfg_.trim);
     t.warnings.push_back(error);
   }
-  if (!writePrivateWav(path(t.id, ".wav"), n.raw)) return "cannot write the audio file";
-  if (std::string why = writeTake(t); !why.empty()) {
-    std::remove(path(t.id, ".wav").c_str());  // ours, written just now
-    return why;
+  // The description first: whatever interrupts this, no voice is on disk that is not listed and cannot be deleted.
+  if (std::string why = writeTake(t); !why.empty()) return why;
+  if (!writePrivateWav(path(t.id, ".wav"), n.raw)) {
+    for (const char* ext : {".wav", ".wav.part", ".json"}) std::remove(path(t.id, ext).c_str());  // ours, written just now
+    return "cannot write the audio file";
   }
   out = t;
   takes_.push_back(std::move(t));
@@ -463,8 +464,19 @@ std::string TakeStore::remove(const std::string& id, bool withdrawn, const std::
     std::remove((cfg_.bank + "/" + t.file).c_str());
   }
   if (t.samples) {
-    std::remove(path(id, ".json").c_str());
-    std::remove(path(id, ".wav").c_str());
+    // Also what an interrupted accept or trim left in the bank: ID.wav, ID-2.wav, and unfinished files.
+    std::vector<fs::path> left;
+    std::error_code ec;
+    for (fs::directory_iterator it(cfg_.bank, ec), end; !ec && it != end; it.increment(ec)) {
+      const std::string f = it->path().filename().string();
+      if (f.rfind(id, 0) != 0) continue;
+      const std::string rest = f.substr(id.size());
+      const auto digits = rest.find_first_not_of("0123456789", 1);
+      const std::string ext = rest[0] == '-' && digits != std::string::npos && digits > 1 ? rest.substr(digits) : rest;
+      if (ext == ".wav" || ext == ".wav.part") left.push_back(it->path());
+    }
+    for (const auto& f : left) std::remove(f.c_str());
+    for (const char* ext : {".wav", ".wav.part", ".json"}) std::remove(path(id, ext).c_str());
   }
   return load();
 }
