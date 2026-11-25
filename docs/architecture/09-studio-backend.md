@@ -1,6 +1,6 @@
-# 09 Phraseology Studio: backend (proposal, for the user's approval)
+# 09 Phraseology Studio: backend (approved 2026-11-25, D-331)
 
-By b2, 2026-11-25. **No code before approval** (CLAUDE.md). Screen: 04 §5 (ui, approved). Interface: ui's `src/app/StudioBackend.h` (0ccbab1) and 07 §5; my answers are in section 8. Binding: D-21, D-25, D-31, D-44, D-117 to D-137, D-312, D-318, D-319. "Exists" was read in the code of 00b307f, not run. Points that need the user are **ST-1 to ST-8** (section 10). No figure here is measured.
+By b2, 2026-11-25. Approved with conditions on ST-1 (D-331). Screen: 04 §5 (ui, approved). Interface: ui's `src/app/StudioBackend.h` (0ccbab1) and 07 §5; my answers are in section 8. Binding: D-21, D-25, D-31, D-44, D-117 to D-137, D-312, D-318, D-319. "Exists" was read in the code of 00b307f, not run. Points that need the user are **ST-1 to ST-8** (section 10). No figure here is measured.
 
 ## 1. Parts
 
@@ -31,7 +31,7 @@ Like the PTT test that exists (`setPttTest`): a client asks for it, it is refuse
 | Key held at session end | that press is swallowed, as after a PTT test |
 | Lost audio | the take gets the warning "audio lost", never silently accepted |
 
-**ST-1:** D-312 says that nothing is recorded or saved without PTT. The Studio needs an exception: in a session that the instructor started, a press on Record (or the pedal, with Pedal on) records. Nothing else changes, and the D-312 test stays as it is.
+**ST-1:** D-312 says that nothing is recorded or saved without PTT. The Studio needs an exception: in a session that the instructor started, a press on Record (or the pedal, with Pedal on) records. Nothing else changes, and the D-312 test stays as it is. **Approved with conditions (D-331):** (a) a clear "RECORDING" indicator while recording (ui; it follows `RadioSnapshot::recording`, never the button); (b) a Studio recording is never recognised and never reaches the exercise: no `txOpened`, no `txClosed`, nothing to `dev_.speech`; (c) at the end of the session, or when the Studio is left, the next core step erases everything older than the 0.3 s pre-roll (tested with `nonZeroStored()`, as the D-312 test does).
 
 ## 3. The writable copy (D-318)
 
@@ -129,7 +129,7 @@ Mutation checks as before. My files: `src/runtime`, `src/storage`, `LiveBackend`
 
 Not in this package: editing pools or scenarios, FLAC, Settings, exercise audio, Assessed.
 
-## 10. The user decides
+## 10. Decided by the user (D-331: all yes, ST-1 with conditions)
 
 | # | Question | Recommended |
 |---|---|---|

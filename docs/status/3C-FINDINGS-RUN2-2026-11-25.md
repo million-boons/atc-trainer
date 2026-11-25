@@ -35,3 +35,14 @@ Press before the first call (B7), a correct "hold short" (B8), the other callsig
 - **Speech Lab, 20:11**: release to text 5.76 s (TX 10) and 7.03 s (TX 11), read by the user. Other sessions were busy, and the model the Lab had is not known: valid only as a reason for a run on the idle panel, not as a measurement of a model. About twice the 2.81 s of the exercises. The user wants timing run T planned on an idle panel; owner stt (D-323, D-406, D-414), time and session: the user.
 - **D-321 confirmed by the user**: Dashboard, Start dialog and Exercise show the same values (a run before the 20:40 build). Finding 5 is then probably not a screen fault; the user's own answer about 20:05 is still open.
 - Instructor PIN: not set; the user sets it.
+
+## Third run, 23:23 to 23:30 (logs read by b2; build of 20:36, `00b307f`)
+
+Four exercises, all Practice, three stopped by the instructor, the last one (23:30) with no `ended` entry (finding 4 again). Steps done: 0. Release to text, 12 transmissions: median 2.89 s (2.69 to 3.31); other programs may have been open.
+
+- **Values:** in two exercises (23:23 EAGLE-421, 23:28 FALCON-732) the user said "alpha three ... runway zero niner" throughout; the engine had B2, 27 (recomputed from the seed). Queried, not advanced. "Hold short" with A3, 09 was understood and judged as a wrong value. Line up and takeoff in step Taxi: refused (UNEXPECTED), as designed.
+- **All nine logged exercises had B2, 27.** Recomputing 40 000 random seeds gives an equal share of the four combinations, so the draw is not biased by its formula; nine in a row has a chance of about 1 in 500. To be checked with the compiled program. Not explained.
+- Not proven where A3, 09 comes from: the screen, or the example sentences of the checklist and of ui (EAGLE-421, A3, 09).
+- "how you read me?" (radio check): UNINTELLIGIBLE (D-324, O-5).
+
+**User's answer (2026-11-25):** the screen values were right in the exercises of 20:05, 23:23 and 23:28; runway and taxiway were mixed up in what was said. No fault, no fix. The "query" and "say again" replies there were right. Finding 5 is closed.
