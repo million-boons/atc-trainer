@@ -514,6 +514,28 @@ TEST(ExerciseRuntime, SilentOrBrokenRecogniserIsNoTraineeError) {
   EXPECT_EQ(r.logged<in::Recognised>().back().sttFault, "no speech model");
 }
 
+// D-314: 10 s unless configured, a system fault that is not the trainee's, and the pilot says again.
+TEST(ExerciseRuntime, RecogniserHasTenSecondsThenThePilotSaysAgain) {
+  EXPECT_EQ(RuntimeConfig{}.recogniseLimit, ms(10'000));
+  Rig r;
+  ASSERT_EQ(r.start(), "");
+  r.hearPilot();
+  r.transmit();
+  r.pass(9500);  // transmit() has waited for the tail
+  EXPECT_TRUE(r.logged<in::Recognised>().empty());
+  r.pass(600);
+  ASSERT_EQ(r.logged<in::Recognised>().size(), 1u);
+  EXPECT_EQ(r.logged<in::Recognised>()[0].sttFault, "no result in time");
+  ASSERT_FALSE(r.logged<out::PilotRequested>().empty());
+  EXPECT_EQ(r.logged<out::PilotRequested>().back().utterance.replyId, "SAY_AGAIN");
+  const ExerciseResult res = buildResult(r.ready.exercise->scenario, r.log->events);
+  ASSERT_EQ(res.suspectedStt.size(), 1u);
+  for (const auto& s : res.steps) {
+    EXPECT_TRUE(s.errors.empty());
+    EXPECT_FALSE(s.completed);
+  }
+}
+
 TEST(ExerciseRuntime, SilenceIsUnintelligibleWithoutFault) {
   Rig r;
   ASSERT_EQ(r.start(), "");

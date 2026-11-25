@@ -26,7 +26,7 @@ Sessions: b2 = `runtime`, 93 = `stt`, 31 = `ui`, 8d = `engine`.
 | 1a | `RadioCore`, `PulsePlayer`, Lab playback, speaker check, `StatusController`. Export stays off (D-407) | b2 | 0a, 0c | 7–9 |
 | 1b | Dashboard wireframe, user OK, QML; remaining Lab controls. Start disabled until 3b | 31 | 0c; 1a to connect | 4–5 |
 | 1c | Recordings: speaker ID and consent required before saving, saving wired to RadioCore, off switch in Settings, list, instructor-only logged delete, low-space warning (D-101, D-102, 04 §5b). Speakers are added by the instructor role only. | 31 | 1a; role mechanism (A-4) | to be estimated by 31 |
-| **G1** | User tests Lab and Dashboard on the panel with the H540; PTT is the mouse stand-in, Screen PTT and Space (D-309) | user | 1a, 1b | – |
+| **G1** | User tests Lab and Dashboard on the panel with the H540; PTT is the mouse stand-in, Screen PTT and Space (D-309). **Passed 2026-11-25** (user, D-315), pedal pending | user | 1a, 1b | – |
 | 1d | Keyboard-type PTT is refused without exclusive grab and exact VID:PID (new config keys, fake-device tests); udev rule with `LIBINPUT_IGNORE_DEVICE` for the matched pedal only, its VID:PID filled in when the pedal arrives (D-310) | b2 | 1a; before G1-P | – |
 | **G1-P** | Short pedal test when the replacement pedal arrives (below); 3a and 3c do not wait for it; final acceptance and deployment (phase 10) require it (D-309) | user, b2 | 1d, pedal | – |
 | 2a | Loader (hand-written checks, D-408), generator, `scenario_check`, departure JSON | 8d | 0c | 4–5 |
@@ -141,6 +141,7 @@ Modes (ruling 2026-11-24): Practice shows the live verdict; Assessed hides it un
 | O-1 | Pilot readback of a wrong value that **exists in the airfield pools** should become possible, so readback errors can be trained. Values outside the pools: challenge or say again. | Later; not in the slice (D-409) |
 | O-2 | Approved line-up wording | Placeholder "line up runway {runway}" confirmed 2026-11-24 until the user supplies wording, if unclassified (D-403) |
 | O-3 | A step that requires hold short | Deferred until the user supplies approved readback wording. Needs a small scenario-format addition; until then hold short is UNEXPECTED (D-417, D-419) |
+| O-4 | Regenerate the pilot clips for "niner" (D-123, D-128) in a no-build window, with `voice_tool` from a `main` that holds 8a2df27, and the user's listening to them. Until then the pilot's sound says "nine" where text and data say "niner". | Deferred by the user 2026-11-25: features first. Who runs Piper: the user says so when it is due |
 | Q-1 | May voice recordings be copied to the PC? | **Closed:** yes, LAN only, one-way (D-412) |
 | Q-2 | PC operating system, LAN address, user name, GPU. SSH server is installed; the user name no longer has to match the panel (D-410). | **Closed 2026-11-24** (D-418): Piper runs on the panel, offline. The PC values stay blank |
 | Q-3 | Approve §4.1 (0d design) | **Closed 2026-11-24:** approved as install prefix + config file / executable-relative, no compiled-in absolute paths. A-3 (extra lookups) closed by D-308 |

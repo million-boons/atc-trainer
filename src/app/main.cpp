@@ -140,7 +140,7 @@ int main(int argc, char** argv) {
     if (ptt.isEmpty()) lab.idleHint = "Hold Screen PTT or Space";
     stt.start(std::move(models), [engines = paths.engines](const atc::SttModel& m, std::string& e) { return atc::makeRecognizer(m, engines, e); },
               atc::describeModel, atc::availableMemoryMb);
-    live = std::make_unique<LiveBackend>(&lab, &stt, lc);
+    live = std::make_unique<LiveBackend>(&lab, &stt, lc, &recordings);
     live->start();
   }
 #endif

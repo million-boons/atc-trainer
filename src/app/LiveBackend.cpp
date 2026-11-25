@@ -1,5 +1,8 @@
 #include "app/LiveBackend.h"
 
+#include <QDateTime>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QTime>
 #include <algorithm>
 #include <utility>
@@ -15,8 +18,8 @@ namespace {
 QString q(const std::string& s) { return QString::fromStdString(s); }
 }  // namespace
 
-LiveBackend::LiveBackend(LabController* lab, SttController* stt, LiveConfig cfg, QObject* parent)
-    : QObject(parent), lab_(lab), stt_(stt), cfg_(std::move(cfg)), micLow_(lab->micLow), micHigh_(lab->micHigh),
+LiveBackend::LiveBackend(LabController* lab, SttController* stt, LiveConfig cfg, RecordingsController* recordings, QObject* parent)
+    : QObject(parent), lab_(lab), stt_(stt), recordings_(recordings), cfg_(std::move(cfg)), micLow_(lab->micLow), micHigh_(lab->micHigh),
       t0_(monotonicNow()), speech_(stt) {
   lab_->setPttSource(cfg_.devices.pttDevice.empty() ? tr("no PTT device set") : cfg_.pttName);
   lab_->setText({}, tr("Waiting"), false, {}, false);
@@ -38,17 +41,41 @@ LiveBackend::LiveBackend(LabController* lab, SttController* stt, LiveConfig cfg,
   connect(stt, &SttController::result, this,
           [this](quint64 tx, const QString& model, const QString& config, const QString& text, const QStringList& words,
                  const QList<double>& conf, double sec) {
-            const QString info = tr("%1  %2 s").arg(model).arg(sec, 0, 'f', 2);
-            if (tx == guiTx_ && !guiOpen_) {  // never overwrite a newer transmission
-              lab_->setText(text.isEmpty() ? tr("(nothing recognised)") : text, tr("Final"), text.isEmpty(), info, !text.isEmpty());
-              lab_->setWords(words, conf);
-            }
-            lab_->setResult(int(tx), text, info, config);
-            core_->processed(tx);
+            // A quick model may answer before the recording has arrived here.
+            if (tx > lastClosed_) early_[tx] = [=, this] { result(tx, model, config, text, words, conf, sec); };
+            else result(tx, model, config, text, words, conf, sec);
           });
+  if (recordings_) {
+    recordings_->setPlayer([this](std::vector<std::int16_t> s, int rate) { core_->playLocal(LocalSound::Recording, std::move(s), rate); });
+    recordings_->setConnected();
+  }
 }
 
-LiveBackend::~LiveBackend() { core_->stop(); }
+LiveBackend::~LiveBackend() {
+  if (recordings_) recordings_->setPlayer({});
+  core_->stop();
+}
+
+void LiveBackend::result(quint64 tx, const QString& model, const QString& config, const QString& text, const QStringList& words,
+                         const QList<double>& conf, double sec) {
+  const QString info = tr("%1  %2 s").arg(model).arg(sec, 0, 'f', 2);
+  if (tx == guiTx_ && !guiOpen_) {  // never overwrite a newer transmission
+    lab_->setText(text.isEmpty() ? tr("(nothing recognised)") : text, tr("Final"), text.isEmpty(), info, !text.isEmpty());
+    lab_->setWords(words, conf);
+  }
+  lab_->setResult(int(tx), text, info, config);
+  if (recordings_) {
+    StoredResult r;
+    r.modelId = QJsonDocument::fromJson(config.toUtf8()).object()["id"].toString().toStdString();
+    r.modelName = model.toStdString();
+    r.modelConfig = config.toStdString();
+    r.text = text.toStdString();
+    for (qsizetype i = 0; i < words.size(); ++i) r.words.push_back({words[i].toStdString(), i < conf.size() ? conf[i] : 0});
+    r.releaseToTextMs = sec * 1000;
+    recordings_->addResult(int(tx), std::move(r));
+  }
+  core_->processed(tx);
+}
 
 bool LiveBackend::start() {
   const bool ok = core_->start();
@@ -112,7 +139,10 @@ RadioCore::Events LiveBackend::events() {
 void LiveBackend::note(const PttNote& n) {
   const QString msHeld = tr("held %1 ms").arg(double(n.held) / 1e6, 0, 'f', 1);
   switch (n.kind) {
-    case K::Down: return event(n.t, n.source, tr("down"), tr("TX %1 open").arg(n.tx), false);
+    case K::Down:
+      sources_[n.tx] = n.source;
+      if (sources_.size() > 8) sources_.erase(sources_.begin());
+      return event(n.t, n.source, tr("down"), tr("TX %1 open").arg(n.tx), false);
     case K::Up: return event(n.t, n.source, tr("up"), n.held < ms(50) ? msHeld : tr("held %1 s").arg(double(n.held) / 1e9, 0, 'f', 2), false);
     case K::Lost:
       event(n.t, n.source, tr("lost"), tr("unplugged"), true);
@@ -145,10 +175,23 @@ void LiveBackend::closed(RadioTx&& t) {
   if (t.press == t.from) rec->startLabel = tr("TX OPEN");  // queued: no pre-roll
   rec->endLabel = t.end == TxEnd::Stuck ? tr("30 s LIMIT") : t.end == TxEnd::DeviceLost ? tr("LOST") : tr("RELEASE");
   rec->tailLabel = t.end == TxEnd::Stuck ? tr("no tail") : tr("tail");
+  StoredRecording meta;
+  meta.startedMs = QDateTime::currentMSecsSinceEpoch() - (monotonicNow() - t.press) / ms(1);
+  meta.tx = rec->id;
+  meta.pttSource = sources_[t.id];
+  sources_.erase(t.id);
+  meta.end = t.end == TxEnd::Stuck ? "stuck" : t.end == TxEnd::DeviceLost ? "lost" : "normal";
+  meta.gap = t.gap;
+  meta.rate = rate;
+  meta.samples = int(t.audio.size());
+  meta.pressSample = int(rec->pressFrac * double(t.audio.size()));
+  meta.endSample = int(rec->endFrac * double(t.audio.size()));
+  meta.report = checks.report;
   rec->audio = std::move(t.audio);
-  ui([this, rec, recognise = t.recognising, hadModel = t.hadModel, issue = checks.issue, noSpeech = t.noSpeech,
+  ui([this, rec, meta = std::move(meta), recognise = t.recognising, hadModel = t.hadModel, issue = checks.issue, noSpeech = t.noSpeech,
       normal = t.end == TxEnd::Normal, id = t.id] {
     if (id == guiTx_) guiOpen_ = false;
+    if (recordings_) recordings_->offer(meta, rec->audio);
     lab_->addRecording(std::move(*rec), QTime::currentTime().toString("HH:mm:ss"));
     if (issue) {
       lab_->setNotice(issue->level, issue->notice);
@@ -158,6 +201,8 @@ void LiveBackend::closed(RadioTx&& t) {
     }
     if (recognise) lab_->setText(tr("Processing"), tr("Processing"), true, {}, false);
     else lab_->setText({}, tr("Not run"), false, {}, false);
+    lastClosed_ = id;
+    if (const auto e = early_.extract(id)) e.mapped()();
   });
   if (!t.recognising) core_->processed(t.id);
 }

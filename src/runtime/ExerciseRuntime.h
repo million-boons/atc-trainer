@@ -51,7 +51,7 @@ struct ExerciseOptions {
 struct RuntimeConfig {
   EngineConfig engine{};
   AssemblerConfig assembler{};
-  Ns recogniseLimit = ms(30'000);  // no result by then is a recogniser fault, not the trainee's
+  Ns recogniseLimit = ms(10'000);  // no text by then: a system fault, not the trainee's; the pilot says again (D-314)
 };
 
 enum class ExercisePhase { Idle, Running, Ended };
