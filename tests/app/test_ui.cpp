@@ -286,6 +286,10 @@ TEST_F(Ui, InstructorSettingsAndRecords) {
   waitLogin();
   EXPECT_TRUE(allText().contains("Mock Name"));
   EXPECT_TRUE(allText().contains("offline, never cloud"));
+  EXPECT_TRUE(allText().contains("to be approved by the unit"));  // D-134
+  walk(win->contentItem(), [&](QQuickItem* x) {
+    if (x->objectName() == "consentTexts") { EXPECT_FALSE(x->property("truncated").toBool()); }
+  });
   clickButton("On");
   EXPECT_FALSE(settings.saveRecordings());
   clickButton("Add");

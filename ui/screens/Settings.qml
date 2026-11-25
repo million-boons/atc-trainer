@@ -75,7 +75,7 @@ Item {
         ListView {
             id: list
             visible: s.instructor
-            y: Theme.px(30); width: parent.width; height: parent.height - y - Theme.px(140)
+            y: Theme.px(30); width: parent.width; height: parent.height - y - Theme.px(180)
             clip: true
             reuseItems: true
             boundsBehavior: Flickable.StopAtBounds
@@ -112,8 +112,8 @@ Item {
                 Accessible.name: qsTr("%1, consent %2").arg(row.d.id).arg(row.d.consent ? qsTr("yes") : qsTr("no"))
             }
         }
-        Label { visible: s.instructor; x: Theme.s12; y: parent.height - Theme.px(132); width: parent.width - 2 * x; height: Theme.px(60)
-                text: qsTr("%1 Pilot voice: %2").arg(s.access.consentText).arg(s.access.pilotVoiceText); wrapMode: Text.WordWrap; color: Theme.textSecondary; font.pixelSize: Theme.small }
+        Label { visible: s.instructor; x: Theme.s12; y: parent.height - Theme.px(172); width: parent.width - 2 * x; height: Theme.px(100)
+                objectName: "consentTexts"; text: s.access.consentText + "\n" + s.access.pilotVoiceText; wrapMode: Text.WordWrap; color: Theme.textSecondary; font.pixelSize: Theme.small }
         Row {
             visible: s.instructor
             anchors { right: parent.right; rightMargin: Theme.s12; bottom: parent.bottom; bottomMargin: Theme.s12 }

@@ -8,6 +8,11 @@
 
 using namespace atc;
 
+namespace {
+// On every consent text until the user confirms the unit's approval (D-134). Then this returns an empty text.
+QString draft() { return AccessController::tr(" [%1]").arg(AccessController::tr("draft — to be approved by the unit")); }
+}  // namespace
+
 AccessController::AccessController(AccessBackend b, std::function<Ns()> clock, QObject* parent)
     : QObject(parent), b_(std::move(b)), clock_(std::move(clock)) {
   if (b_.load) loadError_ = QString::fromStdString(b_.load());
@@ -32,11 +37,11 @@ QString AccessController::shortText() const { return instructor() ? tr("Instruct
 QString AccessController::longText() const { return instructor() ? tr("Instructor") : trainee() ? tr("%1  trainee").arg(id_) : tr("Not logged in"); }
 QString AccessController::today() const { return QDate::currentDate().toString(Qt::ISODate); }
 QString AccessController::consentText() const {
-  return tr("Voice recordings stay on this machine. Consent covers copies to project machines on the local network (offline, never cloud).");
+  return tr("Voice recordings stay on this machine. Consent covers copies to project machines on the local network (offline, never cloud).") + draft();
 }
 
 QString AccessController::pilotVoiceText() const {
-  return tr("Separate answer: recorded pilot phrases are used as the pilot voice and heard by other trainees. If the answer becomes no, they are taken out of use at once.");
+  return tr("Pilot voice (separate answer): Your recorded phrases may be used as the pilot's voice in training exercises and heard by other trainees. You can withdraw this at any time through the instructor; your phrases are then taken out of use immediately.") + draft();
 }
 
 QVariantList AccessController::people() const {

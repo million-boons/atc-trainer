@@ -224,8 +224,13 @@ TEST_F(Login, ConsentTextNamesTheLocalNetworkAndNoCloud) {  // D-114
   EXPECT_TRUE(a->consentText().contains("Consent covers copies to project machines on the local network (offline, never cloud)."));
 }
 
+TEST_F(Login, EveryConsentTextIsMarkedAsDraft) {  // D-134
+  EXPECT_TRUE(a->consentText().contains(QString::fromUtf8("draft — to be approved by the unit")));
+  EXPECT_TRUE(a->pilotVoiceText().contains(QString::fromUtf8("draft — to be approved by the unit")));
+}
+
 TEST_F(Login, PilotVoiceTextSaysWhoHearsIt) {  // D-133
-  EXPECT_TRUE(a->pilotVoiceText().contains("heard by other trainees"));
+  EXPECT_TRUE(a->pilotVoiceText().startsWith("Pilot voice (separate answer): Your recorded phrases may be used as the pilot's voice in training exercises and heard by other trainees. You can withdraw this at any time through the instructor; your phrases are then taken out of use immediately."));
   EXPECT_FALSE(a->people()[0].toMap()["pilot"].toBool());
 }
 
