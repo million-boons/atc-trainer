@@ -33,12 +33,17 @@ StudioTake take(int id, const std::string& clip, State s, bool synthetic = true,
   t.levelDb = -20;
   t.trimStart = 0.18;
   t.trimEnd = 0.79;
+  return t;
+}
+
+std::vector<float> wave() {
+  std::vector<float> l;
   for (int i = 0; i < 240; ++i) {
     const double x = i / 240.0, env = x > 0.2 && x < 0.75 ? 0.25 + 0.5 * std::abs(std::sin(x * 23)) : 0.015;
-    t.peaks.push_back(float(-env * (0.7 + 0.3 * std::sin(i * 1.7))));
-    t.peaks.push_back(float(env * (0.7 + 0.3 * std::cos(i * 2.3))));
+    l.push_back(float(-env * (0.7 + 0.3 * std::sin(i * 1.7))));
+    l.push_back(float(env * (0.7 + 0.3 * std::cos(i * 2.3))));
   }
-  return t;
+  return l;
 }
 
 const char* const kPos[] = {"initial", "medial", "final"};
@@ -171,6 +176,7 @@ StudioBackend mockStudio() {
   en.push_back(entry("LANDING_CLEARANCE", "{callsign} runway {runway} cleared to land", "", false));
   b->content.scenarios = {{"DEPARTURE-01", "SAMPLE-AF"}};
   b->content.voice = "mock voice";
+  b->content.activeVoice = "mock Piper";
   b->content.revision = "1";
   collect(*b);
   int n = 0;
@@ -221,6 +227,7 @@ StudioBackend mockStudio() {
       for (const StudioTake& x : c.takes) t.number = std::max(t.number, x.number + 1);
       c.takes.insert(c.takes.begin(), t);
       raw->recording.clear();
+      if (raw->ev.recording) raw->ev.recording(false);
       if (raw->ev.recordingStopped) raw->ev.recordingStopped(why);
       if (raw->ev.takeReady) raw->ev.takeReady(t);
       return;
@@ -266,8 +273,10 @@ StudioBackend mockStudio() {
     done("");
   };
   s.clips = [b](const std::string&, auto done) { done(b->clips, ""); };
+  s.peaks = [](const std::string&, auto done) { done(wave(), ""); };
   s.startSession = [b](const std::string& speaker, StudioBackend::Done done) {
     b->speaker = speaker;
+    if (b->ev.roomTone) b->ev.roomTone(-62, "");  // the mock does not wait
     done("");
   };
   s.endSession = [b, stop] {
@@ -281,6 +290,7 @@ StudioBackend mockStudio() {
     b->since.start();
     b->timer.start();
     done("");
+    if (b->ev.recording) b->ev.recording(true);
   };
   s.stopRecord = [stop] { stop(""); };
   s.setTrim = [b](const std::string& id, double start, double end, StudioBackend::Done done) {

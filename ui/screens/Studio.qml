@@ -7,7 +7,7 @@ import Atc
 Item {
     id: s
     property StudioController studio
-    property string dialog            // "", session, changes, add, delete, export, unused, scenario, filter
+    property string dialog            // "", session, changes, add, delete, export, unused, differing, scenario, filter
     signal loginAsked()
     signal keyboardFree()
     readonly property int gap: Theme.s8
@@ -65,10 +65,10 @@ Item {
                               enabled: s.studio.changedHere; onClicked: s.dialog = "export" }
             Label { height: parent.height; mono: true; font.pixelSize: Theme.small; text: s.studio.session ? qsTr("Speaker %1").arg(s.studio.speaker) : "" }
             BaseButton { anchors.verticalCenter: parent.verticalCenter; width: Theme.px(148); font.pixelSize: Theme.small; focusPolicy: Qt.NoFocus
-                         text: s.studio.session ? qsTr("End session") : qsTr("Start session...")
+                         text: s.studio.session ? qsTr("End session") : s.studio.starting ? qsTr("Cancel start") : qsTr("Start session...")
                          tint: s.studio.session ? Theme.caution : Theme.accent
-                         enabled: s.studio.session || (!s.studio.busy && !s.studio.trainerBusy)
-                         onClicked: { s.free(); if (s.studio.session) s.studio.endSession(); else s.dialog = "session" } }
+                         enabled: s.studio.session || s.studio.starting || (!s.studio.busy && !s.studio.trainerBusy)
+                         onClicked: { s.free(); if (s.studio.session || s.studio.starting) s.studio.endSession(); else s.dialog = "session" } }
         }
     }
 
@@ -168,7 +168,7 @@ Item {
                 Rectangle { id: line1; anchors { top: lintRow.bottom; topMargin: Theme.s4 } width: parent.width; height: Theme.line; color: Theme.divider }
                 // Reply: the values of the pool. ATC intent: its examples.
                 Label { id: poolT; anchors { top: line1.bottom; topMargin: Theme.s4 } width: parent.width; height: Theme.px(20); color: Theme.textSecondary; font.pixelSize: Theme.caption
-                        text: !s.studio.replies ? qsTr("Examples") : s.studio.poolTitle || qsTr("Static words: one clip") }
+                        text: !s.studio.replies ? qsTr("Examples do not change recognition on this machine") : s.studio.poolTitle || qsTr("Static words: one clip") }
                 Flickable {
                     anchors { top: poolT.bottom; bottom: line2.top; bottomMargin: Theme.s4 }
                     width: parent.width
@@ -214,7 +214,7 @@ Item {
                             width: parent.width; height: Theme.px(20)
                             spacing: Theme.s4
                             StateIcon { level: s.studio.messageLevel; anchors.verticalCenter: parent.verticalCenter }
-                            Label { objectName: "studioMessage"; height: parent.height; width: parent.width - Theme.px(18); text: s.studio.message || s.studio.notice; font.pixelSize: Theme.caption }
+                            Label { objectName: "studioMessage"; height: parent.height; width: parent.width - Theme.px(18); text: s.studio.message || (s.studio.starting ? qsTr("Measuring the room tone: please be quiet") : s.studio.notice); font.pixelSize: Theme.caption }
                         }
                     }
                 }
@@ -240,6 +240,7 @@ Item {
         onScenarioAsked: s.dialog = "scenario"
         onFilterAsked: s.dialog = "filter"
         onUnusedAsked: s.dialog = "unused"
+        onDifferingAsked: s.dialog = "differing"
     }
 
     // ---- dialogs
@@ -292,16 +293,17 @@ Item {
     }
     Loader {
         anchors.fill: parent
-        active: s.dialog === "changes" || s.dialog === "unused" || s.dialog === "delete"
+        active: s.dialog === "changes" || s.dialog === "unused" || s.dialog === "differing" || s.dialog === "delete"
         sourceComponent: Component {
             ConfirmDialog {
-                title: s.dialog === "changes" ? qsTr("Save changed wording?") : s.dialog === "delete" ? qsTr("Delete this take?") : qsTr("Unused clips")
+                title: s.dialog === "changes" ? qsTr("Save changed wording?") : s.dialog === "delete" ? qsTr("Delete this take?") : s.dialog === "differing" ? qsTr("Words differ") : qsTr("Unused clips")
                 text: s.dialog === "changes" ? qsTr("These clips change. A missing clip blocks Start until it is recorded.")
                     : s.dialog === "delete" ? qsTr("The file is deleted from this machine. The deletion is logged.")
+                    : s.dialog === "differing" ? qsTr("These clips say other words than the text. They block Start until they are recorded again.")
                     : qsTr("No reply of %1 uses these clips. They stay in the bank.").arg(s.studio.scenario)
-                rows: s.dialog === "changes" ? s.studio.changeRows : s.dialog === "unused" ? s.studio.unused : []
+                rows: s.dialog === "changes" ? s.studio.changeRows : s.dialog === "unused" ? s.studio.unused : s.dialog === "differing" ? s.studio.differing : []
                 confirmText: s.dialog === "changes" ? qsTr("Save wording") : s.dialog === "delete" ? qsTr("Delete take") : ""
-                closeText: s.dialog === "unused" ? qsTr("Close") : qsTr("Cancel")
+                closeText: s.dialog === "unused" || s.dialog === "differing" ? qsTr("Close") : qsTr("Cancel")
                 onConfirmed: { const d = s.dialog; s.dialog = ""; if (d === "changes") s.studio.save(); else s.studio.deleteTake() }
                 onClosed: s.dialog = ""
             }

@@ -61,15 +61,22 @@ void StudioController::setBackend(StudioBackend b) {
       emit levelChanged();
     });
   };
-  e.recordingStopped = [this](const std::string& why) {
-    queued([this, why] {
-      recording_ = false;
-      level_ = -120;
-      if (!why.empty()) say(L::Caution, q(why));
+  e.roomTone = [this](double db, const std::string& warning) {
+    queued([this, db, warning] {
+      roomTone_ = db;
+      roomWarning_ = q(warning);
+    });
+  };
+  e.recording = [this](bool on) {
+    queued([this, on] {
+      recording_ = on;
+      if (on) elapsedMs_ = 0;
+      else level_ = -120;
       emit sessionChanged();
       emit levelChanged();
     });
   };
+  e.recordingStopped = [this](const std::string& why) { queued([this, why] { if (!why.empty()) say(L::Caution, q(why)); }); };
   e.takeReady = [this](StudioTake t) {
     queued([this, t = std::move(t)] {
       for (StudioClip& c : clips_) {
@@ -79,6 +86,7 @@ void StudioController::setBackend(StudioBackend b) {
         else *at = t;
       }
       if (t.clipId == clipId_) takeId_ = t.id;
+      loadPeaks();
       emit clipChanged();
       emit stripChanged();
       emit coverageChanged();
@@ -196,8 +204,7 @@ void StudioController::setTrainerBusy(bool on) {
 
 void StudioController::dropSession(const QString& why, bool tellBackend) {
   ++startNo_;
-  session_ = starting_ = recording_ = pedal_ = false;
-  level_ = -120;
+  session_ = starting_ = pedal_ = false;  // recording_ follows the backend
   speaker_.clear();
   if (tellBackend && b_.endSession) b_.endSession();  // keeps an open take as pending
   say(L::Caution, why);
@@ -259,6 +266,7 @@ void StudioController::loadClips() {
         const StudioClip* sel = find(clipId_);
         takeId_ = sel && !sel->takes.empty() ? sel->takes.front().id : std::string();
       }
+      loadPeaks();
       emit listChanged();
       emit stripChanged();
       emit clipChanged();
@@ -577,6 +585,7 @@ void StudioController::selectClip(const QString& id) {
   clipId_ = id.toStdString();
   const StudioClip* c = find(clipId_);
   takeId_ = c && !c->takes.empty() ? c->takes.front().id : std::string();
+  loadPeaks();
   emit clipChanged();
   emit stripChanged();
   emit sessionChanged();
@@ -587,7 +596,27 @@ void StudioController::selectTake(int row) {
   if (!c || recording_ || row < 0 || row >= int(c->takes.size())) return;
   stopPlay();
   takeId_ = c->takes[std::size_t(row)].id;
+  loadPeaks();
   emit clipChanged();
+}
+
+// The raw take does not change when it is trimmed, so its waveform is asked for once.
+void StudioController::loadPeaks() {
+  const StudioTake* t = current();
+  const std::string id = t && t->state != State::Withdrawn ? t->id : std::string();
+  if (id == peaksOf_) return;
+  peaksOf_ = id;
+  peaks_.clear();
+  const unsigned n = ++peaksNo_;
+  if (id.empty() || !b_.peaks) return;
+  b_.peaks(id, [this, n](std::vector<float> p, const std::string& why) {
+    queued([this, n, p = std::move(p), why] {
+      if (n != peaksNo_) return;
+      if (!why.empty()) say(L::Caution, q(why));
+      peaks_ = p;
+      emit clipChanged();
+    });
+  });
 }
 
 QString StudioController::poolTitle() const {
@@ -630,7 +659,8 @@ QVariantMap StudioController::take() const {
   const StudioTake* t = current();
   if (!t) return {};
   QVariantList peaks;
-  for (float p : t->peaks) peaks.append(double(p));
+  if (t->id == peaksOf_)
+    for (float p : peaks_) peaks.append(double(p));
   const bool gone = t->state == State::Withdrawn;
   return {{"start", t->trimStart}, {"end", t->trimEnd}, {"peaks", peaks}, {"warnings", list(t->warnings).join(QStringLiteral("; "))},
           {"withdrawn", gone}, {"removable", gone || t->state == State::Rejected}, {"decidable", !gone},
@@ -645,6 +675,9 @@ void StudioController::startSession(const QString& speaker) {
   if (const QString why = refusal(speaker); !why.isEmpty()) return void(say(L::Caution, tr("%1 may not record: %2.").arg(speaker, why)));
   const unsigned n = ++startNo_;
   starting_ = true;
+  roomTone_ = -120;
+  roomWarning_.clear();
+  say(L::None, {});
   b_.startSession(speaker.toStdString(), [this, n, done = answer([this, speaker, n] {
                     if (n != startNo_) return;
                     starting_ = false;
@@ -655,7 +688,8 @@ void StudioController::startSession(const QString& speaker) {
                     }
                     session_ = true;
                     speaker_ = speaker;
-                    say(L::Ok, tr("Recording session started."));
+                    if (!roomWarning_.isEmpty()) say(L::Caution, roomWarning_);
+                    else say(L::Ok, roomTone_ > -120 ? tr("Recording session started. Room tone %1 dBFS.").arg(roomTone_, 0, 'f', 0) : tr("Recording session started."));
                     emit sessionChanged();
                   })](const std::string& why) {
     queued([this, n, why] {
@@ -691,13 +725,7 @@ void StudioController::toggleRecord() {
   if (!hasClip()) return void(say(L::Caution, tr("Choose a clip first.")));
   if (const QString why = refusal(speaker_); !why.isEmpty()) return void(say(L::Caution, tr("%1 may not record: %2.").arg(speaker_, why)));
   stopPlay();
-  elapsedMs_ = 0;
-  b_.record(clipId_, answer([this] {
-              if (!session_) return;
-              recording_ = true;
-              emit sessionChanged();
-              emit levelChanged();
-            }));
+  b_.record(clipId_, answer({}));  // recording() follows when it really starts
 }
 
 QString StudioController::elapsed() const {
@@ -769,6 +797,18 @@ QStringList StudioController::unused() const {
   for (const StudioClip& c : clips_)
     if (!c.needed) l << q(c.id);
   return l;
+}
+
+QStringList StudioController::differing() const {
+  QStringList l;
+  for (const StudioClip& c : clips_)
+    if (c.needed && !c.bankWords.empty() && c.bankWords != c.words) l << tr("%1: \"%2\", text \"%3\"").arg(q(c.id), q(c.bankWords), q(c.words));
+  return l;
+}
+
+QString StudioController::voice() const {
+  if (content_.activeVoice.empty() || content_.activeVoice == content_.voice) return q(content_.voice);
+  return tr("%1 (exercise: %2)").arg(q(content_.voice), q(content_.activeVoice));
 }
 
 bool StudioController::matches(const StudioClip& c) const {

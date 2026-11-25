@@ -274,6 +274,98 @@ TEST_F(Studio, ATakeIsPendingUntilItIsAccepted) {  // S-1
   EXPECT_EQ(s->segments()[3].toMap()["state"].toString(), "P");
 }
 
+TEST_F(Studio, RecordingIsShownFromTheBackendAndNotFromTheButton) {  // ST-1
+  login();
+  openTaxi();
+  StudioEvents e;
+  StudioBackend x = b;
+  x.setEvents = [&e](StudioEvents v) { e = std::move(v); };
+  x.record = [](const std::string&, StudioBackend::Done done) { done(""); };
+  s->setBackend(x);
+  startS01();
+  s->toggleRecord();
+  drain();
+  EXPECT_FALSE(s->recording());  // accepted, but it has not started
+  e.recording(true);
+  drain();
+  EXPECT_TRUE(s->recording());
+  s->endSession();
+  EXPECT_TRUE(s->recording());  // until the core has stopped
+  e.recording(false);
+  e.recordingStopped("20 s limit");
+  drain();
+  EXPECT_FALSE(s->recording());
+  EXPECT_EQ(s->message(), "20 s limit");
+  e.recording(true);  // the pedal
+  drain();
+  EXPECT_TRUE(s->recording());
+}
+
+TEST_F(Studio, TheRoomToneIsMeasuredBeforeTheSessionOpens) {
+  login();
+  StudioEvents e;
+  StudioBackend::Done late;
+  StudioBackend x = b;
+  x.setEvents = [&e](StudioEvents v) { e = std::move(v); };
+  x.startSession = [&late](const std::string&, StudioBackend::Done done) { late = std::move(done); };
+  s->setBackend(x);
+  s->startSession("S01");
+  EXPECT_TRUE(s->starting());
+  EXPECT_FALSE(s->session());
+  e.roomTone(-38, "the room is loud: -38 dBFS");
+  late("");
+  drain();
+  EXPECT_TRUE(s->session());
+  EXPECT_FALSE(s->starting());
+  EXPECT_EQ(s->message(), "the room is loud: -38 dBFS");
+  EXPECT_EQ(s->messageLevel(), int(LabController::Caution));
+  s->endSession();
+  s->startSession("S01");
+  s->endSession();  // cancelled during the room tone: the backend refuses
+  late("cancelled");
+  drain();
+  EXPECT_FALSE(s->session());
+  EXPECT_FALSE(s->starting());
+  EXPECT_FALSE(s->busy());
+}
+
+TEST_F(Studio, TheWaveformIsAskedForTheSelectedTakeOnly) {
+  QStringList asked;
+  StudioBackend x = b;
+  x.peaks = [&asked, inner = b.peaks](const std::string& id, auto done) {
+    asked << QString::fromStdString(id);
+    inner(id, done);
+  };
+  s->setBackend(x);
+  login();
+  openTaxi();
+  s->selectSegment(3);
+  s->selectClip("RUNWAY_09@medial");
+  drain();
+  EXPECT_FALSE(s->take()["peaks"].toList().isEmpty());
+  const auto n = asked.size();
+  s->setTrim(0.1, 0.9);
+  drain();
+  EXPECT_EQ(asked.size(), n);  // the raw take is the same
+  s->selectTake(1);
+  drain();
+  EXPECT_EQ(asked.size(), n + 1);
+  s->selectClip("RUNWAY_27@medial");  // withdrawn
+  drain();
+  EXPECT_EQ(asked.size(), n + 1);
+  EXPECT_TRUE(s->take()["peaks"].toList().isEmpty());
+}
+
+TEST_F(Studio, ClipsWithOtherWordsAreListed) {  // ST-4
+  login();
+  EXPECT_EQ(s->differing(), QStringList{"RUNWAY_09@medial: \"zero nine\", text \"zero niner\""});
+}
+
+TEST_F(Studio, TheVoiceOfTheExerciseIsNamedIfItIsAnother) {  // ST-2
+  login();
+  EXPECT_EQ(s->voice(), "mock voice (exercise: mock Piper)");
+}
+
 TEST_F(Studio, AtMostOnePrimary) {
   login();
   openTaxi();

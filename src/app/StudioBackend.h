@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-// What the Phraseology Studio needs from outside (07, "Studio interface"; PROPOSED, b2 has not accepted it yet).
+// What the Phraseology Studio needs from outside (07, "Studio interface"; 09 section 8, approved by D-331).
 // The only place that knows this interface besides StudioController is a backend. Texts: empty, or the reason of a
 // refusal. Callbacks may come on any thread and after the call has returned; StudioController brings them to the GUI.
 
@@ -41,7 +41,8 @@ struct StudioScenario {
 struct StudioContent {
   std::vector<StudioEntry> entries{};
   std::vector<StudioScenario> scenarios{};
-  std::string voice{};
+  std::string voice{};         // the bank that is recorded
+  std::string activeVoice{};   // the bank of the exercise: may be another one (ST-2)
   bool placeholderVoice = true;
   bool changedHere = false;    // the writable copy is in use (D-318)
   std::string notice{};        // e.g. the installed data is newer than the copy's origin
@@ -58,7 +59,6 @@ struct StudioTake {
   double levelDb = 0;
   double trimStart = 0, trimEnd = 1;  // fractions of the raw take
   std::vector<std::string> warnings{};
-  std::vector<float> peaks{};  // of the raw take: min, max, min, max ... in -1..1, at most 1000 pairs
 };
 
 struct StudioClip {
@@ -73,8 +73,10 @@ struct StudioClip {
 
 struct StudioEvents {
   std::function<void(double dbfs)> level;         // at most 25 per second
+  std::function<void(double dbfs, const std::string& warning)> roomTone;  // measured while a session starts
+  std::function<void(bool on)> recording;         // the core's real start and stop, also by pedal: what RECORDING shows
   std::function<void(int ms)> elapsed;
-  std::function<void(const std::string& why)> recordingStopped;  // empty: as asked
+  std::function<void(const std::string& why)> recordingStopped;  // the reason; empty: as asked
   std::function<void(StudioTake)> takeReady;
   std::function<void(const std::string& why)> sessionEnded;
   std::function<void()> clipsChanged;
@@ -88,13 +90,14 @@ struct StudioBackend {
   std::function<void(StudioEntry, const std::string& revision, Done)> save;
   std::function<void(StudioEntry, const std::string& revision, Done)> addReply;
   std::function<void(const std::string& scenario, std::function<void(std::vector<StudioClip>, const std::string& why)>)> clips;
-  std::function<void(const std::string& speaker, Done)> startSession;
-  std::function<void()> endSession;               // stops a recording and keeps it as pending
+  std::function<void(const std::string& take, std::function<void(std::vector<float>, const std::string& why)>)> peaks;  // of the raw take: min, max, min, max ... in -1..1, at most 1000 pairs
+  std::function<void(const std::string& speaker, Done)> startSession;  // answers after the room tone (about 2 s)
+  std::function<void()> endSession;               // stops a recording and keeps it as pending; during the room tone: startSession is refused; twice: harmless
   std::function<void(bool on)> setPedal;          // the pedal starts and stops a recording; it never transmits here
   std::function<void(const std::string& clipId, Done)> record;
   std::function<void()> stopRecord;
   std::function<void(const std::string& take, double start, double end, Done)> setTrim;
-  std::function<void(const std::string& take, const std::string& mode, Done)> play;  // raw, trimmed, radio, sentence
+  std::function<void(const std::string& take, const std::string& mode, Done)> play;  // raw, trimmed, radio, sentence (as sayBefore and sayAfter show it; the text names missing clips)
   std::function<void()> stopPlay;
   std::function<void(const std::string& take, bool primary, Done)> accept;
   std::function<void(const std::string& take, Done)> reject;

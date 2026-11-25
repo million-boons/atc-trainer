@@ -12,6 +12,24 @@ Card {
     readonly property bool free: !studio.recording && !studio.busy
     function esc(t) { return (t || "").replace(/&/g, "&amp;").replace(/</g, "&lt;") }
     title: qsTr("RECORDER")
+    border { color: studio.recording ? Theme.fault : Theme.border; width: (studio.recording ? 3 : 1) * Theme.line }
+    // ST-1: shown from the backend's state, whatever started the recording. Word, shape and border.
+    headerItems: Rectangle {
+        objectName: "recordingSign"
+        visible: r.studio.recording
+        anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+        width: recRow.width + 2 * Theme.s12; height: Theme.px(30)
+        radius: Theme.radiusChip
+        color: Theme.raised
+        border { color: Theme.fault; width: 2 * Theme.line }
+        Row {
+            id: recRow
+            x: Theme.s12; height: parent.height
+            spacing: Theme.s8
+            Rectangle { width: Theme.px(14); height: width; radius: width / 2; color: Theme.fault; anchors.verticalCenter: parent.verticalCenter }
+            Label { height: parent.height; text: qsTr("RECORDING"); font { pixelSize: Theme.h2; weight: Font.Bold } }
+        }
+    }
     Label { anchors { fill: parent; margins: Theme.s12 } visible: !r.studio.replies || !r.studio.hasClip
             verticalAlignment: Text.AlignTop; wrapMode: Text.WordWrap; color: Theme.textSecondary; font.pixelSize: Theme.small
             text: r.studio.replies ? qsTr("Choose a segment. A new clip can be recorded after its text is saved.") : qsTr("ATC examples are not recorded.") }

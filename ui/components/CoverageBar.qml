@@ -8,6 +8,7 @@ Rectangle {
     signal scenarioAsked()
     signal filterAsked()
     signal unusedAsked()
+    signal differingAsked()
     signal touched()
     readonly property var filterNames: ({ all: qsTr("All clips"), "this": qsTr("This phrase"), pools: qsTr("Pool values"),
                                           initial: qsTr("Initial"), medial: qsTr("Medial"), "final": qsTr("Final") })
@@ -20,11 +21,12 @@ Rectangle {
         spacing: Theme.s8
         B { text: c.studio.scenario || qsTr("No scenario"); enabled: c.studio.scenarios.length > 1; implicitWidth: Math.max(Theme.px(120), contentItem.implicitWidth + 2 * Theme.s12); onClicked: c.scenarioAsked() }
         Label { objectName: "coverage"; height: parent.height; text: c.studio.coverage; mono: true; font.pixelSize: Theme.small }
-        B { text: qsTr("Unused %1").arg(c.studio.unused.length); enabled: c.studio.unused.length > 0; width: Theme.px(88); onClicked: c.unusedAsked() }
+        B { text: qsTr("Unused %1").arg(c.studio.unused.length); enabled: c.studio.unused.length > 0; width: Theme.px(80); onClicked: c.unusedAsked() }
+        B { text: qsTr("Words differ %1").arg(c.studio.differing.length); enabled: c.studio.differing.length > 0; tint: enabled ? Theme.caution : Theme.border; width: Theme.px(108); onClicked: c.differingAsked() }
         Column {
             anchors.verticalCenter: parent.verticalCenter
-            spacing: Theme.s4
-            Label { text: qsTr("Voice %1").arg(c.studio.voice); width: Theme.px(176); font.pixelSize: Theme.caption; color: Theme.textSecondary }
+            spacing: Theme.px(2)
+            Label { text: qsTr("Voice %1").arg(c.studio.voice); width: Theme.px(190); wrapMode: Text.WordWrap; maximumLineCount: 2; font.pixelSize: Theme.caption; color: Theme.textSecondary }
             Tag { visible: c.studio.placeholderVoice; text: qsTr("PLACEHOLDER VOICE") }
         }
     }

@@ -52,10 +52,11 @@ class StudioController : public QObject {
   Q_PROPERTY(QVariantList takes READ takes NOTIFY clipChanged)    // {number, who, state, level, info, selected}
   Q_PROPERTY(bool hasTake READ hasTake NOTIFY clipChanged)
   Q_PROPERTY(QVariantMap take READ take NOTIFY clipChanged)       // {start, end, peaks, warnings, withdrawn, removable, decidable}
+  Q_PROPERTY(bool starting READ starting NOTIFY sessionChanged)   // the room tone is measured
   Q_PROPERTY(bool session READ session NOTIFY sessionChanged)
   Q_PROPERTY(QString speaker READ speaker NOTIFY sessionChanged)
   Q_PROPERTY(QVariantList speakers READ speakers NOTIFY sessionChanged)  // {id, may, why}
-  Q_PROPERTY(bool recording READ recording NOTIFY sessionChanged)
+  Q_PROPERTY(bool recording READ recording NOTIFY sessionChanged)  // as the backend reports it, not the button (ST-1)
   Q_PROPERTY(bool canRecord READ canRecord NOTIFY sessionChanged)
   Q_PROPERTY(bool pedal READ pedal NOTIFY sessionChanged)
   Q_PROPERTY(bool busy READ busy NOTIFY sessionChanged)           // an answer is awaited
@@ -68,6 +69,7 @@ class StudioController : public QObject {
   Q_PROPERTY(QString coverage READ coverage NOTIFY coverageChanged)
   Q_PROPERTY(int missingCount READ missingCount NOTIFY coverageChanged)
   Q_PROPERTY(QStringList unused READ unused NOTIFY coverageChanged)
+  Q_PROPERTY(QStringList differing READ differing NOTIFY coverageChanged)  // clips that say other words than the text (ST-4)
   Q_PROPERTY(QString voice READ voice NOTIFY coverageChanged)
   Q_PROPERTY(bool placeholderVoice READ placeholderVoice NOTIFY coverageChanged)
   Q_PROPERTY(QString filter READ filter NOTIFY coverageChanged)
@@ -110,6 +112,7 @@ class StudioController : public QObject {
   QVariantList takes() const;
   bool hasTake() const { return current() != nullptr; }
   QVariantMap take() const;
+  bool starting() const { return starting_; }
   bool session() const { return session_; }
   QString speaker() const { return speaker_; }
   QVariantList speakers() const;
@@ -125,7 +128,8 @@ class StudioController : public QObject {
   QString coverage() const;
   int missingCount() const { return int(missing().size()); }
   QStringList unused() const;
-  QString voice() const { return QString::fromStdString(content_.voice); }
+  QStringList differing() const;
+  QString voice() const;
   bool placeholderVoice() const { return content_.placeholderVoice; }
   QString filter() const { return filter_; }
   int messageLevel() const { return messageLevel_; }
@@ -196,6 +200,7 @@ class StudioController : public QObject {
   int segmentOf(const std::string& clip) const;
   bool matches(const StudioClip& c) const;  // the filter
   void loadClips();
+  void loadPeaks();   // of the selected take
   void open(const StudioEntry& e);
   void preview();
   void accessChanged();
@@ -214,7 +219,11 @@ class StudioController : public QObject {
   unsigned startNo_ = 0;       // a session start that was left is not taken over
   unsigned previewNo_ = 0, loadNo_ = 0, clipsNo_ = 0;  // answers to older questions are ignored
   bool session_ = false, starting_ = false, recording_ = false, pedal_ = false, trainerBusy_ = false;
-  double level_ = -120;
+  double level_ = -120, roomTone_ = -120;
+  QString roomWarning_;
+  std::string peaksOf_;
+  std::vector<float> peaks_;
+  unsigned peaksNo_ = 0;
   std::string draftRevision_;  // of the data the edit started from
   StudioBackend b_;            // last: it finishes its work before the rest goes
 };

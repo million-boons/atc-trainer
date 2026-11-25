@@ -578,11 +578,13 @@ TEST_F(Ui, SpaceRecordsInTheStudioAndNeverTransmits) {
   QTest::keyPress(win, Qt::Key_Space);
   settle(150);
   EXPECT_TRUE(mock->studio()->recording());
+  EXPECT_TRUE(allText().contains("RECORDING"));
   EXPECT_EQ(lab.txTone(), LabController::Neutral);
   QTest::keyRelease(win, Qt::Key_Space);
   QTest::keyClick(win, Qt::Key_Space);
   settle();
   EXPECT_FALSE(mock->studio()->recording());
+  EXPECT_FALSE(allText().contains("RECORDING"));
   QTest::keyClick(win, Qt::Key_Return);  // accept
   settle();
   EXPECT_TRUE(allText().contains("Primary take."));
