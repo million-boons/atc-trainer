@@ -37,6 +37,8 @@ class StatusController : public QObject {
   bool toneAwaitingAnswer() const { return toneDone_; }
   void onPttTest(const atc::PttTest& t);
   void setBank(atc::BankReady b, const QStringList& missing = {});
+  void setRunning(bool on);  // an exercise: no test can be started, and a running one ends
+  void setScenario(const QVariantMap& card);
 
  private:
   void requestTone();

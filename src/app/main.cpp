@@ -118,6 +118,7 @@ int main(int argc, char** argv) {
     mockBackend->attach(&access, &recordings);
   }
 #ifdef ATC_HAVE_LIVE
+  std::unique_ptr<LiveExercise> exercise;  // before the backend, which calls it until its radio has stopped
   std::unique_ptr<LiveBackend> live;
   if (!useMock) {
     LiveConfig lc;
@@ -140,8 +141,29 @@ int main(int argc, char** argv) {
     if (ptt.isEmpty()) lab.idleHint = "Hold Screen PTT or Space";
     stt.start(std::move(models), [engines = paths.engines](const atc::SttModel& m, std::string& e) { return atc::makeRecognizer(m, engines, e); },
               atc::describeModel, atc::availableMemoryMb);
+    LiveExerciseSetup setup;
+    std::string rulesError;
+    if (!atc::loadParserRules(paths.data + "/phraseology/placeholder.json", setup.rules, rulesError)) {
+      qCritical("no exercise: %s", rulesError.c_str());
+    } else {
+      LiveExerciseConfig ec;
+      ec.data = paths.data;
+      ec.voices = paths.voices;
+      ec.logs = paths.writable + "/exercises";
+      ec.scenarioFile = paths.data + "/scenarios/" + cfg["scenario"].toString("DEPARTURE-01").toStdString() + ".json";
+      ec.model = cfg["exerciseModel"].toString(at(ec.model)).toStdString();
+      ec.pttMissingBlocks = lc.status.pttMissingBlocks;
+      const std::string effect = cfg["radioEffect"].toString("light").toStdString();
+      if (const auto r = atc::radioIntensityFromString(effect)) ec.radio = *r;
+      else qWarning("radioEffect \"%s\" is not known; using light", effect.c_str());
+      setup.runtime.recogniseLimit = atc::ms(std::clamp(cfg["recogniserTimeoutMs"].toInt(10'000), 1000, 60'000));
+      exercise = std::make_unique<LiveExercise>(ec, &stt, &lab, &access, &settings);
+      setup.callbacks = exercise->callbacks();
+      lc.exercise = std::move(setup);
+    }
     live = std::make_unique<LiveBackend>(&lab, &stt, lc, &recordings);
     live->start();
+    if (exercise) exercise->connectRadio(live->exerciseRadio(), live->exerciseStatus(), live->status());
   }
 #endif
 
@@ -168,7 +190,12 @@ int main(int argc, char** argv) {
   const bool windowed = wh.size() == 2;
   QQmlApplicationEngine engine;
   engine.addImportPath("qrc:/");
+  ExerciseController* exerciseView = nullptr;
+#ifdef ATC_HAVE_LIVE
+  if (exercise) exerciseView = exercise->controller();
+#endif
   engine.setInitialProperties({{"lab", QVariant::fromValue(&lab)},
+                               {"exercise", QVariant::fromValue(exerciseView)},
                                {"mock", QVariant::fromValue(mockBackend.get())},
                                {"stt", QVariant::fromValue(&stt)},
                                {"feed", QVariant::fromValue(feed)},

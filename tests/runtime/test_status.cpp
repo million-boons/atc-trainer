@@ -54,6 +54,22 @@ struct Status : testing::Test {
 };
 }  // namespace
 
+TEST_F(Status, AnExerciseEndsTestsAndShowsItsScenario) {
+  emit c->feed()->micTestRequested();
+  EXPECT_GT(in().micTestLeft, 0);
+  c->setScenario({{"name", "Departure"}});
+  c->setRunning(true);
+  EXPECT_EQ(in().micTestLeft, 0);
+  EXPECT_TRUE(dash.running());
+  EXPECT_FALSE(tests.empty());
+  EXPECT_FALSE(tests.back());
+  EXPECT_EQ(dash.scenario()["name"].toString(), "Departure");
+  for (int i = 0; i < 4; ++i) EXPECT_FALSE(tile(i)["actionEnabled"].toBool()) << i;
+  c->setRunning(false);
+  EXPECT_FALSE(dash.running());
+  EXPECT_TRUE(tile(0)["actionEnabled"].toBool());
+}
+
 TEST_F(Status, MicrophoneStates) {
   EXPECT_EQ(in().mic, MicReady::NotTested); agree();
   EXPECT_EQ(in().micName, "H540");

@@ -4,19 +4,29 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <optional>
 
+#include "app/EngineHeaders.h"
 #include "app/LabController.h"
+#include "app/LiveExercise.h"
 #include "app/RecordingsController.h"
 #include "app/StatusController.h"
 #include "app/SttController.h"
 #include "runtime/RadioCore.h"
 #include "runtime/RealDevices.h"
 
+struct LiveExerciseSetup {
+  atc::ParserRules rules;
+  atc::RuntimeConfig runtime;
+  atc::ExerciseRuntime::Callbacks callbacks;  // must stay callable until the backend is gone
+};
+
 struct LiveConfig {
   atc::RealDeviceConfig devices;
   atc::RadioConfig radio;
   QString pttName;  // shown in the event log header
   StatusConfig status;
+  std::optional<LiveExerciseSetup> exercise;  // empty: this program runs no exercise
 };
 
 // The Speech Lab and the status tiles as clients of RadioCore. RadioCore runs on its own
@@ -30,6 +40,9 @@ class LiveBackend : public QObject {
   ~LiveBackend() override;
   bool start();
   StatusFeed* status() { return status_->feed(); }
+  // For LiveExercise; empty functions without an exercise set-up.
+  ExerciseRadio exerciseRadio();
+  ExerciseStatus exerciseStatus();
 
  signals:
   void sideTone();
@@ -46,7 +59,7 @@ class LiveBackend : public QObject {
   template <class F> void ui(F f) { QMetaObject::invokeMethod(this, std::move(f), Qt::QueuedConnection); }
   atc::RadioCore::Events events();
   void event(atc::Ns t, const std::string& src, const QString& edge, const QString& detail, bool warn);
-  void notice(LabController::Level l, const QString& n, LabController::Level al, const QString& a);
+  void notice(LabController::Level l, const QString& n, LabController::Level al, const QString& a, bool ptt = false);
   // Core thread.
   void note(const atc::PttNote& n);
   void closed(atc::RadioTx&& t);
@@ -75,5 +88,7 @@ class LiveBackend : public QObject {
   bool guiOpen_ = false;
   atc::PttLink link_ = atc::PttLink::NotSet;
 
+  std::unique_ptr<atc::SpeechModel> model_;
+  std::unique_ptr<atc::ExerciseRuntime> runtime_;  // may be null
   std::unique_ptr<atc::RadioCore> core_;  // last: joins its thread before the rest goes
 };

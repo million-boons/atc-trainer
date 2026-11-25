@@ -75,6 +75,18 @@ void StatusController::setBank(BankReady b, const QStringList& missing) {
   apply();
 }
 
+void StatusController::setRunning(bool on) {
+  if (in_.running == on) return;
+  if (on) emit feed_.cancelTestsRequested();
+  in_.running = on;
+  apply();
+}
+
+void StatusController::setScenario(const QVariantMap& card) {
+  in_.scenario = card;
+  apply();
+}
+
 void StatusController::onSnapshot(const RadioSnapshot& s) {
   radioState_ = s;
   peak_ = std::max(peak_, s.micDbfs);

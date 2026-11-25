@@ -16,6 +16,13 @@ using K = PttNote::Kind;
 
 namespace {
 QString q(const std::string& s) { return QString::fromStdString(s); }
+std::string modelId(const QString& config) { return QJsonDocument::fromJson(config.toUtf8()).object()["id"].toString().toStdString(); }
+SttResult sttResult(const QString& text, const QStringList& words, const QList<double>& conf) {
+  SttResult r;
+  r.text = text.toStdString();
+  for (qsizetype i = 0; i < words.size(); ++i) r.words.push_back({words[i].toStdString(), i < conf.size() ? conf[i] : 0});
+  return r;
+}
 }  // namespace
 
 LiveBackend::LiveBackend(LabController* lab, SttController* stt, LiveConfig cfg, RecordingsController* recordings, QObject* parent)
@@ -26,7 +33,12 @@ LiveBackend::LiveBackend(LabController* lab, SttController* stt, LiveConfig cfg,
 
   RadioDevices dev = realDevices(cfg_.devices);
   dev.speech = &speech_;
-  core_ = std::make_unique<RadioCore>(cfg_.radio, std::move(dev), events());
+  if (cfg_.exercise && stt->service()) {
+    model_ = std::make_unique<SpeechModel>(*stt->service());
+    runtime_ = std::make_unique<ExerciseRuntime>(cfg_.exercise->runtime, cfg_.exercise->rules, *model_, cfg_.exercise->callbacks);
+  }
+  core_ = std::make_unique<RadioCore>(cfg_.radio, std::move(dev), runtime_ ? runtime_->wrap(events()) : events());
+  if (runtime_) runtime_->attach(*core_);
   status_ = new StatusController(lab, cfg_.status,
                                  {[this](bool on) { core_->setPttTest(on); },
                                   [this] { core_->playLocal(LocalSound::Tone, makeSideTone({.lengthMs = 1000}), SideToneConfig{}.rate); },
@@ -41,6 +53,7 @@ LiveBackend::LiveBackend(LabController* lab, SttController* stt, LiveConfig cfg,
   connect(stt, &SttController::result, this,
           [this](quint64 tx, const QString& model, const QString& config, const QString& text, const QStringList& words,
                  const QList<double>& conf, double sec) {
+            if (runtime_ && runtime_->recognised(tx, modelId(config), config.toStdString(), sttResult(text, words, conf), Ns(sec * 1e9))) return;
             // A quick model may answer before the recording has arrived here.
             if (tx > lastClosed_) early_[tx] = [=, this] { result(tx, model, config, text, words, conf, sec); };
             else result(tx, model, config, text, words, conf, sec);
@@ -66,11 +79,12 @@ void LiveBackend::result(quint64 tx, const QString& model, const QString& config
   lab_->setResult(int(tx), text, info, config);
   if (recordings_) {
     StoredResult r;
-    r.modelId = QJsonDocument::fromJson(config.toUtf8()).object()["id"].toString().toStdString();
+    r.modelId = modelId(config);
     r.modelName = model.toStdString();
     r.modelConfig = config.toStdString();
-    r.text = text.toStdString();
-    for (qsizetype i = 0; i < words.size(); ++i) r.words.push_back({words[i].toStdString(), i < conf.size() ? conf[i] : 0});
+    SttResult heard = sttResult(text, words, conf);
+    r.text = std::move(heard.text);
+    r.words = std::move(heard.words);
     r.releaseToTextMs = sec * 1000;
     recordings_->addResult(int(tx), std::move(r));
   }
@@ -83,14 +97,28 @@ bool LiveBackend::start() {
   return ok;
 }
 
+ExerciseRadio LiveBackend::exerciseRadio() {
+  if (!runtime_) return {};
+  return {.start = [this](PreparedExercise e, ExerciseOptions o, std::unique_ptr<IEventLog> log) { return runtime_->start(std::move(e), std::move(o), std::move(log)); },
+          .stop = [this] { runtime_->stop(); },
+          .resume = [this] { runtime_->resume(); },
+          .useFallback = [this] { runtime_->useFallback(); }};
+}
+
+ExerciseStatus LiveBackend::exerciseStatus() {
+  return {.bank = [this](BankReady b, const QStringList& missing) { status_->setBank(b, missing); },
+          .running = [this](bool on) { status_->setRunning(on); },
+          .scenario = [this](const QVariantMap& s) { status_->setScenario(s); }};
+}
+
 void LiveBackend::event(Ns t, const std::string& src, const QString& edge, const QString& detail, bool warn) {
   ui([this, s = double(t - t0_) / 1e9, src = q(src), edge, detail, warn] { lab_->addEvent(s, src, edge, detail, warn); });
 }
 
-void LiveBackend::notice(L::Level l, const QString& n, L::Level al, const QString& a) {
+void LiveBackend::notice(L::Level l, const QString& n, L::Level al, const QString& a, bool ptt) {
   ui([=, this] {
     lab_->setNotice(l, n);
-    lab_->setAlert(al, a);
+    lab_->setAlert(al, a, ptt);
   });
 }
 
@@ -146,7 +174,7 @@ void LiveBackend::note(const PttNote& n) {
     case K::Up: return event(n.t, n.source, tr("up"), n.held < ms(50) ? msHeld : tr("held %1 s").arg(double(n.held) / 1e9, 0, 'f', 2), false);
     case K::Lost:
       event(n.t, n.source, tr("lost"), tr("unplugged"), true);
-      return notice(L::Fault, tr("PTT disconnected. Reconnect it, or use Screen PTT."), L::Fault, tr("PTT device lost"));
+      return notice(L::Fault, tr("PTT disconnected. Reconnect it, or use Screen PTT."), L::Fault, tr("PTT device lost"), true);
     case K::Ignored:
       event(n.t, n.source, tr("ignored"), tr("%1 owns TX").arg(q(n.owner)), true);
       return ui([this, t = tr("%1 ignored: %2 is already transmitting.").arg(q(n.source), q(n.owner))] { lab_->setNotice(L::Caution, t); });
@@ -211,7 +239,7 @@ void LiveBackend::snapshot(const RadioSnapshot& s) {
   if (s.ptt != link_) {
     link_ = s.ptt;
     if (link_ == PttLink::Ok) lab_->setAlert(L::Ok, tr("Ready"));
-    if (link_ == PttLink::NotOpen) lab_->setAlert(L::Fault, tr("PTT: %1").arg(q(s.pttError)));
+    if (link_ == PttLink::NotOpen) lab_->setAlert(L::Fault, tr("PTT: %1").arg(q(s.pttError)), true);
   }
   lab_->setTx(s.display, int(s.tx));
   lab_->setTxSeconds(s.txSeconds);

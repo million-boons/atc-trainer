@@ -149,6 +149,7 @@ struct Rig {
   RadioSnapshot snap;
   std::vector<std::uint64_t> labOpened, labClosed;
   std::vector<std::string> faults, refusals;
+  std::vector<std::string> order;  // "fault" and the names of the inputs, as the screen gets them
   std::vector<EngineOutput> outputs;
   std::optional<ExerciseResult> result;
   int startedOk = 0;
@@ -170,7 +171,8 @@ struct Rig {
     cb.started = [this](bool ok, const std::string& why) { ok ? void(++startedOk) : refusals.push_back(why); };
     cb.output = [this](Ns, const EngineOutput& o) { outputs.push_back(o); };
     cb.ended = [this](const ExerciseResult& r) { result = r; };
-    cb.fault = [this](const std::string& s) { faults.push_back(s); };
+    cb.fault = [this](const std::string& s) { faults.push_back(s); order.push_back("fault"); };
+    cb.input = [this](Ns, const EngineInput& i) { order.push_back(std::visit([](const auto& x) { return std::string(x.kName); }, i)); };
     run = std::make_unique<ExerciseRuntime>(rc, rules, model, cb);
     RadioDevices d;
     d.mic = [this](PrerollRing& r, LevelMeter& m, std::function<void(const CaptureStatus&)> f) {
@@ -526,6 +528,9 @@ TEST(ExerciseRuntime, RecogniserHasTenSecondsThenThePilotSaysAgain) {
   r.pass(600);
   ASSERT_EQ(r.logged<in::Recognised>().size(), 1u);
   EXPECT_EQ(r.logged<in::Recognised>()[0].sttFault, "no result in time");
+  const auto f = std::find(r.order.begin(), r.order.end(), "fault");
+  ASSERT_NE(f, r.order.end());
+  EXPECT_EQ(*std::next(f), "recognised");  // directly after it: ExerciseView counts the two as one
   ASSERT_FALSE(r.logged<out::PilotRequested>().empty());
   EXPECT_EQ(r.logged<out::PilotRequested>().back().utterance.replyId, "SAY_AGAIN");
   const ExerciseResult res = buildResult(r.ready.exercise->scenario, r.log->events);

@@ -17,8 +17,13 @@
 #include <set>
 
 #include "app/AccessBackends.h"
+#include "app/EngineHeaders.h"
 #include "app/LiveBackend.h"
 #include "audio/PulsePlayer.h"
+#include "audio/WavFile.h"
+#include "core/PathResolver.h"
+#include <mutex>
+#include <nlohmann/json.hpp>
 using namespace atc;
 namespace fs = std::filesystem;
 
@@ -38,11 +43,19 @@ template <class F> bool within(int millis, F f) {
 }
 
 std::atomic<int> begins{0}, samples{0};
+std::mutex wordsMutex;
+std::vector<std::string> words;  // what the next transmissions are recognised as
 struct CountingRecognizer : ISpeechRecognizer {
   std::string name() const override { return "counting"; }
   void begin() override { ++begins; }
   void accept(std::span<const std::int16_t> a) override { samples += int(a.size()); }
-  SttResult finish() override { return {"counted", {{"counted", 0.5}}}; }
+  SttResult finish() override {
+    std::lock_guard l(wordsMutex);
+    if (words.empty()) return {"counted", {{"counted", 0.5}}};
+    SttResult r{words.front(), {}};
+    words.erase(words.begin());
+    return r;
+  }
 };
 
 // The app's backend on real PulseAudio code, against a private server with a simulated microphone.
@@ -103,10 +116,12 @@ struct Live : testing::Test {
     c.devices.micSource = "mic";
     c.devices.pulseServer = server;
     c.status.storagePath = QString::fromStdString((home / "data").string());
+    configure(c);
     live = std::make_unique<LiveBackend>(&lab, &stt, c, &recordings);
     ASSERT_TRUE(live->start());
     ASSERT_TRUE(within(8000, [this] { return lab.micDbfs() > -30; })) << "the simulated microphone is not heard";
   }
+  virtual void configure(LiveConfig&) {}
   void TearDown() override {
     live.reset();
     EXPECT_FALSE(recordings.playerReady());  // nothing points at the radio any more
@@ -258,6 +273,169 @@ TEST_F(Live, StoredRecordingPlaysOnlyForTheInstructorAndNotOnTheAir) {
   lab.setNotice(LabController::Caution, "before");
   recordings.playStored(0);
   EXPECT_TRUE(within(3000, [this] { return lab.notice().isEmpty(); }));  // cleared when the sound starts
+}
+
+// A whole departure in the app's own objects: pedal edge to the pilot's sound, only the recognised words are scripted.
+struct LiveDeparture : Live {
+  std::unique_ptr<LiveExercise> ex;
+  std::unique_ptr<LiveBackend>& backend = live;
+  std::vector<std::string> faults;
+  PreparedExercise prepared;
+  fs::path logs;
+
+  void configure(LiveConfig& c) override {
+    Paths p;
+    std::string error;
+    ASSERT_TRUE(resolvePaths(systemPathInputs(), p, error)) << error;
+    const std::string scenario = p.data + "/scenarios/DEPARTURE-01.json";
+    const fs::path bank = dir / "bank";
+    fs::create_directories(bank);
+    Exercise e;
+    std::vector<LoadError> errors;
+    ASSERT_TRUE(loadExercise(scenarioSources(p.data, scenario), e, errors));
+    std::map<std::string, RequiredClip> need;
+    std::vector<std::string> bad;
+    ASSERT_TRUE(requiredClips(e, need, bad));
+    nlohmann::json m = {{"schemaVersion", 1}, {"voice", "test"}, {"sampleRate", 16000}, {"placeholder", true}, {"clips", nlohmann::json::array()}};
+    int n = 0;
+    for (const auto& [id, clip] : need) {
+      const std::string file = "c" + std::to_string(n++) + ".wav";
+      ASSERT_TRUE(writeWav((bank / file).string(), 16000, std::vector<std::int16_t>(1600, 1000)));
+      nlohmann::json take = {{"file", file}, {"take", "primary"}};
+      m["clips"].push_back({{"id", id}, {"takes", nlohmann::json::array({take})}});
+    }
+    std::ofstream(bank / "manifest.json") << m.dump();
+    prepared = ExerciseCheck::check(p.data, bank.string(), scenario).ready;
+    ASSERT_TRUE(prepared);
+    logs = home / "data" / "exercises";
+    LiveExerciseConfig ec;
+    ec.data = p.data;
+    ec.voices = bank.string();
+    ec.logs = logs.string();
+    ec.scenarioFile = scenario;
+    ec.model = "counting";
+    ec.pttMissingBlocks = false;  // there is no PTT device here: Screen PTT, as a fallback
+    ex = std::make_unique<LiveExercise>(ec, &stt, &lab, &access, &settings);
+    LiveExerciseSetup s;
+    ASSERT_TRUE(loadParserRules(p.data + "/phraseology/placeholder.json", s.rules, error)) << error;
+    s.runtime.recogniseLimit = ms(1500);
+    s.callbacks = ex->callbacks();
+    s.callbacks.fault = [this, f = s.callbacks.fault](const std::string& w) { faults.push_back(w); f(w); };
+    c.exercise = std::move(s);
+  }
+  void SetUp() override {
+    Live::SetUp();
+    if (IsSkipped() || HasFatalFailure()) return;
+    ex->connectRadio(live->exerciseRadio(), live->exerciseStatus(), live->status());
+    ASSERT_TRUE(within(8000, [this] { return live->status()->inputs().bank == BankReady::CoverageOk; }));
+  }
+  void TearDown() override {
+    Live::TearDown();
+    ex.reset();
+  }
+  ExerciseController& c() { return *ex->controller(); }
+  void begin() {
+    emit live->status()->startExerciseRequested();
+    ASSERT_TRUE(within(1000, [this] { return c().phase() == ExerciseController::Starting; }));
+    c().start(false);
+    ASSERT_TRUE(within(2000, [this] { return c().phase() == ExerciseController::Running; })) << c().notice().toStdString();
+  }
+  int pilotTurns() {
+    int k = 0;
+    for (int i = 0; i < c().transcript()->rowCount(); ++i)
+      k += c().transcript()->data(c().transcript()->index(i, 0), Qt::UserRole).toInt() == ExerciseController::Pilot;
+    return k;
+  }
+  // The pilot has spoken for the n-th time and the radio is free again.
+  void pilotHeard(int n) {
+    ASSERT_TRUE(within(15000, [&] { return pilotTurns() >= n; })) << n;
+    ASSERT_TRUE(within(15000, [this] { return lab.txLabel() == "IDLE" && !lab.rxActive(); })) << n;
+  }
+  void key() {
+    emit lab.pressRequested("SCREEN");
+    ASSERT_TRUE(within(2000, [this] { return lab.txLabel() == "TX"; }));
+    spin(700);
+    emit lab.releaseRequested("SCREEN");
+  }
+  void script() {
+    const QVariantMap card = live->status()->inputs().scenario;
+    std::string call;
+    for (const auto& x : prepared.exercise->airfield.callsigns)
+      if (x.id == card["callsign"].toString().toStdString()) call = x.spoken;
+    ASSERT_FALSE(call.empty());
+    const std::string rwy = card["runway"] == "09" ? "zero nine" : "two seven", twy = card["taxiway"] == "A3" ? "alpha three" : "bravo two";
+    std::lock_guard l(wordsMutex);
+    words = {call + " taxi via " + twy + " runway " + rwy, call + " line up runway " + rwy, call + " runway " + rwy + " cleared for takeoff"};
+  }
+  QStringList logLines() const {
+    QStringList l;
+    std::error_code ec;
+    for (const auto& e : fs::directory_iterator(logs, ec)) {
+      std::ifstream f(e.path());
+      for (std::string s; std::getline(f, s);) l << QString::fromStdString(s);
+    }
+    return l;
+  }
+};
+
+TEST_F(LiveDeparture, ByVoiceFromStartToResult) {
+  ASSERT_TRUE(access.loginTrainee("S01"));  // consent given, and still no exercise audio (D-314)
+  begin();
+  ASSERT_FALSE(HasFatalFailure());
+  script();
+  EXPECT_TRUE(live->status()->inputs().running);
+  EXPECT_TRUE(stt.locked());
+  EXPECT_FALSE(stt.canLoad("counting"));
+  for (int turn = 1; turn <= 3; ++turn) {
+    pilotHeard(turn);
+    ASSERT_FALSE(HasFatalFailure());
+    key();
+    ASSERT_FALSE(HasFatalFailure());
+  }
+  ASSERT_TRUE(within(20000, [this] { return c().phase() == ExerciseController::Complete; })) << c().progressText().toStdString();
+  EXPECT_EQ(c().progressText(), "3 of 3 done");
+  EXPECT_TRUE(faults.empty()) << faults.front();
+  EXPECT_FALSE(live->status()->inputs().running);
+  EXPECT_TRUE(within(2000, [this] { return !stt.locked(); }));
+  c().showResult();
+  EXPECT_EQ(c().result()["title"].toString(), "COMPLETED");
+  EXPECT_EQ(lab.recordings()->rowCount(), 0);  // the exercise's, not the Lab's
+  EXPECT_TRUE(stored(".wav").empty());
+  EXPECT_FALSE(c().audioSaved());
+  const QStringList l = logLines();
+  ASSERT_GT(l.size(), 10);
+  EXPECT_TRUE(l.first().contains("counting"));
+  EXPECT_EQ(l.filter("fallback_ptt_used").size(), 3);
+  EXPECT_EQ(l.filter("\"ended\"").size(), 1);
+  // The Lab is the radio's client again.
+  c().leaveResult();
+  transmit();
+  EXPECT_EQ(lab.recordings()->rowCount(), 1);
+  EXPECT_EQ(stored(".wav").size(), 1u);
+}
+
+TEST_F(LiveDeparture, StopSilencesThePilotAndFreesTheModel) {
+  begin();
+  ASSERT_FALSE(HasFatalFailure());
+  ASSERT_TRUE(within(15000, [this] { return lab.rxActive(); }));
+  c().stop();
+  EXPECT_TRUE(within(1500, [this] { return !lab.rxActive(); }));
+  EXPECT_TRUE(within(2000, [this] { return c().phase() == ExerciseController::Result && !stt.locked(); }));
+  EXPECT_EQ(c().result()["title"].toString(), "STOPPED BY INSTRUCTOR");
+  EXPECT_FALSE(live->status()->inputs().running);
+  EXPECT_TRUE(logLines().last().contains("ended"));
+}
+
+// The window closes in the middle of an exercise.
+TEST_F(LiveDeparture, ClosingTheAppInAnExerciseKeepsTheLog) {
+  begin();
+  ASSERT_FALSE(HasFatalFailure());
+  pilotHeard(1);
+  emit lab.pressRequested("SCREEN");
+  ASSERT_TRUE(within(2000, [this] { return lab.txLabel() == "TX"; }));
+  live.reset();
+  spin(100);
+  EXPECT_FALSE(logLines().filter("tx_opened").isEmpty());
 }
 
 int main(int argc, char** argv) {

@@ -28,17 +28,19 @@ if(Qt6_FOUND)
   target_link_libraries(status_tests PRIVATE atc_runtime Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
   gtest_discover_tests(status_tests)
   # The live backend, without a window, against a private PulseAudio server.
-  if(TARGET atc_devices AND TARGET atc_storage)
+  if(TARGET atc_devices AND TARGET atc_storage AND TARGET atc_exercise)
     set(A ${CMAKE_SOURCE_DIR}/src/app)
     add_executable(live_tests test_live.cpp ${A}/LiveBackend.h ${A}/LiveBackend.cpp ${A}/LabChecks.h ${A}/LabChecks.cpp
       ${A}/StatusController.h ${A}/StatusController.cpp ${A}/StatusFeed.h ${A}/RowModel.h ${A}/LabController.h ${A}/LabController.cpp
       ${A}/SttController.h ${A}/SttController.cpp ${A}/AccessController.h ${A}/AccessController.cpp
       ${A}/SettingsController.h ${A}/SettingsController.cpp ${A}/RecordingsController.h ${A}/RecordingsController.cpp
-      ${A}/AccessBackends.h ${A}/AccessBackends.cpp)
+      ${A}/AccessBackends.h ${A}/AccessBackends.cpp ${A}/LiveExercise.h ${A}/LiveExercise.cpp
+      ${A}/ExerciseView.h ${A}/ExerciseView.cpp ${A}/ExerciseController.h ${A}/ExerciseController.cpp)
     target_compile_definitions(live_tests PRIVATE ATC_HAVE_STORAGE)
+    target_include_directories(live_tests SYSTEM PRIVATE ${TP}/json)
     set_target_properties(live_tests PROPERTIES AUTOMOC ON)
     target_include_directories(live_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${A})
-    target_link_libraries(live_tests PRIVATE atc_devices atc_storage atc_logic Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
+    target_link_libraries(live_tests PRIVATE atc_devices atc_exercise atc_storage atc_logic Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
     gtest_discover_tests(live_tests)
   endif()
 endif()
