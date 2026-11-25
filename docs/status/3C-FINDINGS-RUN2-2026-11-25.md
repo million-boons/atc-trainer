@@ -29,3 +29,9 @@ Build: `0b39f01` (18:43). Three exercises, all Practice, `whisper-tiny-genprompt
 ## Not tried yet (by the logs)
 
 Press before the first call (B7), a correct "hold short" (B8), the other callsign (C3), takeoff clearance in Taxi (C2), an interrupted **readback** (C7), dongle pulled (C9). Screen PTT and Space: the log does not tell the source.
+
+## Added later, reported through ui (the user's note pasted there, about 20:16; not checked by b2)
+
+- **Speech Lab, 20:11**: release to text 5.76 s (TX 10) and 7.03 s (TX 11), read by the user. Other sessions were busy, and the model the Lab had is not known: valid only as a reason for a run on the idle panel, not as a measurement of a model. About twice the 2.81 s of the exercises. The user wants timing run T planned on an idle panel; owner stt (D-323, D-406, D-414), time and session: the user.
+- **D-321 confirmed by the user**: Dashboard, Start dialog and Exercise show the same values (a run before the 20:40 build). Finding 5 is then probably not a screen fault; the user's own answer about 20:05 is still open.
+- Instructor PIN: not set; the user sets it.
