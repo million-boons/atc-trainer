@@ -7,6 +7,7 @@ Item {
     property LabController lab
     property ExerciseController ex
     property bool askStop: false
+    property bool canStart: true   // still ready: something may have changed while the Start dialog is open
     readonly property int gap: Theme.s12
     readonly property int leftW: Theme.px(268)
     readonly property int rightW: Theme.px(292)
@@ -153,6 +154,22 @@ Item {
     }
 
     // ---- dialogs
+    // The instructor's choice leaves the radio bar free: a transmission may end the waiting (D-125).
+    Loader {
+        x: 0; y: 0; width: s.width; height: bar.y
+        active: s.ex.choice && !s.askStop
+        sourceComponent: ModalPanel {
+            title: qsTr("Instructor: no ATC call")
+            Label { width: parent.width; wrapMode: Text.WordWrap; text: s.ex.choiceText }
+            Label { width: parent.width; wrapMode: Text.WordWrap; color: Theme.textSecondary
+                    text: qsTr("Continue: the pilot calls again, same step. A transmission also continues the exercise.") }
+            Row {
+                spacing: Theme.s12
+                PrimaryButton { text: qsTr("Continue"); focusPolicy: Qt.NoFocus; onClicked: s.ex.continueExercise() }
+                DangerButton { text: qsTr("End exercise"); focusPolicy: Qt.NoFocus; onClicked: s.askStop = true }
+            }
+        }
+    }
     Loader {
         anchors.fill: parent
         active: s.askStop || s.ex.phase === ExerciseController.Starting || s.ex.phase === ExerciseController.Paused
@@ -188,8 +205,15 @@ Item {
             }
             Label { text: qsTr("Speech model: %1, locked at Start").arg(s.ex.context.model); color: Theme.textSecondary }
             Row {
+                visible: !s.canStart || s.ex.notice !== ""
+                spacing: Theme.s8
+                StateIcon { level: LabController.Fault; anchors.verticalCenter: parent.verticalCenter }
+                Label { width: Theme.px(480); wrapMode: Text.WordWrap
+                        text: s.ex.notice || qsTr("Cannot start now. The footer says why.") }
+            }
+            Row {
                 spacing: Theme.s12
-                PrimaryButton { text: qsTr("Start exercise"); focusPolicy: Qt.NoFocus; onClicked: s.ex.start(sd.assessed) }
+                PrimaryButton { text: qsTr("Start exercise"); focusPolicy: Qt.NoFocus; enabled: s.canStart; onClicked: s.ex.start(sd.assessed) }
                 SecondaryButton { text: qsTr("Cancel"); focusPolicy: Qt.NoFocus; onClicked: s.ex.cancelStart() }
             }
         }

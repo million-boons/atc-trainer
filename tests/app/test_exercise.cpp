@@ -93,6 +93,32 @@ TEST(Exercise, NoPlaybackWithoutConsentOrStoredAudio) {
   EXPECT_EQ(plays, 1);
 }
 
+TEST(Exercise, InstructorChoiceTellsTheTraineeOnlyThatTheInstructorKnows) {  // D-125
+  for (bool assessed : {false, true}) {
+    C c;
+    int goes = 0, stops = 0;
+    QObject::connect(&c, &C::continueRequested, [&] { ++goes; });
+    QObject::connect(&c, &C::stopRequested, [&] { ++stops; });
+    exercise_mock::show(c, "exchoice", assessed, false);
+    EXPECT_TRUE(c.choice());
+    EXPECT_EQ(c.notice(), "Instructor notified");
+    EXPECT_EQ(c.alert(), "Instructor notified");
+    EXPECT_EQ(c.choiceText().contains("Line up"), !assessed);
+    EXPECT_TRUE(c.missedText() == "none" || assessed);
+    c.continueExercise();
+    EXPECT_EQ(goes, 1);
+    c.stop();
+    EXPECT_EQ(stops, 1);
+    c.setPhase(C::Paused);  // the PTT dialog comes first
+    EXPECT_FALSE(c.choice());
+    c.setPhase(C::Running);
+    c.clearChoice();
+    c.continueExercise();
+    EXPECT_EQ(goes, 1);
+    EXPECT_EQ(c.alert(), "Exercise running");
+  }
+}
+
 TEST(Exercise, UncertainValueIsShownAsHeard) {
   C c;
   exercise_mock::show(c, "examb", false, false);

@@ -119,7 +119,7 @@ Item {
         Row {
             x: Theme.s12; y: Theme.s8; height: Theme.px(22)
             spacing: Theme.s8
-            StateIcon { level: LabController.Caution; anchors.verticalCenter: parent.verticalCenter }
+            StateIcon { level: s.r.suspectedLevel || 0; anchors.verticalCenter: parent.verticalCenter }
             Label { text: s.r.suspectedTitle || ""; height: parent.height; font { pixelSize: Theme.small; weight: Font.DemiBold } }
         }
         Label { x: Theme.s12; y: Theme.px(34); width: parent.width - 2 * x; height: speech.y - y

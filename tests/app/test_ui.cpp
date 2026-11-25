@@ -210,7 +210,8 @@ TEST_F(Ui, TheLabFooterIsNotReadyWithoutPtt) {
   load();
   run("lost");
   EXPECT_EQ(screen(), "lab");
-  EXPECT_TRUE(allText().contains("PTT missing"));
+  EXPECT_TRUE(allText().contains("PTT device lost"));
+  EXPECT_FALSE(allText().contains("PTT missing"));  // once (D-126)
 }
 
 // ---- 1c: login
@@ -389,6 +390,34 @@ TEST_F(Ui, LostPttPausesAndScreenPttContinues) {
   EXPECT_TRUE(allText().contains("PTT disconnected"));
   clickButton("Use Screen PTT");
   EXPECT_EQ(mock->exercise()->phase(), C::Running);
+}
+
+TEST_F(Ui, InstructorChoiceLeavesTheRadioBarFree) {  // D-125
+  load();
+  run("exchoice");
+  EXPECT_TRUE(allText().contains("Instructor notified"));
+  clickButton("End exercise");
+  clickButton("Cancel");
+  EXPECT_EQ(mock->exercise()->phase(), C::Running);
+  QQuickItem* ptt = find("Screen PTT", false);
+  ASSERT_TRUE(ptt);
+  QTest::mousePress(win, Qt::LeftButton, {}, ptt->mapToScene({ptt->width() / 2, ptt->height() / 2}).toPoint());
+  settle(200);
+  EXPECT_EQ(lab.txTone(), LabController::Active);
+  QTest::mouseRelease(win, Qt::LeftButton, {}, ptt->mapToScene({ptt->width() / 2, ptt->height() / 2}).toPoint());
+  settle();
+  clickButton("Continue");
+  EXPECT_FALSE(mock->exercise()->choice());
+}
+
+TEST_F(Ui, DashboardStartOpensTheDialog) {
+  load();
+  run("dashready");
+  clickButton("START EXERCISE");
+  EXPECT_EQ(mock->exercise()->phase(), C::Starting);
+  EXPECT_EQ(screen(), "ex");
+  clickButton("Cancel");
+  EXPECT_EQ(screen(), "dash");
 }
 
 TEST_F(Ui, StopAsksFirst) {

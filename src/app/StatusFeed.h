@@ -52,6 +52,7 @@ class StatusFeed : public QObject {
   void toneHeardRequested();  // the only way to SpeakerReady::Ok
   void pttTestRequested();
   void cancelTestsRequested();
+  void startExerciseRequested();
   void stopExerciseRequested();
 
  private:

@@ -17,8 +17,7 @@ struct ExerciseStep {
   int attempts = 0;
 };
 
-// View state of the Exercise and Result screens (04 section 5c). A backend (the mock now, the runtime in
-// 3b) calls the setters on the GUI thread; QML reads properties and calls the invokables. What Assessed
+// View state of the Exercise and Result screens (04 section 5c). A backend (the mock, or ExerciseView) calls the setters on the GUI thread; QML reads properties and calls the invokables. What Assessed
 // hides is hidden here, so that no screen can show it (D-107, D-113).
 class ExerciseController : public QObject {
   Q_OBJECT
@@ -44,6 +43,9 @@ class ExerciseController : public QObject {
   Q_PROPERTY(QString waitingText READ waitingText NOTIFY waitingChanged)  // changes every second
   Q_PROPERTY(int noticeLevel READ noticeLevel NOTIFY changed)
   Q_PROPERTY(QString notice READ notice NOTIFY changed)
+  // The pilot's calls are used up and the instructor decides (D-424, D-125).
+  Q_PROPERTY(bool choice READ choice NOTIFY changed)
+  Q_PROPERTY(QString choiceText READ choiceText NOTIFY changed)
   Q_PROPERTY(QVariantMap result READ result NOTIFY resultChanged)
   Q_PROPERTY(QAbstractItemModel* transcript READ transcript CONSTANT)  // newest first
   Q_PROPERTY(QAbstractItemModel* timeline READ timeline CONSTANT)      // oldest first
@@ -71,6 +73,8 @@ class ExerciseController : public QObject {
   void setWaiting(const QString& t);
   void setNotice(int level, const QString& t, bool verdict = false);
   void setAlert(int level, const QString& t, bool verdict = false);
+  void setChoice(const QString& step, int pilotCalls);  // also the trainee's "Instructor notified"
+  void clearChoice();
   // chips: list of {value, uncertain}. An uncertain value is passed as heard and never corrected.
   void addAtc(const QString& time, const QString& text, const QString& intent, const QVariantList& chips, const QString& cls, bool recognised, const QString& delay);
   void addPilot(const QString& time, const QString& text);
@@ -101,6 +105,8 @@ class ExerciseController : public QObject {
   QString notice() const { return hide() && notice_.verdict ? QString() : notice_.text; }
   int alertLevel() const;  // footer
   QString alert() const;
+  bool choice() const { return choice_ && phase_ == Running; }
+  QString choiceText() const;
   QVariantMap result() const { return phase_ == Result ? result_ : QVariantMap(); }
   QAbstractItemModel* transcript() { return &transcript_; }
   QAbstractItemModel* timeline() { return &timeline_; }
@@ -108,6 +114,7 @@ class ExerciseController : public QObject {
   Q_INVOKABLE void start(bool assessed);  // refused if the mode is not available
   Q_INVOKABLE void cancelStart() { emit cancelStartRequested(); }
   Q_INVOKABLE void stop();
+  Q_INVOKABLE void continueExercise();  // the pilot calls again
   Q_INVOKABLE void showResult();
   Q_INVOKABLE void useScreenPtt();
   Q_INVOKABLE void runAgain() { emit runAgainRequested(); }
@@ -124,6 +131,7 @@ class ExerciseController : public QObject {
   void startRequested(bool assessed);
   void cancelStartRequested();
   void stopRequested();
+  void continueRequested();
   void resultRequested();
   void screenPttRequested();
   void runAgainRequested();
@@ -146,6 +154,9 @@ class ExerciseController : public QObject {
   QList<ExerciseStep> steps_;
   int done_ = 0;
   Line notice_, alert_;
+  bool choice_ = false;
+  QString choiceStep_;
+  int choiceCalls_ = 0;
   QVariantMap result_;
   RowModel transcript_, timeline_;
 };

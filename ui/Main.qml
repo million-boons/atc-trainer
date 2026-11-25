@@ -17,8 +17,8 @@ Window {
     property string screen_: "lab"
     property bool loginOpen: false
     onLoginOpenChanged: { lab.releaseRequested("SPACE"); if (!loginOpen) { access.clearMessage(); shell.forceActiveFocus() } }
-    // Package 3b connects the live one. Until then a live build has no Exercise and no Result screen.
-    readonly property ExerciseController ex: mock ? mock.exercise : null
+    property ExerciseController exercise: null   // live; null: this build cannot run an exercise
+    readonly property ExerciseController ex: mock ? mock.exercise : exercise
     readonly property bool exActive: ex !== null && ex.active
     readonly property bool exResult: ex !== null && ex.phase === ExerciseController.Result
     width: 1280; height: 800
@@ -98,10 +98,10 @@ Window {
                 { id: "dash", name: qsTr("Dashboard"), enabled: !root.exActive, off: true, why: nav.busy, icon: "M 3 3 L 9 3 L 9 9 L 3 9 Z M 11 3 L 17 3 L 17 9 L 11 9 Z M 3 11 L 9 11 L 9 17 L 3 17 Z M 11 11 L 17 11 L 17 17 L 11 17 Z" },
                 { id: "scen", name: qsTr("Scenarios"), enabled: false, why: qsTr("Not part of the first exercise. No package is planned for this screen yet."),
                   icon: "M 4 5 L 16 5 M 4 10 L 16 10 M 4 15 L 16 15" },
-                { id: "ex", name: qsTr("Exercise"), enabled: root.exActive, off: root.ex !== null, why: root.ex ? qsTr("No exercise is running. Mock: press M and choose an Exercise case.") : qsTr("Available after the first exercise works (package 3b)."),
+                { id: "ex", name: qsTr("Exercise"), enabled: root.exActive, off: root.ex !== null, why: root.mock ? qsTr("No exercise is running. Mock: press M and choose an Exercise case.") : root.ex ? qsTr("No exercise is running. Start one on the Dashboard.") : qsTr("This build cannot run an exercise."),
                   icon: "M 6 4 L 16 10 L 6 16 Z" },
                 { id: "lab", name: qsTr("Speech Lab"), enabled: !root.exActive, off: true, why: nav.busy, icon: "M 7 3 L 13 3 L 13 11 L 7 11 Z M 4 9 L 4 14 L 16 14 L 16 9 M 10 14 L 10 18" },
-                { id: "ass", name: qsTr("Assessment"), enabled: root.exResult, off: root.ex !== null, why: root.exActive ? nav.busy : root.ex ? qsTr("No result yet. Mock: press M and choose a RESULT case.") : qsTr("Available after the first exercise works (package 3b)."),
+                { id: "ass", name: qsTr("Assessment"), enabled: root.exResult, off: root.ex !== null, why: root.exActive ? nav.busy : root.mock ? qsTr("No result yet. Mock: press M and choose a RESULT case.") : root.ex ? qsTr("No result yet. It opens after an exercise.") : qsTr("This build cannot run an exercise."),
                   icon: "M 4 16 L 4 10 M 10 16 L 10 4 M 16 16 L 16 8" },
                 { id: "set", name: qsTr("Settings"), enabled: !root.exActive, off: true, why: nav.busy,
                   icon: "M 3 6 L 17 6 M 13 4 L 13 8 M 3 14 L 17 14 M 7 12 L 7 16" }
@@ -121,7 +121,7 @@ Window {
             anchors { top: status.bottom; bottom: alert.top; left: nav.right; right: parent.right }
             active: root.ex !== null && (root.screen_ === "ex" || root.exActive)   // stays loaded during an exercise
             visible: root.screen_ === "ex"
-            sourceComponent: Component { Exercise { lab: root.lab; ex: root.ex } }
+            sourceComponent: Component { Exercise { lab: root.lab; ex: root.ex; canStart: root.mock !== null || dashCtl.startEnabled } }
         }
         Loader {
             anchors { top: status.bottom; bottom: alert.top; left: nav.right; right: parent.right }

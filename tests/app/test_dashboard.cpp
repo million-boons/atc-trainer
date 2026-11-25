@@ -93,6 +93,58 @@ TEST_F(Dash, MissingPttOnlyWarnsWithTheInstructorOption) {  // D-116
   EXPECT_EQ(chip(2)["level"].toInt(), int(LabController::Fault));
 }
 
+TEST_F(Dash, LostPttIsSaidOnce) {  // D-126
+  ExerciseController ex;
+  d.setExercise(&ex);
+  lab.setAlert(LabController::Fault, "PTT device lost", true);
+  in.ptt = PttReady::Missing;
+  send(); agree();
+  EXPECT_EQ(d.alert(), "Not ready to start: PTT device lost");
+  in.speaker = SpeakerReady::NotChecked;
+  send();
+  EXPECT_EQ(d.alert(), "Not ready to start: PTT device lost; 1 warn");
+  in.running = true;
+  ex.begin({}, false, false);
+  ex.setPhase(ExerciseController::Paused);
+  ex.setAlert(LabController::Fault, "PTT device lost: exercise paused");
+  send();
+  EXPECT_EQ(d.alert(), "PTT device lost: exercise paused; 1 warn");
+  EXPECT_EQ(d.alertLevel(), int(LabController::Fault));
+  in.mic = MicReady::Lost;  // another fault is not hidden by it
+  send();
+  EXPECT_EQ(d.alert(), "PTT device lost: exercise paused; Microphone lost; 1 warn");
+  // With the instructor's option it warns, and is still said once.
+  in = {};
+  in.mic = MicReady::Ok;
+  in.speaker = SpeakerReady::Ok;
+  in.bank = BankReady::CoverageOk;
+  ex.begin({}, false, false);
+  d.setPttFallback(true);
+  send();
+  EXPECT_EQ(d.alert(), "PTT device lost, 1 warn, none block Start");
+  // Another alert is shown beside it.
+  lab.setAlert(LabController::Caution, "Short tap cancelled");
+  EXPECT_EQ(d.alert(), "Short tap cancelled  |  1 warn, none block Start");
+}
+
+TEST_F(Dash, StartOnlyWhenNothingBlocks) {
+  int starts = 0;
+  QObject::connect(&feed, &StatusFeed::startExerciseRequested, [&starts] { ++starts; });
+  EXPECT_TRUE(d.startEnabled());
+  EXPECT_TRUE(d.reasons().isEmpty());
+  d.startExercise();
+  EXPECT_EQ(starts, 1);
+  in.bank = BankReady::Checking;
+  send();
+  EXPECT_FALSE(d.startEnabled());
+  d.startExercise();
+  in.bank = BankReady::CoverageOk;
+  in.running = true;
+  send();
+  d.startExercise();
+  EXPECT_EQ(starts, 1);
+}
+
 TEST_F(Dash, ModelAndBankThatBlockStartAreFaultChips) {
   model(SttState::NotLoaded);
   in.bank = BankReady::NotLoaded;
