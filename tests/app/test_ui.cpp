@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 
@@ -78,9 +79,10 @@ struct Ui : testing::Test {
                                   {"themeMode", theme},
                                   {"reduceMotion", true}});
     engine->load(QUrl("qrc:/Atc/Main.qml"));
-    ASSERT_FALSE(engine->rootObjects().isEmpty());
+    // Thrown, not asserted: an ASSERT would only leave load(), and the test would go on without a window.
+    if (engine->rootObjects().isEmpty()) throw std::runtime_error("Main.qml does not load: " + g_warnings.join('\n').toStdString());
     win = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-    ASSERT_TRUE(win);
+    if (!win) throw std::runtime_error("the root of Main.qml is not a window");
     win->resize(size);
     win->show();
     win->requestActivate();
