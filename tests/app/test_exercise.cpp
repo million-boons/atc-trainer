@@ -109,7 +109,12 @@ TEST(Exercise, InstructorChoiceTellsTheTraineeOnlyThatTheInstructorKnows) {  // 
     EXPECT_EQ(goes, 1);
     c.stop();
     EXPECT_EQ(stops, assessed ? 0 : 1);  // Assessed needs the instructor's PIN
+    c.endConfirmed();  // nobody asked for the PIN
+    EXPECT_EQ(stops, assessed ? 0 : 1);
+    c.requestEnd();
+    EXPECT_EQ(c.pinAsked(), assessed);
     if (assessed) c.endConfirmed();
+    EXPECT_FALSE(c.pinAsked());
     EXPECT_EQ(stops, 1);
     c.setPhase(C::Paused);  // the PTT dialog comes first
     EXPECT_FALSE(c.choice());
@@ -121,6 +126,38 @@ TEST(Exercise, InstructorChoiceTellsTheTraineeOnlyThatTheInstructorKnows) {  // 
     c.endConfirmed();  // the choice is over
     EXPECT_EQ(stops, 1);
   }
+}
+
+TEST(Exercise, StopInAssessedNeedsThePinAlsoWhilePaused) {  // D-129
+  for (const char* id : {"exwait", "exlost"}) {
+    C c;
+    int stops = 0;
+    QObject::connect(&c, &C::stopRequested, [&] { ++stops; });
+    exercise_mock::show(c, id, true, false);
+    c.stop();
+    EXPECT_EQ(stops, 0) << id;
+    c.requestEnd();
+    EXPECT_TRUE(c.pinAsked()) << id;
+    c.cancelEnd();
+    c.endConfirmed();
+    EXPECT_EQ(stops, 0) << id;
+    c.requestEnd();
+    c.endConfirmed();
+    EXPECT_EQ(stops, 1) << id;
+    exercise_mock::show(c, id, false, false);
+    c.requestEnd();  // Practice has no PIN
+    EXPECT_FALSE(c.pinAsked()) << id;
+    c.stop();
+    EXPECT_EQ(stops, 2) << id;
+  }
+  C c;
+  int stops = 0;
+  QObject::connect(&c, &C::stopRequested, [&] { ++stops; });
+  exercise_mock::show(c, "exchoice", true, false);
+  c.requestEnd();
+  c.clearChoice();  // a transmission ended the waiting while the PIN was checked
+  c.endConfirmed();
+  EXPECT_EQ(stops, 0);
 }
 
 TEST(Exercise, AGuestHasNoAudio) {  // D-127

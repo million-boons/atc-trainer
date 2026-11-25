@@ -429,6 +429,25 @@ TEST_F(Ui, EndInAssessedNeedsTheInstructorPin) {  // D-125
   EXPECT_FALSE(access.instructor());
 }
 
+TEST_F(Ui, StopInAssessedNeedsTheInstructorPin) {  // D-129
+  load();
+  mock->setAssessed(true);
+  for (const char* id : {"exwait", "exlost"}) {
+    run(id);
+    const C::Phase before = mock->exercise()->phase();
+    clickButton("Stop exercise");
+    EXPECT_TRUE(allText().contains("instructor PIN")) << id;
+    clickButton("Cancel");
+    EXPECT_EQ(mock->exercise()->phase(), before) << id;
+    clickButton("Stop exercise");
+    pinWithKeypad("123456");
+    clickButton("End exercise");
+    waitLogin();
+    settle(200);
+    EXPECT_EQ(mock->exercise()->phase(), C::Result) << id;
+  }
+}
+
 TEST_F(Ui, DashboardStartOpensTheDialog) {
   load();
   run("dashready");

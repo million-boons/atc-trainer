@@ -8,7 +8,8 @@ Item {
     property ExerciseController ex
     property AccessController access
     property bool askStop: false
-    property bool askPin: false    // End in Assessed needs the instructor (D-125)
+    // Practice: confirmation. Assessed: the instructor's PIN (D-129).
+    function end() { if (ex.assessed) { access.clearMessage(); ex.requestEnd() } else askStop = true }
     property bool canStart: true   // still ready: something may have changed while the Start dialog is open
     readonly property int gap: Theme.s12
     readonly property int leftW: Theme.px(268)
@@ -142,7 +143,7 @@ Item {
             PrimaryButton { anchors.fill: parent; visible: s.complete; text: qsTr("Show result"); focusPolicy: Qt.NoFocus
                             onClicked: s.ex.showResult() }
             DangerButton { anchors.fill: parent; visible: !s.complete; text: qsTr("Stop exercise"); focusPolicy: Qt.NoFocus
-                           enabled: s.ex.pttLive; onClicked: s.askStop = true }
+                           enabled: s.ex.pttLive; onClicked: s.end() }
         }
     }
 
@@ -157,11 +158,15 @@ Item {
 
     // ---- dialogs
     // The instructor's choice leaves the radio bar free: a transmission may end the waiting (D-125).
-    Connections { target: s.ex; function onChanged() { if (!s.ex.choice) s.askPin = false } }
     Loader {
         x: 0; y: 0; width: s.width; height: bar.y
-        active: s.ex.choice && !s.askStop
-        sourceComponent: s.askPin ? pinDialog : choiceDialog
+        active: s.ex.choice && !s.askStop && !s.ex.pinAsked
+        sourceComponent: choiceDialog
+    }
+    Loader {
+        x: 0; y: 0; width: s.width; height: s.ex.phase === ExerciseController.Paused ? s.height : bar.y
+        active: s.ex.pinAsked
+        sourceComponent: pinDialog
     }
     Component {
         id: choiceDialog
@@ -173,8 +178,7 @@ Item {
             Row {
                 spacing: Theme.s12
                 PrimaryButton { text: qsTr("Continue"); focusPolicy: Qt.NoFocus; onClicked: s.ex.continueExercise() }
-                DangerButton { text: qsTr("End exercise"); focusPolicy: Qt.NoFocus
-                               onClicked: { if (s.ex.assessed) { s.access.clearMessage(); s.askPin = true } else s.askStop = true } }
+                DangerButton { text: qsTr("End exercise"); focusPolicy: Qt.NoFocus; onClicked: s.end() }
             }
         }
     }
@@ -203,13 +207,13 @@ Item {
                 spacing: Theme.s12
                 DangerButton { text: qsTr("End exercise"); focusPolicy: Qt.NoFocus; enabled: pd.pin.length >= 6 && !s.access.busy
                                onClicked: { s.access.confirmInstructor(pd.pin); pd.pin = "" } }
-                SecondaryButton { text: qsTr("Cancel"); focusPolicy: Qt.NoFocus; enabled: !s.access.busy; onClicked: s.askPin = false }
+                SecondaryButton { text: qsTr("Cancel"); focusPolicy: Qt.NoFocus; enabled: !s.access.busy; onClicked: s.ex.cancelEnd() }
             }
         }
     }
     Loader {
         anchors.fill: parent
-        active: s.askStop || s.ex.phase === ExerciseController.Starting || s.ex.phase === ExerciseController.Paused
+        active: s.askStop || s.ex.phase === ExerciseController.Starting || (s.ex.phase === ExerciseController.Paused && !s.ex.pinAsked)
         sourceComponent: s.askStop ? stopDialog : s.ex.phase === ExerciseController.Starting ? startDialog : lostDialog
     }
     Component {
@@ -266,7 +270,7 @@ Item {
             Row {
                 spacing: Theme.s12
                 SecondaryButton { text: qsTr("Use Screen PTT"); focusPolicy: Qt.NoFocus; onClicked: s.ex.useScreenPtt() }
-                DangerButton { text: qsTr("Stop exercise"); focusPolicy: Qt.NoFocus; onClicked: s.askStop = true }
+                DangerButton { text: qsTr("Stop exercise"); focusPolicy: Qt.NoFocus; onClicked: s.end() }
             }
         }
     }
