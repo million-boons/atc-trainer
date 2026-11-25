@@ -39,7 +39,7 @@ Sessions: b2 = `runtime`, 93 = `stt`, 31 = `ui`, 8d = `engine`.
 | 3a | `ExerciseRuntime`: RadioCore, STT, parser, engine, voice, player; model lock; JSON Lines log (D-401); "fallback PTT used" in log and result (D-311) | b2 | G1, 2a–2f | 7–9 |
 | 3b | Real controllers for Exercise, Result, Dashboard Start/Stop | 31 | 2g, 3a | 3–4 |
 | T | Clean STT timing run on the idle panel (D-406) | 93 | before 3c demo | 1 |
-| 3c | Acceptance run, fixes, panel measurements; accepted with the mouse stand-in, marked "pedal pending" (D-309) | all, b2 leads | 3a, 3b, T | 6–10 |
+| 3c | **Accepted 2026-11-25 (D-330)**, pedal pending (D-309); panel measurements (T) open. Acceptance run, fixes, panel measurements | all, b2 leads | 3a, 3b, T | 6–10 |
 
 Order: `0a → 0b, 0c, 0d → 1a → G1 → 3a → 3b → 3c`. Wave 2 runs beside Wave 1 from 0c. 1c follows 1a. G1 does not wait for 1c; it needs only 1a and 1b (D-415). G1 has no pedal checks; they are G1-P, and neither 3a nor 3c waits for G1-P (D-309).
 Estimate before the move to the PC: 67–88 session-hours (before 0d, which adds 2–4, and before 1c, not yet estimated), likely 5–6 working days, range 4–8. Not yet re-estimated for the PC: builds get faster, the move itself (§4) is extra.
