@@ -149,7 +149,7 @@ TEST(ClipList, ValuesAreSaidFromTheData) {
   a.callsigns = {c};
   const SpokenForms f = forms();
   std::string error;
-  EXPECT_EQ(spokenValue(a, f, "runways", "09", error), "zero nine");
+  EXPECT_EQ(spokenValue(a, f, "runways", "09", error), "zero niner");
   EXPECT_EQ(spokenValue(a, f, "runways", "27L", error), "two seven left");
   EXPECT_EQ(spokenValue(a, f, "taxiways", "A3", error), "alpha three");
   EXPECT_EQ(spokenValue(a, f, "taxiways", "L", error), "lima");

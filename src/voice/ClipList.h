@@ -13,7 +13,7 @@ struct SpokenForms {
 };
 bool loadSpokenForms(const std::string& phraseologyDir, SpokenForms& out, std::string& error);
 
-// "09" -> "zero nine", "27L" -> "two seven left", "A3" -> "alpha three". Callsigns use the
+// "09" -> "zero niner", "27L" -> "two seven left", "A3" -> "alpha three". Callsigns use the
 // airfield's own words. Empty, with error set, for anything that cannot be said.
 std::string spokenValue(const Airfield& a, const SpokenForms& f, const std::string& pool, const std::string& value, std::string& error);
 
