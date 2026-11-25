@@ -46,4 +46,5 @@ Branch and worktree `ui`, everything committed. Next free decision number: D-141
 - `main.cpp` needs nothing: live, `Main.qml`'s `planner` property is null, the tab is disabled and the Dashboard has no "Choose plan".
 - Mock cases: planoff, plan, plannew, planmis, planchg, planold, dashplan.
 - Waits for the design of the Planner backend and the user's approval: plan in `ExerciseView` and `LiveExercise`.
-- Next free ui decision number: D-147.
+- D-147: the user's review of D-145 and D-146; "Use new preset values" added. D-145 is confirmed finally by the user on the screenshots.
+- Next free ui decision number: D-148.

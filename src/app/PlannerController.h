@@ -99,6 +99,7 @@ class PlannerController : public QObject {
   Q_INVOKABLE void setRunway(const QString& id);
   Q_INVOKABLE void setTaxiway(const QString& id);
   Q_INVOKABLE void setPreset(int preset);          // PlanPreset
+  Q_INVOKABLE void useNewPreset();                 // a plan whose preset has changed: the preset's values of today
   Q_INVOKABLE void stepReply(bool from, int steps);  // of 0.1 s; then the plan is Custom
   Q_INVOKABLE void setRadio(const QString& r);
   Q_INVOKABLE void save();

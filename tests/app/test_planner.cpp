@@ -281,6 +281,23 @@ TEST_F(Planner, AChangedPresetLeavesSavedPlansAsTheyAre) {  // P-6, D-144
   EXPECT_EQ(p->plan()["to"].toString(), "2.0 s");
 }
 
+TEST_F(Planner, UseNewPresetValuesTakesThePresetOfToday) {  // D-147
+  login();
+  open("p1");
+  p->useNewPreset();  // nothing has changed
+  EXPECT_FALSE(p->dirty());
+  open("p4");  // Normal, saved with 2.0 s
+  ASSERT_TRUE(p->plan()["presetChanged"].toBool());
+  p->useNewPreset();
+  EXPECT_EQ(p->plan()["to"].toString(), "1.5 s");
+  EXPECT_FALSE(p->plan()["presetChanged"].toBool());
+  EXPECT_EQ(stateOf("p4"), "Warns: preset changed");  // until it is saved
+  p->save();
+  drain();
+  EXPECT_EQ(p->plan()["preset"].toInt(), int(PlanPreset::Normal));
+  EXPECT_EQ(stateOf("p4"), "Ready");
+}
+
 TEST_F(Planner, PresetsWaitForAnOpenEditAndCanBeRestored) {
   login();
   open("p1");

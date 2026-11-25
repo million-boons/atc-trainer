@@ -564,6 +564,10 @@ void PlannerController::setPreset(int preset) {
   touched();
 }
 
+void PlannerController::useNewPreset() {
+  if (presetChanged(draft_)) setPreset(int(draft_.difficulty.preset));
+}
+
 void PlannerController::stepReply(bool from, int steps) {
   if (!edit()) return;
   const PlanDifficulty was = draft_.difficulty;

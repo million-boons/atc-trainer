@@ -203,7 +203,9 @@ Item {
                     Item {
                         width: parent.width; height: Theme.touch
                         Head { height: parent.height; text: qsTr("DIFFICULTY") }
-                        SecondaryButton { anchors.right: parent.right; text: qsTr("Presets..."); font.pixelSize: Theme.small; focusPolicy: Qt.NoFocus; enabled: !s.planner.busy
+                        SecondaryButton { anchors { right: presetsBtn.left; rightMargin: Theme.s8 } visible: s.p.presetChanged === true; enabled: !s.planner.busy
+                                          text: qsTr("Use new preset values"); font.pixelSize: Theme.small; focusPolicy: Qt.NoFocus; onClicked: { s.free(); s.planner.useNewPreset() } }
+                        SecondaryButton { id: presetsBtn; anchors.right: parent.right; text: qsTr("Presets..."); font.pixelSize: Theme.small; focusPolicy: Qt.NoFocus; enabled: !s.planner.busy
                                           onClicked: { s.planner.clearMessage(); s.planner.editPresets(); s.ask("presets") } }
                     }
                     Row {

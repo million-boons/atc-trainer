@@ -697,6 +697,27 @@ TEST_F(Ui, AMisfitIsMarkedInWords) {
   EXPECT_FALSE(find("Save", true)->isEnabled());
 }
 
+TEST_F(Ui, NewPresetValuesAreOfferedOnlyIfThePresetChanged) {  // D-147
+  load();
+  run("plan");
+  waitLogin();
+  settle(200);
+  EXPECT_FALSE(find("Use new preset values", true));
+  run("planold");
+  waitLogin();
+  settle(200);
+  QQuickItem* b = find("Use new preset values", true);
+  ASSERT_TRUE(b);
+  for (QQuickItem* f = b->parentItem(); f; f = f->parentItem())  // the pane scrolls
+    if (f->inherits("QQuickFlickable")) {
+      f->setProperty("contentY", f->property("contentHeight").toReal() - f->height());
+      break;
+    }
+  settle();
+  clickButton("Use new preset values");
+  EXPECT_FALSE(mock->planner()->plan()["presetChanged"].toBool());
+}
+
 TEST_F(Ui, TheNameFieldIsTakenOverAndEdited) {
   load();
   run("plannew");
