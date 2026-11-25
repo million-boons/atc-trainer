@@ -6,6 +6,10 @@ Item {
     id: s
     property DashboardController dash
     property bool askStop: false
+    property bool scenarios: false             // Scenario Selection is there
+    property bool results: false               // Assessment is there
+    signal scenariosAsked()
+    signal resultsAsked()
     property PlannerController planner: null   // null: no plans in this build
     property bool showClips: false
     property string dialog_                    // "", plans, briefing
@@ -84,7 +88,8 @@ Item {
             spacing: Theme.s8
             SecondaryButton { visible: s.planner !== null; text: qsTr("Choose plan"); focusPolicy: Qt.NoFocus; font.pixelSize: Theme.small
                               enabled: !s.dash.running; onClicked: { s.planner.clearMessage(); s.dialog_ = "plans" } }
-            SecondaryButton { enabled: false; text: qsTr("Choose scenario (not built)"); font.pixelSize: Theme.small }
+            SecondaryButton { enabled: s.scenarios && !s.dash.running; text: s.scenarios ? qsTr("Choose scenario") : qsTr("Choose scenario (not built)"); focusPolicy: Qt.NoFocus
+                              font.pixelSize: Theme.small; onClicked: s.scenariosAsked() }
             SecondaryButton { visible: s.planned && (s.scn.briefing || "") !== ""; text: qsTr("Briefing"); focusPolicy: Qt.NoFocus; font.pixelSize: Theme.small
                               onClicked: s.dialog_ = "briefing" }
         }
@@ -138,8 +143,8 @@ Item {
                        focusPolicy: Qt.NoFocus; onClicked: s.askStop = true }
         SecondaryButton { width: start.small; height: parent.height; text: qsTr("Settings"); focusPolicy: Qt.NoFocus; onClicked: s.settingsAsked()
                           font.pixelSize: Theme.small }
-        SecondaryButton { width: start.small; height: parent.height; text: qsTr("Last result (not built)"); enabled: false
-                          font.pixelSize: Theme.small }
+        SecondaryButton { width: start.small; height: parent.height; text: s.results ? qsTr("Results") : qsTr("Last result (not built)"); enabled: s.results && !s.dash.running
+                          focusPolicy: Qt.NoFocus; onClicked: s.resultsAsked(); font.pixelSize: Theme.small }
     }
 
     Loader {

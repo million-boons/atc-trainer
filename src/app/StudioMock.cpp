@@ -283,7 +283,7 @@ StudioBackend mockStudio() {
     stop("");
     b->speaker.clear();
   };
-  s.setPedal = [](bool) {};
+  s.setPedal = [](bool, const std::string&) {};
   s.record = [b](const std::string& clip, StudioBackend::Done done) {
     if (b->speaker.empty()) return done("no recording session");
     b->recording = clip;

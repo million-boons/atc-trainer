@@ -129,11 +129,64 @@ TEST_F(People, DraftAnswersCountUntilAnApprovedTextIsInPlace) {  // D-135
   EXPECT_FALSE(mayRecord(*s.find("S02"), approved));
 }
 
-TEST_F(People, AnotherApprovedTextCountsAsWiderUntilItIsMarked) {  // D-137, the mark is not built
+TEST_F(People, AnotherApprovedTextCountsAsWiderUntilItIsMarked) {  // D-137
   Person p{"S01", "", "", true, kToday};
   p.consentVersion = "approved-1";
   EXPECT_TRUE(mayRecord(p, {"approved-1", "draft-1"}));
   EXPECT_FALSE(mayRecord(p, {"approved-2", "draft-1"}));
+}
+
+TEST_F(People, ConsentStatesBetweenApprovedTexts) {  // D-137
+  using S = ConsentState;
+  const std::vector<std::string> old{"u1", "u2"};
+  EXPECT_EQ(consentState("u3", "u3", old, {}), S::Valid);
+  EXPECT_EQ(consentState("u2", "u3", old, {}), S::Again);  // not marked
+  EXPECT_EQ(consentState("u2", "u3", old, {{"u3", true}}), S::Again);
+  EXPECT_EQ(consentState("u2", "u3", old, {{"u3", false}}), S::Ask);
+  EXPECT_EQ(consentState("u1", "u3", old, {{"u3", false}}), S::Again);  // u2 in between is not marked
+  EXPECT_EQ(consentState("u1", "u3", old, {{"u3", false}, {"u2", true}}), S::Again);
+  EXPECT_EQ(consentState("u1", "u3", old, {{"u3", false}, {"u2", false}}), S::Ask);
+  EXPECT_EQ(consentState("unknown", "u3", old, {{"u3", false}, {"u2", false}}), S::Again);
+  EXPECT_EQ(consentState("draft-1", "u3", old, {{"u3", false}}), S::Again);  // D-135
+  EXPECT_EQ(consentState("", "u3", old, {{"u3", false}}), S::Again);
+  EXPECT_EQ(consentState("u1", "draft-4", old, {}), S::Valid);  // a draft never asks
+}
+
+TEST_F(People, TheMarkIsKeptWithTheRecordsAndHasNoWayBackFromWider) {  // D-137
+  ConsentVersions v{"u2", "u2"};
+  v.recordingOld = {"u1"};
+  {
+    PeopleStore first(file, {"u1", "u1"});
+    ASSERT_EQ(first.load(), "");
+    ASSERT_EQ(first.add({"S01", "", "", true, kToday}, kToday), "");
+  }
+  {
+    PeopleStore s(file, v);
+    ASSERT_EQ(s.load(), "");
+    EXPECT_FALSE(mayRecord(*s.find("S01"), s.versions()));
+    EXPECT_NE(s.setWider(true, false), "");  // the pilot-voice text has replaced no approved one
+    ASSERT_EQ(s.setWider(false, false), "");
+    EXPECT_TRUE(mayRecord(*s.find("S01"), s.versions()));
+    EXPECT_EQ(recordingState(*s.find("S01"), s.versions()), ConsentState::Ask);
+  }
+  PeopleStore s(file, v);
+  ASSERT_EQ(s.load(), "");
+  EXPECT_EQ(recordingState(*s.find("S01"), s.versions()), ConsentState::Ask);
+  ASSERT_EQ(s.add({"S02", "", "", true, kToday}, kToday), "");  // other changes keep the mark
+  ASSERT_EQ(s.load(), "");
+  EXPECT_EQ(s.versions().recordingWider.at("u2"), false);
+  ASSERT_EQ(s.setWider(false, true), "");
+  EXPECT_FALSE(mayRecord(*s.find("S01"), s.versions()));
+  EXPECT_TRUE(mayRecord(*s.find("S02"), s.versions()));  // answered the present text
+  EXPECT_NE(s.setWider(false, false), "");
+  EXPECT_FALSE(mayRecord(*s.find("S01"), s.versions()));
+}
+
+TEST_F(People, NoMarkWhileTheTextIsADraft) {
+  PeopleStore s(file);
+  ASSERT_EQ(s.load(), "");
+  EXPECT_NE(s.setWider(false, false), "");
+  EXPECT_NE(s.setWider(true, true), "");
 }
 
 TEST_F(People, AnAnswerWithoutAVersionIsADraftAnswer) {

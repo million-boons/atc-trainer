@@ -551,18 +551,22 @@ TEST_F(Studio, ASessionThatAnEventEndsIsNotEndedTwice) {
 
 TEST_F(Studio, ThePedalIsForASessionOnlyAndEndsWithIt) {
   login();
-  std::vector<bool> pedal;
+  std::vector<std::string> pedal;
   StudioBackend x = b;
-  x.setPedal = [&pedal](bool on) { pedal.push_back(on); };
+  x.setPedal = [&pedal](bool on, const std::string& clip) { pedal.push_back(on ? clip : "off"); };
   s->setBackend(x);
   s->setPedal(true);
   EXPECT_TRUE(pedal.empty());
   startS01();
+  openTaxi();
+  s->selectSegment(3);
+  s->selectClip("RUNWAY_09@medial");
   s->setPedal(true);
   EXPECT_TRUE(s->pedal());
+  s->selectClip("RUNWAY_27@medial");  // the backend is told the new clip
   s->endSession();
   EXPECT_FALSE(s->pedal());
-  EXPECT_EQ(pedal, std::vector<bool>{true});
+  EXPECT_EQ(pedal, (std::vector<std::string>{"RUNWAY_09@medial", "RUNWAY_27@medial", "off"}));
 }
 
 TEST_F(Studio, ASecondRequestWaitsForTheFirst) {

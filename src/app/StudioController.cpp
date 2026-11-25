@@ -204,6 +204,7 @@ void StudioController::setTrainerBusy(bool on) {
 
 void StudioController::dropSession(const QString& why, bool tellBackend) {
   ++startNo_;
+  if (pedal_ && b_.setPedal) b_.setPedal(false, {});
   session_ = starting_ = pedal_ = false;  // recording_ follows the backend
   speaker_.clear();
   if (tellBackend && b_.endSession) b_.endSession();  // keeps an open take as pending
@@ -585,6 +586,7 @@ void StudioController::selectClip(const QString& id) {
   clipId_ = id.toStdString();
   const StudioClip* c = find(clipId_);
   takeId_ = c && !c->takes.empty() ? c->takes.front().id : std::string();
+  if (pedal_ && b_.setPedal) b_.setPedal(true, clipId_);
   loadPeaks();
   emit clipChanged();
   emit stripChanged();
@@ -710,7 +712,7 @@ void StudioController::endSession() {
 void StudioController::setPedal(bool on) {
   if (!session_ || on == pedal_) return;
   pedal_ = on;
-  if (b_.setPedal) b_.setPedal(on);
+  if (b_.setPedal) b_.setPedal(on, on ? clipId_ : std::string());
   emit sessionChanged();
 }
 

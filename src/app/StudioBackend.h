@@ -93,7 +93,9 @@ struct StudioBackend {
   std::function<void(const std::string& take, std::function<void(std::vector<float>, const std::string& why)>)> peaks;  // of the raw take: min, max, min, max ... in -1..1, at most 1000 pairs
   std::function<void(const std::string& speaker, Done)> startSession;  // answers after the room tone (about 2 s)
   std::function<void()> endSession;               // stops a recording and keeps it as pending; during the room tone: startSession is refused; twice: harmless
-  std::function<void(bool on)> setPedal;          // the pedal starts and stops a recording; it never transmits here
+  // The pedal starts and stops a recording of this clip; it never transmits here. Called again when another clip is
+  // chosen while it is on; a take that runs keeps its clip. Without a clip the pedal records nothing.
+  std::function<void(bool on, const std::string& clipId)> setPedal;
   std::function<void(const std::string& clipId, Done)> record;
   std::function<void()> stopRecord;
   std::function<void(const std::string& take, double start, double end, Done)> setTrim;

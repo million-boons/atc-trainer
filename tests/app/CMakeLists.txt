@@ -37,6 +37,24 @@ if(Qt6_FOUND)
   target_include_directories(planner_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${APP})
   target_link_libraries(planner_tests PRIVATE atc_logic Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
   gtest_discover_tests(planner_tests)
+  add_executable(scenarios_screen_tests test_scenarios.cpp ${APP}/ScenarioBackend.h ${APP}/ScenarioController.h ${APP}/ScenarioController.cpp
+    ${APP}/ScenarioMock.h ${APP}/ScenarioMock.cpp ${APP}/RowModel.h ${APP}/LabController.h ${APP}/LabController.cpp)
+  set_target_properties(scenarios_screen_tests PROPERTIES AUTOMOC ON)
+  target_include_directories(scenarios_screen_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${APP})
+  target_link_libraries(scenarios_screen_tests PRIVATE atc_logic Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
+  gtest_discover_tests(scenarios_screen_tests)
+  add_executable(history_screen_tests test_history.cpp ${APP}/HistoryBackend.h ${APP}/HistoryController.h ${APP}/HistoryController.cpp
+    ${APP}/HistoryMock.h ${APP}/HistoryMock.cpp ${APP}/AccessController.h ${APP}/AccessController.cpp ${APP}/RowModel.h ${APP}/LabController.h ${APP}/LabController.cpp)
+  set_target_properties(history_screen_tests PROPERTIES AUTOMOC ON)
+  target_include_directories(history_screen_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${APP})
+  target_link_libraries(history_screen_tests PRIVATE atc_logic Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
+  gtest_discover_tests(history_screen_tests)
+  add_executable(setup_screen_tests test_setup.cpp ${APP}/SetupBackend.h ${APP}/SetupController.h ${APP}/SetupController.cpp
+    ${APP}/SetupMock.h ${APP}/SetupMock.cpp ${APP}/AccessController.h ${APP}/AccessController.cpp ${APP}/RowModel.h ${APP}/LabController.h ${APP}/LabController.cpp)
+  set_target_properties(setup_screen_tests PROPERTIES AUTOMOC ON)
+  target_include_directories(setup_screen_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${APP})
+  target_link_libraries(setup_screen_tests PRIVATE atc_logic Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
+  gtest_discover_tests(setup_screen_tests)
   # The live exercise (3b): real engine, simulated time, no radio.
   if(TARGET atc_exercise)
     add_executable(live_exercise_tests test_live_exercise.cpp ${APP}/LiveExercise.h ${APP}/LiveExercise.cpp

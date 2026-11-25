@@ -9,10 +9,13 @@
 #include <vector>
 
 #include "app/ExerciseController.h"
+#include "app/HistoryController.h"
 #include "app/LabChecks.h"
 #include "app/LabController.h"
 #include "app/PlannerController.h"
 #include "app/RecordingsController.h"
+#include "app/ScenarioController.h"
+#include "app/SetupController.h"
 #include "app/StatusFeed.h"
 #include "app/StudioController.h"
 #include "app/SttController.h"
@@ -30,6 +33,9 @@ class MockBackend : public QObject {
   Q_PROPERTY(ExerciseController* exercise READ exercise CONSTANT)
   Q_PROPERTY(StudioController* studio READ studio CONSTANT)
   Q_PROPERTY(PlannerController* planner READ planner CONSTANT)
+  Q_PROPERTY(ScenarioController* scenarios READ scenarios CONSTANT)
+  Q_PROPERTY(HistoryController* history READ history CONSTANT)
+  Q_PROPERTY(SetupController* setup READ setup CONSTANT)
   Q_PROPERTY(QVariantList exerciseScripts READ exerciseScripts CONSTANT)
   Q_PROPERTY(bool assessed MEMBER assessed_ WRITE setAssessed NOTIFY currentChanged)  // Exercise cases only
   Q_PROPERTY(bool consent MEMBER consent_ WRITE setConsent NOTIFY currentChanged)
@@ -41,15 +47,21 @@ class MockBackend : public QObject {
   ExerciseController* exercise() { return &exercise_; }
   StudioController* studio() { return &studio_; }
   PlannerController* planner() { return &planner_; }
+  ScenarioController* scenarios() { return &scenarios_; }
+  HistoryController* history() { return &history_; }
+  SetupController* setup() { return &setup_; }
   QVariantList exerciseScripts() const;
   void attach(AccessController* a, RecordingsController* r) {
     access_ = a;
     connect(a, &AccessController::confirmed, &exercise_, &ExerciseController::endConfirmed);
     studio_.setAccess(a);
     planner_.setAccess(a);
+    history_.setAccess(a);
+    setup_.setAccess(a);
     connect(a, &AccessController::loggedIn, this, [this] {
       studioCase();
       plannerCase();
+      screenCase();
     });
     recordings_ = r;
     r->setConnected();
@@ -77,6 +89,7 @@ class MockBackend : public QObject {
   void loginCase(const QString& id);
   void studioCase();                      // once the instructor is logged in
   void plannerCase();
+  void screenCase();                      // Scenario Selection, Assessment
   void showChoice(const PlanChoice& c);   // the plan on the Dashboard
   void endPttTest(const QString& note);
   struct Speech { double startMs = 320, endBeforeReleaseMs = 350, gain = 0.292  /* about -12 dBFS */; };
@@ -107,6 +120,10 @@ class MockBackend : public QObject {
   ExerciseController exercise_;
   StudioController studio_;
   PlannerController planner_;
+  ScenarioController scenarios_;
+  HistoryController history_;
+  SetupController setup_;
+  std::optional<QVariantMap> chosenScenario_;   // the card of a selected scenario
   std::optional<PlanChoice> chosen_;
   bool assessed_ = false, consent_ = false;
   bool exPressed_ = false;    // a press in an Exercise case

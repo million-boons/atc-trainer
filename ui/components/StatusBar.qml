@@ -13,6 +13,8 @@ Rectangle {
     property string loginLong
     property bool loginEnabled: true
     property bool loggedIn: false
+    property string clockMode: "both"     // both, utc, local
+    onClockModeChanged: clock.refresh()
     signal loginAsked()
     signal logoutAsked()
     // Width the right part needs without the scenario name.
@@ -76,8 +78,9 @@ Rectangle {
             function refresh() {
                 var d = new Date()
                 function z(n) { return String(n).padStart(2, "0") }
-                text = z(d.getUTCHours()) + ":" + z(d.getUTCMinutes()) + ":" + z(d.getUTCSeconds()) + "Z\n"
-                     + z(d.getHours()) + ":" + z(d.getMinutes()) + "L"
+                var utc = z(d.getUTCHours()) + ":" + z(d.getUTCMinutes()) + ":" + z(d.getUTCSeconds()) + "Z"
+                var local = z(d.getHours()) + ":" + z(d.getMinutes()) + (bar.clockMode === "local" ? ":" + z(d.getSeconds()) : "") + "L"
+                text = bar.clockMode === "utc" ? utc : bar.clockMode === "local" ? local : utc + "\n" + local
             }
             Component.onCompleted: refresh()
             Timer { interval: 1000; running: true; repeat: true; onTriggered: clock.refresh() }
