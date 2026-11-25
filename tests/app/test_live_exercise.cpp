@@ -433,10 +433,19 @@ TEST_F(Live, AfterTheEndTheNextExerciseHasNewValuesAndTheLabIsWaiting) {
   EXPECT_EQ(lab.textState(), "Waiting");
   EXPECT_EQ(c()->phase(), C::Result);
   EXPECT_EQ(screens.last(), "ass");
+  const QVariantMap card = scenario;  // what the Dashboard shows from now on
   c()->runAgain();
   EXPECT_EQ(c()->phase(), C::Starting);
   c()->start(false);
   ASSERT_EQ(starts.size(), 2u);
+  // D-321: card, Start dialog and engine have the same values, also by Run again.
+  ParamValues p;
+  ASSERT_TRUE(generateParams(ex->scenario, ex->airfield, starts[1].seed, p));
+  for (const auto& [key, name] : {std::pair{"callsign", "callsign"}, std::pair{"runway", "runway"}, std::pair{"taxiway", "taxiway"}, std::pair{"type", "aircraftType"}}) {
+    EXPECT_EQ(card[key].toString().toStdString(), p[name]) << key;
+    EXPECT_EQ(scenario[key].toString(), card[key].toString()) << key;
+    EXPECT_EQ(c()->context()[key].toString(), card[key].toString()) << key;
+  }
   EXPECT_NE(starts[1].seed, first);
   EXPECT_NE(starts[1].sessionId, starts[0].sessionId);
 }
