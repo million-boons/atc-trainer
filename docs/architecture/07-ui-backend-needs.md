@@ -68,7 +68,7 @@ Instructor only (D-25). Logic is engine's (`atc-scenario-pilot-engine`); the lis
 
 Speakers (D-132): only a person with a record and consent "yes"; the instructor starts the session and chooses the speaker; the ID (never name or rank) is stored with each take, also in `pending` and in the manifest. Consent (recording and pilot voice) is checked when the session starts and before each take is saved. D-31 applies: never in git. **Missing:** speaker ID and pilot-voice consent per take in the manifest (engine's format).
 
-Consent withdrawn (D-133): the bank, the coverage check and the player must leave those takes out **at once**: a clip with no other take is then missing, and Start is blocked. The running program must notice the change (P: LiveExercise asks for a new check when an answer changes; not during an exercise, where no record can be changed). The Studio lists them "Consent withdrawn – delete or replace"; deletion by the instructor is logged first.
+Consent withdrawn (D-133), or "re-consent needed" (D-135): the bank, the coverage check and the player must leave those takes out **at once**: a clip with no other take is then missing, and Start is blocked. The running program must notice the change (P: LiveExercise asks for a new check when an answer changes; not during an exercise, where no record can be changed). The Studio lists them "Consent withdrawn – delete or replace"; deletion by the instructor is logged first.
 
 ## Order and dependencies
 

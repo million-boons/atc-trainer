@@ -13,7 +13,7 @@ using namespace atc;
 AccessBackend realAccess([[maybe_unused]] const std::string& writable) {
   AccessBackend b;
 #ifdef ATC_HAVE_STORAGE
-  auto store = std::make_shared<PeopleStore>(writable + "/people.json");
+  auto store = std::make_shared<PeopleStore>(writable + "/people.json", b.versions);
   b.load = [store] { return store->load(); };
   b.people = [store] { return store->people(); };
   b.add = [store](Person p, const std::string& today) { return store->add(std::move(p), today); };
@@ -54,6 +54,7 @@ AccessBackend mockAccess() {
       if (p.id == id) {
         p.consent = consent;
         p.consentDate = date;
+        p.consentVersion = ConsentVersions{}.recording;
       }
     return std::string();
   };
@@ -62,6 +63,7 @@ AccessBackend mockAccess() {
       if (p.id == id) {
         p.pilotVoice = consent;
         p.pilotVoiceDate = date;
+        p.pilotVoiceVersion = ConsentVersions{}.pilotVoice;
       }
     return std::string();
   };

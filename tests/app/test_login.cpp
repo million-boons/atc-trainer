@@ -224,6 +224,28 @@ TEST_F(Login, ConsentTextNamesTheLocalNetworkAndNoCloud) {  // D-114
   EXPECT_TRUE(a->consentText().contains("Consent covers copies to project machines on the local network (offline, never cloud)."));
 }
 
+TEST_F(Login, ADraftAnswerIsNoOnceTheTextIsApproved) {  // D-135
+  AccessBackend b;
+  b.people = [this] { return people; };
+  b.versions = {"approved-1", "approved-1"};
+  AccessController c(b, [this] { return now; });
+  EXPECT_FALSE(c.consentText().contains("draft"));
+  EXPECT_FALSE(c.pilotVoiceText().contains("draft"));
+  ASSERT_TRUE(c.loginTrainee("S01"));
+  EXPECT_FALSE(c.consent());
+  EXPECT_TRUE(c.people()[0].toMap()["again"].toBool());
+  people[0].consentVersion = "approved-1";
+  EXPECT_TRUE(c.consent());
+  EXPECT_FALSE(c.people()[0].toMap()["again"].toBool());
+}
+
+TEST_F(Login, TextAndVersionBelongTogether) {  // D-135: a changed text needs a new version in core/Consent.h
+  EXPECT_EQ(ConsentVersions{}.recording, "draft-1");
+  EXPECT_EQ(ConsentVersions{}.pilotVoice, "draft-1");
+  EXPECT_EQ(a->consentText(), QString::fromUtf8("Voice recordings stay on this machine. Consent covers copies to project machines on the local network (offline, never cloud). [draft — to be approved by the unit]"));
+  EXPECT_EQ(a->pilotVoiceText(), QString::fromUtf8("Pilot voice (separate answer): Your recorded phrases may be used as the pilot's voice in training exercises and heard by other trainees. You can withdraw this at any time through the instructor; your phrases are then taken out of use immediately. [draft — to be approved by the unit]"));
+}
+
 TEST_F(Login, EveryConsentTextIsMarkedAsDraft) {  // D-134
   EXPECT_TRUE(a->consentText().contains(QString::fromUtf8("draft — to be approved by the unit")));
   EXPECT_TRUE(a->pilotVoiceText().contains(QString::fromUtf8("draft — to be approved by the unit")));
