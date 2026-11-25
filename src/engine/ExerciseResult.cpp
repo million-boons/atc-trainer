@@ -13,6 +13,7 @@ struct Builder {
   std::map<std::uint64_t, Ns> response;            // per transmission
   std::map<std::uint64_t, SuspectedStt> heard;     // per transmission
   std::vector<int> keyToSpeech;
+  std::set<std::uint64_t> early;                   // before the pilot's first call
   std::set<std::uint64_t> repeats;                 // pilot calls after a missed response
 
   StepResult* step(const std::string& id) {
@@ -69,7 +70,8 @@ struct Builder {
       s->missed.push_back({now - started, x.waited});
       return;
     }
-    if (++s->attempts == 1)
+    const bool counts = x.outcome == Outcome::Correct || !early.count(x.tx);  // D-322
+    if (counts && ++s->attempts == 1)
       if (const auto it = response.find(x.tx); it != response.end()) s->responseTime = it->second;
     if (x.outcome == Outcome::Correct) {
       s->completed = true;
@@ -81,12 +83,16 @@ struct Builder {
       q.outcome = x.outcome;
       q.problems = x.problems;
       r.suspectedStt.push_back(std::move(q));
-    } else {
+    } else if (counts) {
       ++s->errors[x.outcome];
     }
   }
   void on(const out::PilotRequested& x) {
     if (x.utterance.cause == Outcome::Timeout) repeats.insert(x.utterance.id);
+  }
+  void on(const out::AtcBeforePilot& x) {
+    ++r.atcBeforePilot;
+    early.insert(x.tx);
   }
   void on(const out::NoReply&) {}
   void on(const out::TimerSet&) {}

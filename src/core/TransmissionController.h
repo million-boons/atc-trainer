@@ -27,6 +27,8 @@ struct TxConfig {
   Ns maxDuration = ms(30'000);
   Ns preRoll = ms(300);
   Ns tail = ms(200);
+  // A cut reply waits for the transmission that cut it. Short tap: said again. Otherwise the new answer
+  // comes first, then the cut reply if it is owed (D-325). False: a cut reply is dropped at once.
   bool repeatInterruptedReply = true;
   PressRule pressDuringPilot = PressRule::Interrupt;
   // A queued press opens this long after the pilot ends, so that a release made before the
@@ -44,6 +46,8 @@ struct Reply {
   Ns delay = 0;     // chosen by the caller's seeded RNG
   Ns expected = 0;  // length of the assembled speech; 0 = unknown, only the cap applies
   std::uint64_t id = 0;  // PilotUtterance::id, kept when a reply is withdrawn or repeated
+  bool first = false;    // D-322: before all others, and it does not wait for results
+  bool owed = false;     // D-325: said again after the new answer; otherwise a cut reply is dropped
 };
 
 using PlaybackId = std::uint64_t;
@@ -117,6 +121,7 @@ class TransmissionController {
   // Unresolved transmissions in order; value set once processed.
   std::map<std::uint64_t, std::optional<std::optional<Reply>>> open_;
   std::deque<Reply> replies_;
+  std::map<std::uint64_t, Reply> cut_;  // by the transmission that cut it
   std::optional<Reply> speaking_;
   PlaybackId playback_ = 0;
   Ns pilotStart_ = 0, pilotDeadline_ = 0;

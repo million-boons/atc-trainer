@@ -39,7 +39,7 @@
       "phase": "taxi",
       "onEnter": {
         "say": "REQUEST_TAXI",
-        "delaySeconds": 2
+        "delaySeconds": 1
       },
       "expects": [
         {
@@ -48,6 +48,9 @@
             "callsign",
             "taxiway",
             "runway"
+          ],
+          "optional": [
+            "hold_short"
           ],
           "mustMatch": {
             "callsign": "{callsign}",
@@ -62,7 +65,10 @@
       "responses": {
         "CORRECT": {
           "action": "say",
-          "reply": "READBACK_TAXI"
+          "reply": "READBACK_TAXI",
+          "withField": {
+            "hold_short": "READBACK_TAXI_HOLD_SHORT"
+          }
         },
         "MISSING_INFO": {
           "action": "say",

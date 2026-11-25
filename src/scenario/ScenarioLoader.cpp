@@ -225,6 +225,8 @@ void loadIntents(const std::string& dir, std::map<std::string, IntentInfo>& out,
         if (!templateSlots(e, slots)) x.fail("bad {slot} in an example");
         info.slots.insert(slots.begin(), slots.end());
       }
+      if (x.has("parse") && x.child("parse").j.is_object() && x.child("parse").has("optional"))
+        for (const auto& f : x.child("parse").texts("optional", true)) info.optional.insert(f);
       if (!out.emplace(id, std::move(info)).second) x.fail(id + " is defined twice");
     });
   }
@@ -257,14 +259,25 @@ void loadReplies(const std::string& dir, std::map<std::string, PilotReply>& out,
 struct Use { std::string reply; Node at; };
 
 void loadResponse(const Node& n, StepResponse& out, std::vector<Use>& uses) {
-  if (!n.object({"action"}, {"reply"})) return;
+  if (!n.object({"action"}, {"reply", "withField"})) return;
   const std::string action = n.text("action");
   if (action == "say") {
     out.say = true;
     out.reply = n.text("reply");
     if (!n.has("reply")) n.fail("say needs a reply");
     if (!out.reply.empty()) uses.push_back({out.reply, n.child("reply")});
+    if (n.has("withField")) {
+      const Node w = n.child("withField");
+      if (!w.j.is_object()) return w.fail("must be an object");
+      for (const auto& [field, v] : w.j.items()) {
+        const std::string id = w.text(field.c_str());
+        if (id.empty()) continue;
+        out.withField[field] = id;
+        uses.push_back({id, w.child(field)});
+      }
+    }
   } else if (action == "silent") {
+    if (n.has("withField")) n.child("withField").fail("silent has no reply");
     if (n.has("reply")) n.child("reply").fail("silent has no reply");
   } else if (!action.empty()) {
     n.child("action").fail("must be say or silent");
@@ -278,9 +291,11 @@ std::optional<Outcome> outcomeAt(const Node& n, const std::string& name) {
 }
 
 void loadExpectation(const Node& n, const Exercise& e, const Scenario& s, Expectation& x) {
-  if (!n.object({"intent", "required", "mustMatch"})) return;
+  if (!n.object({"intent", "required", "mustMatch"}, {"optional"})) return;
   x.intent = n.text("intent");
   x.required = n.texts("required", false);
+  x.optional = n.texts("optional", true);
+  if (x.optional.size() > 1) n.child("optional").fail("at most one optional field");
   if (n.has("mustMatch")) {
     const Node m = n.child("mustMatch");
     if (!m.j.is_object()) {
@@ -306,6 +321,10 @@ void loadExpectation(const Node& n, const Exercise& e, const Scenario& s, Expect
     // Without it any value would be accepted, e.g. the wrong runway.
     if (n.has("mustMatch") && n.child("mustMatch").j.is_object() && !n.child("mustMatch").j.contains(f))
       n.fail("required field " + f + " needs a mustMatch");
+  }
+  for (const auto& f : x.optional) {
+    if (!it->second.optional.count(f)) n.child("optional").fail(x.intent + " has no optional field " + f);
+    if (std::find(x.required.begin(), x.required.end(), f) != x.required.end()) n.child("optional").fail(f + " is already required");
   }
   for (const auto& [f, p] : x.mustMatch)
     if (std::find(x.required.begin(), x.required.end(), f) == x.required.end())
@@ -382,6 +401,16 @@ void loadStep(const Node& n, const Exercise& e, const Scenario& s, const std::se
     return;
   }
   if (st.expects.empty()) n.fail("a step that is not final needs expects");
+  // What is given must be read back (D-417), and only what a step takes.
+  std::set<std::string> optional;
+  for (const auto& x : st.expects) optional.insert(x.optional.begin(), x.optional.end());
+  const auto correct = st.responses.find(Outcome::Correct);
+  for (const auto& f : optional)
+    if (correct == st.responses.end() || !correct->second.withField.count(f))
+      n.child("responses").fail("optional " + f + " needs CORRECT/withField/" + f);
+  for (const auto& [o, r] : st.responses)
+    for (const auto& [f, id] : r.withField)
+      if (o != Outcome::Correct || !optional.count(f)) n.child("responses").fail("withField " + f + " is only for CORRECT and an optional field");
   if (!ons.count(Outcome::Correct)) n.fail("no transition on CORRECT");
   for (const auto& [o, name] : kOutcomeNames) {
     // No safety rules yet, so UNSAFE cannot occur; TIMEOUT only with a timeout.

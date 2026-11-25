@@ -39,22 +39,45 @@ void SequenceEngine::on(Ns t, const in::Started&, Outputs& o) {
   status_ = Status::Running;
   if (exercise_->scenario.maxDuration > 0) setTimer(in::Timer::ExerciseLimit, exercise_->scenario.maxDuration, t, o);
   enter(exercise_->scenario.initialStep, o);
+  if (!step().onEnter) return;
+  first_ = First::Waiting;
+  firstReply_ = step().onEnter->reply;
+  onEnterPending_ = false;
+  setTimer(in::Timer::OnEnter, step().onEnter->delay, t, o);
 }
 
-void SequenceEngine::on(Ns, const in::TxOpened& x, Outputs&) { openTx_[x.tx] = {}; }
+void SequenceEngine::on(Ns, const in::TxOpened& x, Outputs&) {
+  openTx_[x.tx] = {};
+  lastTx_ = std::max(lastTx_, x.tx);
+  if (running() && (first_ == First::Waiting || first_ == First::Requested)) early_.insert(x.tx);
+}
 
-void SequenceEngine::on(Ns, const in::TxClosed& x, Outputs&) {
+void SequenceEngine::on(Ns, const in::TxClosed& x, Outputs& o) {
   const auto it = openTx_.find(x.tx);
-  if (it != openTx_.end()) it->second = {true, x.end, x.report};
+  if (it == openTx_.end()) return;
+  it->second = {true, x.end, x.report};
+  if (running() && early_.count(x.tx)) o.push_back(out::AtcBeforePilot{x.tx});
 }
 
-void SequenceEngine::on(Ns, const in::TxCancelled& x, Outputs&) { openTx_.erase(x.tx); }
+void SequenceEngine::on(Ns, const in::TxCancelled& x, Outputs&) {
+  openTx_.erase(x.tx);
+  early_.erase(x.tx);
+  std::erase_if(cut_, [&](const auto& c) { return c.second < x.tx; });  // nothing was said: it is said again
+}
 
 void SequenceEngine::on(Ns, const in::PressNotOpened&, Outputs&) {}  // in the log for the result only
 
 void SequenceEngine::on(Ns t, const in::Recognised& x, Outputs& o) {
   const std::uint64_t tx = x.instruction.tx;
   const auto it = openTx_.find(tx);
+  // D-325: a new instruction was given, so what it cut is not said again (the transmission controller does the same).
+  if (it != openTx_.end())
+    std::erase_if(cut_, [&](const auto& c) {
+      if (c.second >= tx) return false;
+      outstanding_.erase(c.first);
+      return true;
+    });
+  const bool early = early_.erase(tx) > 0;
   if (!running() || it == openTx_.end() || step().final) {
     if (it != openTx_.end()) openTx_.erase(it);
     o.push_back(out::NoReply{tx});
@@ -84,25 +107,35 @@ void SequenceEngine::on(Ns t, const in::Recognised& x, Outputs& o) {
     ctx_.clearances.push_back(std::move(c));
   }
   const auto r = st.responses.find(v.outcome);
-  if (r != st.responses.end() && r->second.say)
-    say(r->second.reply, v.outcome, tx, false, o);
-  else
+  if (r != st.responses.end() && r->second.say) {
+    std::string reply = r->second.reply;
+    for (const auto& [field, with] : r->second.withField)
+      if (const auto f = x.instruction.fields.find(field); f != x.instruction.fields.end() && !f->second.value.empty()) reply = with;
+    say(reply, v.outcome, tx, false, o);
+  } else {
     o.push_back(out::NoReply{tx});
-  if (v.outcome == Outcome::Ambiguous || v.outcome == Outcome::Unintelligible)
+  }
+  if (!early && (v.outcome == Outcome::Ambiguous || v.outcome == Outcome::Unintelligible))
     if (++sayAgain_ == st.maxSayAgain)
       o.push_back(out::InstructorAlert{st.id + ": not understood " + std::to_string(sayAgain_) + " times"});
   takeBranch(v.outcome, o);
 }
 
 void SequenceEngine::on(Ns t, const in::PilotStarted& x, Outputs&) {
+  if (x.utterance == firstCall_ && first_ == First::Requested) first_ = First::Begun;
+  cut_.erase(x.utterance);  // said again
   const auto it = outstanding_.find(x.utterance);
-  if (it != outstanding_.end() && running()) ctx_.history.push_back({t, true, x.utterance, step().id, it->second, std::nullopt});
+  if (it != outstanding_.end() && running()) ctx_.history.push_back({t, true, x.utterance, step().id, it->second.text, std::nullopt});
 }
 
 void SequenceEngine::on(Ns, const in::PilotEnded& x, Outputs&) {
-  // The transmission controller keeps the reply in these two cases and will start it again.
+  // The transmission controller keeps the reply in these two cases. One that is not owed is kept only
+  // until the next instruction (D-325).
   if (x.end == in::PilotEnd::PressCameFirst) return;
-  if (x.end == in::PilotEnd::Interrupted && exercise_->scenario.repeatInterruptedReply) return;
+  if (x.end == in::PilotEnd::Interrupted && exercise_->scenario.repeatInterruptedReply) {
+    if (const auto it = outstanding_.find(x.utterance); it != outstanding_.end() && !it->second.owed) cut_[x.utterance] = lastTx_;
+    return;
+  }
   outstanding_.erase(x.utterance);
 }
 
@@ -115,6 +148,13 @@ void SequenceEngine::on(Ns, const in::TimerFired& x, Outputs& o) {
       stepTimedOut(o);
       break;
     case in::Timer::OnEnter:
+      if (first_ == First::Waiting) {
+        first_ = First::Requested;
+        PilotUtterance& u = say(firstReply_, Outcome::Correct, 0, true, o);
+        u.first = true;
+        firstCall_ = u.id;
+        break;
+      }
       onEnterPending_ = false;
       if (step().onEnter) say(step().onEnter->reply, Outcome::Correct, 0, true, o);
       break;
@@ -175,7 +215,7 @@ void SequenceEngine::enter(const std::string& id, Outputs& o) {
   for (std::size_t i = 0; i < steps.size(); ++i)
     if (steps[i].id == id) step_ = i;
   cancelTimer(in::Timer::StepTimeout, o);
-  cancelTimer(in::Timer::OnEnter, o);
+  if (first_ != First::Waiting) cancelTimer(in::Timer::OnEnter, o);
   onEnterPending_ = step().onEnter.has_value();
   callsExhausted_ = false;
   pilotCalls_ = sayAgain_ = 0;
@@ -190,7 +230,7 @@ void SequenceEngine::takeBranch(Outcome outcome, Outputs& o) {
   }
 }
 
-void SequenceEngine::say(const std::string& replyId, Outcome cause, std::uint64_t tx, bool unprompted, Outputs& o) {
+PilotUtterance& SequenceEngine::say(const std::string& replyId, Outcome cause, std::uint64_t tx, bool unprompted, Outputs& o) {
   PilotUtterance u;
   u.id = nextUtterance_++;
   u.replyId = replyId;
@@ -207,8 +247,10 @@ void SequenceEngine::say(const std::string& replyId, Outcome cause, std::uint64_
   u.unprompted = unprompted;
   u.cause = cause;
   u.tx = tx;
-  outstanding_[u.id] = u.text;
+  u.owed = !unprompted && cause == Outcome::Correct;
+  outstanding_[u.id] = {u.text, u.owed};
   o.push_back(out::PilotRequested{std::move(u)});
+  return std::get<out::PilotRequested>(o.back()).utterance;
 }
 
 void SequenceEngine::stepTimedOut(Outputs& o) {
@@ -239,15 +281,18 @@ void SequenceEngine::finish(out::EndReason why, Outputs& o) {
 void SequenceEngine::settle(Ns t, Outputs& o) {
   if (!running()) return;
   const ScenarioStep& st = step();
-  if (st.final && outstanding_.empty() && !onEnterPending_) return finish(out::EndReason::Completed, o);
+  const bool firstDue = first_ == First::Waiting;
+  if (st.final && outstanding_.empty() && !onEnterPending_ && !firstDue) return finish(out::EndReason::Completed, o);
   const bool quiet = outstanding_.empty() && openTx_.empty();
   // The pilot's own call waits for a quiet channel; the trainee may be quicker.
-  if (onEnterPending_ && quiet) {
+  if (firstDue) {
+    // Its timer runs on.
+  } else if (onEnterPending_ && quiet) {
     if (!timer(in::Timer::OnEnter).active) setTimer(in::Timer::OnEnter, st.onEnter->delay, t, o);
   } else {
     cancelTimer(in::Timer::OnEnter, o);
   }
-  if (quiet && !onEnterPending_ && !st.final && st.timeout > 0 && !callsExhausted_) {
+  if (quiet && !onEnterPending_ && !firstDue && !st.final && st.timeout > 0 && !callsExhausted_) {
     if (!timer(in::Timer::StepTimeout).active) setTimer(in::Timer::StepTimeout, st.timeout, t, o);
   } else {
     cancelTimer(in::Timer::StepTimeout, o);

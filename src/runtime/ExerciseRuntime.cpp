@@ -142,6 +142,8 @@ void ExerciseRuntime::say(const PilotUtterance& u) {
   r.delay = u.delay;
   r.expected = speechLength(pcm.size());
   r.id = u.id;
+  r.first = u.first;
+  r.owed = u.owed;
   run_->sounds[u.id] = std::move(pcm);
   if (u.tx) answer(u.tx, std::move(r));
   else core_->requestPilot(std::move(r));

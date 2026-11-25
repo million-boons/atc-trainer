@@ -75,8 +75,10 @@ json j(const out::PilotRequested& x) {
   const PilotUtterance& u = x.utterance;
   return {{"utterance", u.id}, {"reply", u.replyId},         {"text", u.text},
           {"clips", u.clipIds}, {"delay", u.delay},           {"unprompted", u.unprompted},
-          {"cause", str(toString(u.cause))}, {"tx", u.tx}};
+          {"cause", str(toString(u.cause))}, {"tx", u.tx},             {"first", u.first},
+          {"owed", u.owed}};
 }
+json j(const out::AtcBeforePilot& x) { return json{{"tx", x.tx}}; }
 json j(const out::NoReply& x) { return json{{"tx", x.tx}}; }
 json j(const out::TimerSet& x) { return {{"timer", name(x.timer)}, {"generation", x.generation}, {"delay", x.delay}}; }
 json j(const out::TimerCancelled& x) { return json{{"timer", name(x.timer)}}; }

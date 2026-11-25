@@ -27,6 +27,13 @@
       }
     },
     {
+      "id": "READBACK_TAXI_HOLD_SHORT",
+      "text": "taxi via {taxiway} hold short runway {runway}, {callsign}",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
       "id": "READBACK_LINE_UP",
       "text": "line up runway {runway}, {callsign}",
       "validation": {

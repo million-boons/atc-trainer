@@ -37,7 +37,8 @@ void Simulator::apply(const EngineInput& input) {
       timers_.erase(c->timer);
     } else if (const auto* p = std::get_if<out::PilotRequested>(&o)) {
       if (queue_.empty() && !speaking_) eligibleSince_ = now_;
-      queue_.push_back(p->utterance);
+      if (p->utterance.first) queue_.push_front(p->utterance);
+      else queue_.push_back(p->utterance);
     } else if (const auto* e = std::get_if<out::Ended>(&o)) {
       reason_ = e->reason;
       queue_.clear();
@@ -47,7 +48,7 @@ void Simulator::apply(const EngineInput& input) {
 
 std::optional<Ns> Simulator::nextPilot() const {
   if (speaking_) return speechEnd_;
-  if (queue_.empty() || txBusy_) return std::nullopt;
+  if (queue_.empty() || talking_ || (txBusy_ && !queue_.front().first)) return std::nullopt;
   return std::max(now_, eligibleSince_ + queue_.front().delay);
 }
 
@@ -101,10 +102,11 @@ void Simulator::waitForPilot() {
 void Simulator::transmit(ParsedInstruction p, const UtteranceReport& report, TxEnd end, const std::string& sttFault) {
   waitForPilot();
   p.tx = ++tx_;
-  txBusy_ = true;
+  txBusy_ = talking_ = true;
   apply(in::TxOpened{tx_, now_, false});
   advanceTo(now_ + opt_.talk);
   apply(in::TxClosed{tx_, now_, end, report});
+  talking_ = false;
   advanceTo(now_ + opt_.recognise);
   txBusy_ = false;
   eligibleSince_ = now_;

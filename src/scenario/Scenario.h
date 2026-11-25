@@ -40,15 +40,21 @@ struct PilotReply {
 
 struct IntentInfo {
   std::set<std::string> slots;
+  std::set<std::string> optional;  // parse.optional
   bool placeholder = true;
 };
 
-struct StepResponse { bool say = false; std::string reply; };
+struct StepResponse {
+  bool say = false;
+  std::string reply;
+  std::map<std::string, std::string> withField;  // optional field given -> this reply instead (O-3)
+};
 struct StepTransition { Outcome on = Outcome::Correct; std::string to; bool errorBranch = false; };
 struct StepOnEnter { std::string reply; Ns delay = 0; };
 struct Expectation {
   std::string intent;
   std::vector<std::string> required;
+  std::vector<std::string> optional;             // accepted if given, at most one; the readback includes it
   std::map<std::string, std::string> mustMatch;  // field -> generated parameter
 };
 struct ScenarioStep {
