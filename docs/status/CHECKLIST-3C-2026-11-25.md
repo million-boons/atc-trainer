@@ -39,11 +39,14 @@ With runway 27: taxiway B2 ("bravo two"), runway "two seven"; FALCON-732 is "fal
 
 | # | Do | Expect | Result |
 |---|---|---|---|
-| B1 | Start, then **do not press until the pilot has called** (about 2 s; finding 2, not fixed yet) | The pilot calls first ("request taxi"), with the light radio effect; RX shown | |
+| B1 | Start dialog shows the Dashboard's values; Start | The pilot calls first ("request taxi"), with the light radio effect; RX shown | |
 | B2 | Hold the right button, give the taxi instruction, release | TX while held; text and chips; readback; step 1 Done | |
 | B3 | Line up, then takeoff | The pilot calls "ready for departure" before line up; both steps Done | |
 | B4 | After the last readback | "Exercise complete"; **Result**: 3 of 3, attempts, response time, PTT, suspected STT apart, no pass mark | |
-| B5 | Run again | New values: read the callsign on the Exercise screen, not the Dashboard seen before (finding 1, not fixed yet) | |
+| B5 | Run again | New values, shown in the Start dialog, and the exercise runs with them (D-321) | |
+| B7 | Start and press within 1 s, speak over the moment of the call | PTT works; the pilot calls right after the release; "ATC called before pilot"; no attempt counted (D-322) | |
+| B8 | Taxi with "hold short": "... taxi via alpha three hold short runway zero nine" | Step done; the readback includes "hold short"; another runway: query, not advanced (D-328) | |
+| B9 | Listen: both runway 09 clips ("zero niner"), "hold short runway", a few others | Clear | |
 | B6 | Third run with Screen PTT, fourth with Space | The same | |
 
 ## C. Errors
@@ -56,7 +59,7 @@ With runway 27: taxiway B2 ("bravo two"), runway "two seven"; FALCON-732 is "fal
 | C4 | Mumble | "say again"; three times in a step: instructor notice | |
 | C5 | Say nothing for 30 s | The pilot calls again, at most twice; then **Continue / End**; Continue: he calls again, same step | |
 | C6 | Tap about 0.15 s | No transmission, no reply | |
-| C7 | Press while the pilot speaks | Pilot silent **before** TX opens (by ear); PILOT CUT; the reply is repeated afterwards | |
+| C7 | Press while the pilot speaks, then give an instruction | Pilot silent **before** TX opens (by ear); PILOT CUT; the new instruction is answered first; a cut **readback** follows, a cut "say again" or call does not; after a short tap the reply is repeated (D-325). The notice on the screen still says "will be repeated" (ui's text) | |
 | C8 | Release in the middle of a sentence | "Released early" in the result; not advanced or say again | |
 | C9 | Pull the mouse dongle in an exercise | Paused, dialog; **Use Screen PTT** continues; result says "Fallback PTT used: yes". Afterwards the `setfacl` line again | |
 | C10 | Stop exercise while the pilot speaks | Silent at once; result STOPPED BY INSTRUCTOR | |
@@ -76,8 +79,6 @@ The log of each exercise is `~/.local/state/atc-trainer/exercises/<session>.json
 
 ## Known, not a failure
 
-- Do not say "hold short" in the taxi instruction: the step does not take it and answers "query instruction" (O-3).
-- "nine" is heard where the text says "niner" (O-4, clips not regenerated).
 - Frequent "say again": best measured result is 25 of 40 instructions fully correct (06 §7), for one speaker. This acceptance is not a speech accuracy test.
 - A transmission without text after 10 s is shown as a system fault; until engine builds D-317 the result still counts it in the step's attempts and towards the say-again limit.
 - Pedal pending (D-309); Assessed is off while text is placeholder.

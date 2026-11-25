@@ -140,8 +140,8 @@ Modes (ruling 2026-11-24): Practice shows the live verdict; Assessed hides it un
 |---|---|---|
 | O-1 | Pilot readback of a wrong value that **exists in the airfield pools** should become possible, so readback errors can be trained. Values outside the pools: challenge or say again. | Later; not in the slice (D-409) |
 | O-2 | Approved line-up wording | Placeholder "line up runway {runway}" confirmed 2026-11-24 until the user supplies wording, if unclassified (D-403) |
-| O-3 | A step that takes hold short | **Ruled 2026-11-25 (D-328):** optional in the taxi step, placeholder wording, with readback; needs the clip PH_HOLD_SHORT_RUNWAY@medial |
-| O-4 | Regenerate the pilot clips for "niner" (D-123, D-128) in a no-build window, with `voice_tool` from a `main` that holds 8a2df27, and the user's listening to them. Until then the pilot's sound says "nine" where text and data say "niner". | Deferred by the user 2026-11-25: features first. Who runs Piper: the user says so when it is due |
+| O-3 | A step that takes hold short | **Ruled 2026-11-25 (D-328):** optional in the taxi step, placeholder wording, with readback; clip made (D-329) |
+| O-4 | Pilot clips for "niner" (D-123, D-128) | **Regenerated 2026-11-25 (D-329)**; the user's listening is open |
 | O-5 | Intent RADIO_CHECK with station names (D-324). Whisper wrote the user's "Rajali" as "a rally" in 3c run 1, and the callsign in it was not found either. | Future; not in the slice |
 | Q-1 | May voice recordings be copied to the PC? | **Closed:** yes, LAN only, one-way (D-412) |
 | Q-2 | PC operating system, LAN address, user name, GPU. SSH server is installed; the user name no longer has to match the panel (D-410). | **Closed 2026-11-24** (D-418): Piper runs on the panel, offline. The PC values stay blank |
