@@ -49,7 +49,7 @@ class Simulator {
   std::deque<PilotUtterance> queue_;
   std::optional<PilotUtterance> speaking_;
   Ns eligibleSince_ = 0, speechEnd_ = 0;
-  bool txBusy_ = false;
+  bool txBusy_ = false, talking_ = false;
   std::uint64_t tx_ = 0;
   std::optional<out::EndReason> reason_;
 };

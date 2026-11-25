@@ -74,7 +74,8 @@
       "required": ["action"],
       "properties": {
         "action": { "enum": ["say", "silent"] },
-        "reply": { "type": "string", "description": "id in data/phraseology/replies (D-402)" }
+        "reply": { "type": "string", "description": "id in data/phraseology/replies (D-402)" },
+        "withField": { "type": "object", "additionalProperties": { "type": "string" }, "description": "CORRECT only: optional field that was given -> reply id said instead (O-3)" }
       },
       "if": { "properties": { "action": { "const": "say" } } },
       "then": { "required": ["action", "reply"] }
@@ -96,6 +97,7 @@
       "properties": {
         "intent": { "type": "string" },
         "required": { "type": "array", "items": { "type": "string" } },
+        "optional": { "type": "array", "maxItems": 1, "items": { "type": "string" }, "description": "accepted if given (the intent's parse.optional); CORRECT needs a withField reply for it" },
         "mustMatch": { "type": "object", "additionalProperties": { "type": "string" }, "description": "field -> {parameter} it must equal" }
       }
     },

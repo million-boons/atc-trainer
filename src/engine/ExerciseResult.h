@@ -48,6 +48,7 @@ struct ExerciseResult {
   std::vector<StepResult> steps;      // final steps left out
   PttResult ptt;
   std::vector<SuspectedStt> suspectedStt;
+  int atcBeforePilot = 0;             // transmissions before the pilot's first call (D-322): no attempt unless correct
   int pilotFaults = 0;                // watchdog stops (D-301)
   std::vector<std::string> alerts;
   bool fallbackPttUsed() const { return ptt.fallback > 0; }

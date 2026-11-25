@@ -19,6 +19,8 @@ struct PilotUtterance {
   bool unprompted = false;           // onEnter call, or the pilot calling again
   Outcome cause = Outcome::Correct;  // what it answers; Timeout when calling again; unused for onEnter
   std::uint64_t tx = 0;              // transmission it answers; 0 if unprompted
+  bool first = false;                // D-322: the pilot's first call; it does not wait for the recogniser
+  bool owed = false;                 // D-325: a readback; said again after being cut, until it was heard to the end
 };
 
 }  // namespace atc

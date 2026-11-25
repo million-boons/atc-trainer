@@ -115,14 +115,96 @@ TEST_F(Tx, PressInterruptsPilotBeforeOpeningTx) {
   c.onPress(ms(100));
   EXPECT_EQ(log, (V{"pilot call", "cut call", "begin1@-200"}));
 }
-TEST_F(Tx, InterruptedReplyRepeatsAfterNewInstruction) {
+// D-325: the new instruction is answered first; the cut reply follows only if it is owed.
+TEST_F(Tx, CutReadbackFollowsTheNewAnswer) {
   auto c = make();
-  c.requestPilot({"call", 0}, 0);
+  c.requestPilot({.text = "readback", .id = 1, .owed = true}, 0);
+  c.requestPilot({.text = "later", .id = 2}, 0);
   c.onPress(ms(100));
   c.onRelease(ms(1100), ReleaseReason::Normal);
   c.tick(ms(1300));
   EXPECT_FALSE(playing);
+  c.onProcessed(1, Reply{.text = "new", .id = 3}, ms(1400));
+  EXPECT_EQ(log.back(), "pilot new");
+  for (const char* next : {"pilot readback", "pilot later"}) {
+    playing = false;
+    c.onPlaybackDone(pid, ms(3000));
+    EXPECT_EQ(log.back(), next);
+  }
+}
+TEST_F(Tx, CutReplyThatIsNotOwedIsDroppedByANewInstruction) {
+  auto c = make();
+  c.requestPilot({"say again", 0}, 0);
+  c.onPress(ms(100));
+  c.onRelease(ms(1100), ReleaseReason::Normal);
+  c.tick(ms(1300));
+  c.onProcessed(1, Reply{"new", 0}, ms(1400));
+  EXPECT_EQ(log.back(), "pilot new");
+  playing = false;
+  c.onPlaybackDone(pid, ms(3000));
+  EXPECT_EQ(c.state(), S::Idle);
+}
+TEST_F(Tx, CutReadbackIsStillOwedAfterSilence) {  // e.g. a wrong callsign
+  auto c = make();
+  c.requestPilot({.text = "readback", .owed = true}, 0);
+  c.onPress(ms(100));
+  c.onRelease(ms(1100), ReleaseReason::Normal);
+  c.tick(ms(1300));
   c.onProcessed(1, std::nullopt, ms(1400));
+  EXPECT_EQ(log.back(), "pilot readback");
+}
+TEST_F(Tx, ShortTapOverThePilotRepeatsEveryReply) {
+  for (const bool owed : {false, true}) {
+    log.clear();
+    playing = false;
+    auto c = make();
+    c.requestPilot({.text = "call", .owed = owed}, 0);
+    c.onPress(ms(100));
+    c.onRelease(ms(150), ReleaseReason::Normal);
+    c.tick(ms(500));
+    EXPECT_EQ(log.back(), "pilot call");
+  }
+}
+TEST_F(Tx, CutReadbackCanBeCutAgain) {
+  auto c = make();
+  c.requestPilot({.text = "readback", .owed = true}, 0);
+  for (std::uint64_t id : {1, 2}) {
+    const Ns t = ms(static_cast<std::int64_t>(id) * 5000);
+    ASSERT_TRUE(playing);
+    c.onPress(t);
+    c.onRelease(t + ms(1000), ReleaseReason::Normal);
+    c.tick(t + ms(1300));
+    c.onProcessed(id, std::nullopt, t + ms(1400));
+    EXPECT_EQ(log.back(), "pilot readback");
+  }
+}
+// D-322: the pilot's first call does not wait for the recogniser, but it waits for the release.
+TEST_F(Tx, FirstCallPlaysAfterReleaseBeforeTheResult) {
+  auto c = make();
+  self = &c;
+  c.onPress(ms(500));
+  c.requestPilot({.text = "call", .first = true}, ms(1000));
+  c.tick(ms(1500));
+  EXPECT_FALSE(playing);
+  c.onRelease(ms(2000), ReleaseReason::Normal);
+  c.tick(ms(2199));
+  EXPECT_FALSE(playing) << "the tail is still part of the transmission";
+  c.tick(ms(2200));
+  EXPECT_EQ(log.back(), "pilot call");
+  c.onProcessed(1, Reply{"answer", 0}, ms(2300));
+  EXPECT_EQ(log.back(), "pilot call");
+  playing = false;
+  c.onPlaybackDone(pid, ms(4000));
+  EXPECT_EQ(log.back(), "pilot answer");
+}
+TEST_F(Tx, OtherCallsStillWaitForTheResult) {
+  auto c = make();
+  c.onPress(ms(500));
+  c.onRelease(ms(2000), ReleaseReason::Normal);
+  c.requestPilot({"call", 0}, ms(2100));
+  c.tick(ms(4000));
+  EXPECT_FALSE(playing);
+  c.onProcessed(1, std::nullopt, ms(4100));
   EXPECT_EQ(log.back(), "pilot call");
 }
 TEST_F(Tx, InterruptedReplyCanBeDiscarded) {
@@ -662,7 +744,7 @@ TEST(TxReply, IdSurvivesInterruptAndRepeat) {
   TransmissionController c(TxConfig{}, {none1, [](std::uint64_t, Ns, Ns, TxEnd) {}, [](std::uint64_t) {},
                                         [&](const Reply& r, PlaybackId p) { started.emplace_back(r.id, p); },
                                         [&](const Reply& r, PlaybackId, PilotStop) { stopped.push_back(r.id); }});
-  c.requestPilot(Reply{.text = "call", .delay = 0, .expected = 0, .id = 42}, ms(1000));
+  c.requestPilot(Reply{.text = "readback", .delay = 0, .expected = 0, .id = 42, .owed = true}, ms(1000));
   c.tick(ms(1100));
   ASSERT_EQ(started.size(), 1u);
   c.onPress(ms(1500));  // rule Interrupt

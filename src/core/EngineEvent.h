@@ -96,6 +96,10 @@ struct Judged {  // the validator's verdict on one transmission, or on a missing
   bool suspectedStt = false;    // shown apart, not counted against the trainee
   Ns waited = 0;                // Timeout: silence since the channel was free
 };
+struct AtcBeforePilot {  // D-322: transmitted before the pilot's first call began; no step failure
+  static constexpr std::string_view kName = "atc_before_pilot";
+  std::uint64_t tx = 0;
+};
 struct PilotRequested {
   static constexpr std::string_view kName = "pilot_requested";
   PilotUtterance utterance{};
@@ -131,7 +135,7 @@ using EngineInput = std::variant<in::Started, in::TxOpened, in::TxClosed, in::Tx
                                  in::Recognised, in::PilotStarted, in::PilotEnded, in::TimerFired, in::PttPresence,
                                  in::InstructorStop, in::InstructorContinue, in::FallbackPttUsed>;
 using EngineOutput = std::variant<out::StepEntered, out::Judged, out::PilotRequested, out::NoReply, out::TimerSet,
-                                  out::TimerCancelled, out::InstructorAlert, out::Ended>;
+                                  out::TimerCancelled, out::InstructorAlert, out::Ended, out::AtcBeforePilot>;
 
 struct EngineEvent {
   std::uint64_t seq = 0;  // from 1, no gaps

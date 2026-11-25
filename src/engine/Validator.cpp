@@ -92,7 +92,8 @@ Verdict validate(const ScenarioStep& step, const ScenarioContext& ctx, const Par
   if (!x) return {Outcome::Unexpected, {p.intent}, false};
   std::vector<std::string> unlisted;
   for (const auto& [name, f] : p.fields)
-    if (!f.value.empty() && !x->mustMatch.count(name) && std::find(x->required.begin(), x->required.end(), name) == x->required.end())
+    if (!f.value.empty() && !x->mustMatch.count(name) && std::find(x->required.begin(), x->required.end(), name) == x->required.end() &&
+        std::find(x->optional.begin(), x->optional.end(), name) == x->optional.end())
       unlisted.push_back(name);
   if (!unlisted.empty()) return {Outcome::Unexpected, unlisted, false};
 

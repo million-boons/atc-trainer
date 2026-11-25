@@ -131,7 +131,7 @@ Modes (ruling 2026-11-24): Practice shows the live verdict; Assessed hides it un
 ## 7. Known limits of the demo
 
 - Speech: best result so far is 25 of 40 instructions fully correct (whisper tiny, generated prompt, shape rules, one speaker, placeholder phrases). Frequent "say again" is expected.
-- Delay: median 2.0 s, maximum 4.9 s release to text, measured with the older prompt on a busy machine; the timing run T (D-406, D-414) re-measures it.
+- Delay: median 2.0 s, maximum 4.9 s release to text, measured with the older prompt on a busy machine; the timing run T (D-406, D-414) re-measures it. In 3c run 1 on the panel (2026-11-25) the median was 2.8 s over 8 transmissions; target at most 2 s (D-323).
 - "0.9" for "zero nine" is classed AMBIGUOUS, never corrected.
 
 ## 8. Open items
@@ -140,8 +140,9 @@ Modes (ruling 2026-11-24): Practice shows the live verdict; Assessed hides it un
 |---|---|---|
 | O-1 | Pilot readback of a wrong value that **exists in the airfield pools** should become possible, so readback errors can be trained. Values outside the pools: challenge or say again. | Later; not in the slice (D-409) |
 | O-2 | Approved line-up wording | Placeholder "line up runway {runway}" confirmed 2026-11-24 until the user supplies wording, if unclassified (D-403) |
-| O-3 | A step that requires hold short | Deferred until the user supplies approved readback wording. Needs a small scenario-format addition; until then hold short is UNEXPECTED (D-417, D-419) |
-| O-4 | Regenerate the pilot clips for "niner" (D-123, D-128) in a no-build window, with `voice_tool` from a `main` that holds 8a2df27, and the user's listening to them. Until then the pilot's sound says "nine" where text and data say "niner". | Deferred by the user 2026-11-25: features first. Who runs Piper: the user says so when it is due |
+| O-3 | A step that takes hold short | **Ruled 2026-11-25 (D-328):** optional in the taxi step, placeholder wording, with readback; clip made (D-329) |
+| O-4 | Pilot clips for "niner" (D-123, D-128) | **Regenerated 2026-11-25 (D-329)**; the user's listening is open |
+| O-5 | Intent RADIO_CHECK with station names (D-324). Whisper wrote the user's "Rajali" as "a rally" in 3c run 1, and the callsign in it was not found either. | Future; not in the slice |
 | Q-1 | May voice recordings be copied to the PC? | **Closed:** yes, LAN only, one-way (D-412) |
 | Q-2 | PC operating system, LAN address, user name, GPU. SSH server is installed; the user name no longer has to match the panel (D-410). | **Closed 2026-11-24** (D-418): Piper runs on the panel, offline. The PC values stay blank |
 | Q-3 | Approve §4.1 (0d design) | **Closed 2026-11-24:** approved as install prefix + config file / executable-relative, no compiled-in absolute paths. A-3 (extra lookups) closed by D-308 |

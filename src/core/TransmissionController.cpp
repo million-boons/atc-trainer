@@ -48,8 +48,8 @@ void TransmissionController::stopPilot(PilotStop why, Ns t) {
   speaking_.reset();
   pilotEnd_ = t;
   const PlaybackId id = playback_;
-  if (why == PilotStop::PressCameFirst || (why == PilotStop::Interrupted && cfg_.repeatInterruptedReply))
-    replies_.push_front(r);
+  if (why == PilotStop::PressCameFirst) replies_.push_front(r);
+  else if (why == PilotStop::Interrupted && cfg_.repeatInterruptedReply) cut_[id_ + 1] = r;  // the press opens it
   if (cb_.pilotStop) cb_.pilotStop(r, id, why);
 }
 
@@ -92,6 +92,7 @@ void TransmissionController::closeTx(Ns audioTo, TxEnd end) {
   tx_ = Tx::None;
   if (end == TxEnd::Normal && releaseT_ - pressT_ < cfg_.minDuration) {
     open_.erase(id_);
+    if (const auto c = cut_.extract(id_)) replies_.push_front(c.mapped());  // nothing was said: again
     if (cb_.txCancelled) cb_.txCancelled(id_);
     return;
   }
@@ -106,7 +107,10 @@ void TransmissionController::onProcessed(std::uint64_t id, std::optional<Reply> 
   // Release results from the front only, so a late one cannot be overtaken.
   while (!open_.empty() && open_.begin()->second) {
     auto& r = *open_.begin()->second;
-    if (r) replies_.push_back(std::move(*r));
+    const auto c = cut_.extract(open_.begin()->first);
+    if (c && c.mapped().owed) replies_.push_front(c.mapped());
+    if (r && c) replies_.push_front(std::move(*r));  // the new instruction is answered first
+    else if (r) replies_.push_back(std::move(*r));
     open_.erase(open_.begin());
   }
   maybeStartPilot(now);
@@ -114,7 +118,8 @@ void TransmissionController::onProcessed(std::uint64_t id, std::optional<Reply> 
 
 void TransmissionController::requestPilot(Reply reply, Ns now) {
   tick(now);
-  replies_.push_back(std::move(reply));
+  if (reply.first) replies_.push_front(std::move(reply));
+  else replies_.push_back(std::move(reply));
   maybeStartPilot(now);
 }
 
@@ -127,6 +132,7 @@ bool TransmissionController::setRules(PressRule pressDuringPilot, bool repeatInt
 
 void TransmissionController::dropPilot(Ns now) {
   replies_.clear();
+  cut_.clear();
   for (auto& [id, processed] : open_)
     if (processed) processed->reset();  // answered, but waiting for an earlier one
   if (!speaking_) return;
@@ -169,8 +175,8 @@ void TransmissionController::tick(Ns now) {
 }
 
 void TransmissionController::maybeStartPilot(Ns now) {
-  const bool eligible =
-      !pedalDown_ && tx_ == Tx::None && open_.empty() && !speaking_ && !replies_.empty();
+  const bool eligible = !pedalDown_ && tx_ == Tx::None && !speaking_ && !replies_.empty() &&
+                        (open_.empty() || replies_.front().first);
   if (!eligible) {
     eligibleSince_.reset();
     return;

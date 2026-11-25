@@ -7,6 +7,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 
 #include "app/ExerciseController.h"
@@ -52,6 +53,7 @@ class ExerciseView {
   void on(atc::Ns t, const atc::out::StepEntered&);
   void on(atc::Ns t, const atc::out::Judged&);
   void on(atc::Ns t, const atc::out::PilotRequested&);
+  void on(atc::Ns t, const atc::out::AtcBeforePilot&);
   void on(atc::Ns t, const atc::out::NoReply&);
   void on(atc::Ns t, const atc::out::TimerSet&);
   void on(atc::Ns t, const atc::out::TimerCancelled&);
@@ -77,6 +79,7 @@ class ExerciseView {
   QStringList clearances_;
   std::map<std::uint64_t, atc::Ns> pressed_;
   std::map<std::uint64_t, QString> utterances_;
+  std::set<std::uint64_t> early_;                // transmitted before the pilot's first call (D-322)
   std::map<std::uint64_t, int> row_;             // timeline row of a transmission
   std::map<std::string, int> sayAgain_;
   Heard heard_;                                  // latest transmission

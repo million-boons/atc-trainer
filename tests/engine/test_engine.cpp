@@ -141,6 +141,26 @@ struct Engine : ::testing::Test {
 
 }  // namespace
 
+namespace {
+std::optional<out::TimerSet> timerIn(const SequenceEngine::Outputs& o, in::Timer k) {
+  for (const auto& x : o)
+    if (const auto* t = std::get_if<out::TimerSet>(&x))
+      if (t->timer == k) return *t;
+  return std::nullopt;
+}
+bool cancelled(const SequenceEngine::Outputs& o, in::Timer k) {
+  for (const auto& x : o)
+    if (const auto* t = std::get_if<out::TimerCancelled>(&x))
+      if (t->timer == k) return true;
+  return false;
+}
+std::uint64_t utteranceIn(const SequenceEngine::Outputs& o) {
+  for (const auto& x : o)
+    if (const auto* p = std::get_if<out::PilotRequested>(&x)) return p->utterance.id;
+  return 0;
+}
+}  // namespace
+
 TEST_F(Engine, DepartureCompletes) {
   run();
   EXPECT_EQ(sim->reason(), out::EndReason::Completed);
@@ -217,6 +237,7 @@ TEST_F(Engine, WrongValuesNeverAdvance) {
 }
 // D-417: "taxi via A3 hold short runway 09" in a step that does not list hold short.
 TEST_F(Engine, UnlistedCriticalValueIsUnexpectedAndQueried) {
+  ex->scenario.steps[0].expects[0].optional.clear();
   auto p = taxi();
   p.fields["hold_short"].value = "yes";
   expectStays(p, Outcome::Unexpected, "hold_short");
@@ -231,12 +252,35 @@ TEST_F(Engine, UnlistedCriticalValueIsUnexpectedAndQueried) {
   EXPECT_EQ(lastJudged().outcome, Outcome::Correct);
 }
 TEST_F(Engine, AnyOtherUnlistedValueIsUnexpectedToo) {
+  ex->scenario.steps[0].expects[0].optional.clear();
   auto p = taxi();
   p.fields["heading"].value = "270";
   expectStays(p, Outcome::Unexpected, "heading");
   p.fields["hold_short"].value = "yes";  // each one is named
   expectStays(p, Outcome::Unexpected, "heading");
   expectStays(p, Outcome::Unexpected, "hold_short");
+}
+// O-3: hold short is optional in the taxi step, and the readback includes it only when it was given.
+TEST_F(Engine, OptionalHoldShortIsAcceptedAndReadBack) {
+  for (const bool given : {true, false}) {
+    make();
+    sim->start();
+    sim->wait(ms(6000));
+    auto p = taxi();
+    if (given) p.fields["hold_short"].value = "yes";
+    sim->transmit(p);
+    EXPECT_EQ(lastJudged().outcome, Outcome::Correct);
+    EXPECT_EQ(step(), "LINE_UP");
+    EXPECT_EQ(lastPilot().find("hold short") != std::string::npos, given) << lastPilot();
+    EXPECT_EQ(sim->engine().context().clearances.at(0).fields.count("hold_short"), given ? 1u : 0u);
+  }
+}
+TEST_F(Engine, HoldShortOfAnotherRunwayIsAWrongValue) {
+  auto p = taxi();
+  p.fields["hold_short"].value = "yes";
+  p.fields["runway"].value = otherRunway();
+  expectStays(p, Outcome::Incorrect, "runway");
+  EXPECT_EQ(lastPilot().find("hold short"), std::string::npos);
 }
 TEST_F(Engine, UnlistedValueDoesNotHideAnEarlierCheck) {
   auto p = taxi();
@@ -436,8 +480,8 @@ TEST_F(Engine, MissedResponsesAreTimedAndTheInstructorChooses) {
   for (const auto& j : outputs<out::Judged>()) EXPECT_EQ(j.waited, ms(30'000));
   auto res = buildResult(ex->scenario, log.events);
   ASSERT_EQ(res.steps[0].missed.size(), 3u);
-  EXPECT_EQ(res.steps[0].missed[0].at, ms(34'500));  // own call ends at 4.5 s
-  EXPECT_EQ(res.steps[0].missed[1].at, ms(67'000));  // 2.5 s of call and 30 s later
+  EXPECT_EQ(res.steps[0].missed[0].at, ms(33'500));  // own call ends at 3.5 s
+  EXPECT_EQ(res.steps[0].missed[1].at, ms(66'000));  // 2.5 s of call and 30 s later
   EXPECT_EQ(res.steps[0].missed[0].waited, ms(30'000));
   const auto calls = outputs<out::PilotRequested>().size();
   sim->resume();
@@ -479,40 +523,116 @@ TEST_F(Engine, InstructorStopEndsItAndLaterResultsGetNoReply) {
   EXPECT_TRUE(std::holds_alternative<out::NoReply>(late[0]));
 }
 
-TEST_F(Engine, TraineeWhoIsQuickerSkipsThePilotsOwnCall) {
+// D-322: the first call is not cancelled by a transmission, and that transmission is no step failure.
+TEST_F(Engine, TheFirstCallComesWhateverIsTransmitted) {
   sim->start();
-  sim->transmit(taxi());  // before the pilot's first call at 2 s
+  sim->transmit(ParsedInstruction{});  // from 0 s to 3 s; the call is due at 1 s
+  sim->waitForPilot();
+  const auto said = outputs<out::PilotRequested>();
+  ASSERT_EQ(said.size(), 2u);
+  EXPECT_EQ(said[0].utterance.replyId, "REQUEST_TAXI");
+  EXPECT_TRUE(said[0].utterance.first);
+  EXPECT_EQ(said[1].utterance.replyId, "SAY_AGAIN");
+  const auto early = outputs<out::AtcBeforePilot>();
+  ASSERT_EQ(early.size(), 1u);
+  EXPECT_EQ(early[0].tx, 1u);
+  sim->transmit(ParsedInstruction{});  // after it: an ordinary attempt
+  EXPECT_EQ(outputs<out::AtcBeforePilot>().size(), 1u);
+  sim->stop();
+  const auto res = buildResult(ex->scenario, log.events);
+  EXPECT_EQ(res.atcBeforePilot, 1);
+  EXPECT_EQ(res.steps[0].attempts, 1);
+  EXPECT_EQ(res.steps[0].suspectedStt, 2);  // both listed: information, not a count against anyone
+  EXPECT_TRUE(outputs<out::InstructorAlert>().empty());
+}
+TEST_F(Engine, EarlyTransmissionsDoNotCountTowardsSayAgain) {
+  ex->scenario.steps[0].maxSayAgain = 1;
+  make();
+  sim->start();
+  sim->transmit(ParsedInstruction{});
+  EXPECT_TRUE(outputs<out::InstructorAlert>().empty());
+  sim->transmit(ParsedInstruction{});
+  EXPECT_EQ(outputs<out::InstructorAlert>().size(), 1u);
+}
+TEST_F(Engine, ACorrectInstructionBeforeTheFirstCallStillCounts) {
+  sim->start();
+  sim->transmit(taxi());
   EXPECT_EQ(lastJudged().outcome, Outcome::Correct);
-  for (const auto& p : outputs<out::PilotRequested>()) EXPECT_NE(p.utterance.replyId, "REQUEST_TAXI");
+  EXPECT_EQ(step(), "LINE_UP");
+  const auto said = outputs<out::PilotRequested>();
+  ASSERT_GE(said.size(), 2u);
+  EXPECT_EQ(said[0].utterance.replyId, "REQUEST_TAXI");
+  EXPECT_EQ(said[1].utterance.replyId, "READBACK_TAXI");
+  sim->wait(ms(10'000));
+  EXPECT_EQ(outputs<out::PilotRequested>()[2].utterance.replyId, "READY_DEPARTURE");
+  EXPECT_EQ(buildResult(ex->scenario, log.events).steps[0].attempts, 1);
+}
+TEST_F(Engine, AWrongValueBeforeTheFirstCallIsNoError) {
+  sim->start();
+  auto p = taxi();
+  p.fields["runway"].value = otherRunway();
+  sim->transmit(p);
+  EXPECT_EQ(lastJudged().outcome, Outcome::Incorrect);
+  EXPECT_EQ(step(), "TAXI");
+  sim->stop();
+  const auto res = buildResult(ex->scenario, log.events);
+  EXPECT_EQ(res.steps[0].attempts, 0);
+  EXPECT_TRUE(res.steps[0].errors.empty());
+  EXPECT_EQ(res.atcBeforePilot, 1);
+}
+// The step moves on before the call is due: the call still comes, then the next step's own.
+TEST_F(Engine, TheFirstCallSurvivesAnEarlyAdvance) {
+  sim = std::make_unique<Simulator>(SequenceEngine(ex, 7), log, Simulator::Options{ms(300), ms(300), ms(2500)});
+  sim->start();
+  sim->transmit(taxi());
+  EXPECT_EQ(step(), "LINE_UP");
+  EXPECT_LT(sim->now(), ms(1000));
+  sim->wait(ms(20'000));
+  std::vector<std::string> said;
+  for (const auto& x : outputs<out::PilotRequested>()) said.push_back(x.utterance.replyId);
+  EXPECT_EQ(said, (std::vector<std::string>{"READBACK_TAXI", "REQUEST_TAXI", "READY_DEPARTURE"}));
+}
+TEST_F(Engine, AShortTapBeforeTheFirstCallIsNotReported) {
+  SequenceEngine e(ex, 1);
+  e.handle(0, in::Started{});
+  e.handle(ms(100), in::TxOpened{1, ms(100), false});
+  for (const auto& x : e.handle(ms(200), in::TxCancelled{1})) EXPECT_FALSE(std::holds_alternative<out::AtcBeforePilot>(x));
+}
+// The sound may begin before the end of the transmission is reported.
+TEST_F(Engine, EarlyIsJudgedByTheOpeningOfTheTransmission) {
+  SequenceEngine e(ex, 1);
+  const auto t = timerIn(e.handle(0, in::Started{}), in::Timer::OnEnter);
+  ASSERT_TRUE(t);
+  EXPECT_EQ(t->delay, ms(1000));
+  e.handle(ms(500), in::TxOpened{1, ms(500), false});
+  const auto id = utteranceIn(e.handle(ms(1000), in::TimerFired{in::Timer::OnEnter, t->generation}));
+  ASSERT_NE(id, 0u);
+  e.handle(ms(2200), in::PilotStarted{id});
+  in::TxClosed c;
+  c.tx = 1;
+  const auto o = e.handle(ms(2250), c);
+  ASSERT_EQ(o.size(), 1u);
+  EXPECT_TRUE(std::holds_alternative<out::AtcBeforePilot>(o[0]));
+}
+// Later calls still give way to a trainee who is quicker.
+TEST_F(Engine, TraineeWhoIsQuickerSkipsALaterCall) {
+  sim->start();
+  sim->wait(ms(6000));
+  sim->transmit(taxi());
+  sim->transmit(lineUp());  // at once after the readback
+  EXPECT_EQ(lastJudged().outcome, Outcome::Correct);
+  for (const auto& p : outputs<out::PilotRequested>()) EXPECT_NE(p.utterance.replyId, "READY_DEPARTURE");
 }
 
-namespace {
-std::optional<out::TimerSet> timerIn(const SequenceEngine::Outputs& o, in::Timer k) {
-  for (const auto& x : o)
-    if (const auto* t = std::get_if<out::TimerSet>(&x))
-      if (t->timer == k) return *t;
-  return std::nullopt;
-}
-bool cancelled(const SequenceEngine::Outputs& o, in::Timer k) {
-  for (const auto& x : o)
-    if (const auto* t = std::get_if<out::TimerCancelled>(&x))
-      if (t->timer == k) return true;
-  return false;
-}
-std::uint64_t utteranceIn(const SequenceEngine::Outputs& o) {
-  for (const auto& x : o)
-    if (const auto* p = std::get_if<out::PilotRequested>(&x)) return p->utterance.id;
-  return 0;
-}
-}  // namespace
 
 TEST_F(Engine, StaleTimerIsIgnored) {
   SequenceEngine e(ex, 1);
   const auto first = timerIn(e.handle(0, in::Started{}), in::Timer::OnEnter);
   ASSERT_TRUE(first);
-  EXPECT_TRUE(cancelled(e.handle(ms(100), in::TxOpened{1, ms(100), false}), in::Timer::OnEnter));
+  EXPECT_FALSE(cancelled(e.handle(ms(100), in::TxOpened{1, ms(100), false}), in::Timer::OnEnter));  // D-322
+  EXPECT_TRUE(cancelled(e.handle(ms(200), in::PttPresence{false}), in::Timer::OnEnter));
   EXPECT_TRUE(e.handle(ms(2000), in::TimerFired{in::Timer::OnEnter, first->generation}).empty());
-  const auto second = timerIn(e.handle(ms(2100), in::TxCancelled{1}), in::Timer::OnEnter);
+  const auto second = timerIn(e.handle(ms(2100), in::PttPresence{true}), in::Timer::OnEnter);
   ASSERT_TRUE(second);
   EXPECT_NE(second->generation, first->generation);
   EXPECT_TRUE(e.handle(ms(4000), in::TimerFired{in::Timer::OnEnter, first->generation}).empty());
@@ -526,7 +646,7 @@ TEST_F(Engine, PttLossPausesTimers) {
   const auto o = e.handle(ms(60'000), in::PttPresence{true});
   const auto t = timerIn(o, in::Timer::OnEnter);
   ASSERT_TRUE(t);
-  EXPECT_EQ(t->delay, ms(1500));
+  EXPECT_EQ(t->delay, ms(500));
   const auto limit = timerIn(o, in::Timer::ExerciseLimit);
   ASSERT_TRUE(limit);
   EXPECT_EQ(limit->delay, ms(899'500));
@@ -544,6 +664,49 @@ TEST_F(Engine, InterruptedReplyStaysOutstandingOnlyWhenItIsRepeated) {
     EXPECT_EQ(timerIn(o, in::Timer::StepTimeout).has_value(), !repeat);
     const auto kept = e.handle(ms(2600), in::PilotEnded{id, in::PilotEnd::PressCameFirst});
     EXPECT_FALSE(timerIn(kept, in::Timer::StepTimeout).has_value());
+  }
+}
+
+// D-325: kept until the next instruction, and after it only if it is a readback.
+TEST_F(Engine, ACutReplyStaysOutstandingOnlyIfOwed) {
+  for (const bool readback : {true, false}) {
+    for (const bool tap : {true, false}) {
+      SequenceEngine e(ex, 7);
+      const auto t = timerIn(e.handle(0, in::Started{}), in::Timer::OnEnter);
+      auto id = utteranceIn(e.handle(ms(1000), in::TimerFired{in::Timer::OnEnter, t->generation}));
+      e.handle(ms(1000), in::PilotStarted{id});
+      std::uint64_t tx = 0;
+      const auto transmit = [&](ParsedInstruction p) {
+        in::TxClosed c;
+        c.tx = ++tx;
+        c.report = Simulator::goodReport();
+        e.handle(ms(3000 + 10 * static_cast<std::int64_t>(tx)), in::TxOpened{tx, 0, false});
+        e.handle(ms(3001 + 10 * static_cast<std::int64_t>(tx)), c);
+        in::Recognised r;
+        r.instruction = std::move(p);
+        r.instruction.tx = tx;
+        return e.handle(ms(3002 + 10 * static_cast<std::int64_t>(tx)), r);
+      };
+      if (readback) {
+        e.handle(ms(2000), in::PilotEnded{id, in::PilotEnd::Completed});
+        id = utteranceIn(transmit(taxi()));
+        e.handle(ms(4000), in::PilotStarted{id});
+      }
+      e.handle(ms(4100), in::PilotEnded{id, in::PilotEnd::Interrupted});
+      std::uint64_t answer = 0;
+      if (tap) {
+        e.handle(ms(4200), in::TxOpened{++tx, 0, false});
+        e.handle(ms(4300), in::TxCancelled{tx});
+      } else {
+        answer = utteranceIn(transmit(ParsedInstruction{}));
+        ASSERT_NE(answer, 0u);
+        e.handle(ms(5000), in::PilotStarted{answer});
+        e.handle(ms(6000), in::PilotEnded{answer, in::PilotEnd::Completed});
+      }
+      const auto turns = e.context().history.size();
+      e.handle(ms(7000), in::PilotStarted{id});  // said again: known only if it is still outstanding
+      EXPECT_EQ(e.context().history.size() > turns, readback || tap) << readback << tap;
+    }
   }
 }
 
@@ -629,7 +792,9 @@ TEST_F(Engine, RandomInputsNeverBreakTheRules) {
     for (const auto& c : sim->engine().context().clearances) {
       EXPECT_EQ(c.fields.at("callsign"), param("callsign"));
       EXPECT_EQ(c.fields.at("runway"), param("runway"));
-      EXPECT_EQ(c.fields.count("hold_short"), 0u);  // no step lists it
+      if (c.step != "TAXI") {
+        EXPECT_EQ(c.fields.count("hold_short"), 0u);  // no other step lists it
+      }
     }
   }
 }
@@ -658,7 +823,7 @@ TEST_F(Engine, ResultSeparatesTraineeErrorsFromSuspectedRecognitionErrors) {
   EXPECT_EQ(res.steps[0].suspectedStt, 1);
   ASSERT_EQ(res.suspectedStt.size(), 1u);
   EXPECT_EQ(res.suspectedStt[0].step, "TAXI");
-  EXPECT_EQ(res.steps[0].responseTime, std::optional<Ns>(ms(1500)));  // pilot ends at 4.5 s, press at 6 s
+  EXPECT_EQ(res.steps[0].responseTime, std::optional<Ns>(ms(2500)));  // pilot ends at 3.5 s, press at 6 s
   EXPECT_FALSE(res.steps[2].reached);
   EXPECT_EQ(res.ptt.transmissions, 4);
   EXPECT_EQ(res.ptt.spokeBeforeKeying, 1);

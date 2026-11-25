@@ -123,6 +123,7 @@ void ExerciseView::prepare(Setup s) {
   pressed_.clear();
   utterances_.clear();
   row_.clear();
+  early_.clear();
   sayAgain_.clear();
   heard_ = {};
   delays_.clear();
@@ -264,6 +265,10 @@ void ExerciseView::on(Ns t, const out::Judged& x) {
     }
     return;
   }
+  if (early_.erase(x.tx) && x.outcome != Outcome::Correct) {  // before the pilot's call: no attempt (D-322)
+    if (const auto r = row_.find(x.tx); r != row_.end()) timeline_[r->second][3] = tr("%1, not counted").arg(q(toString(x.outcome)).replace('_', ' '));
+    return;
+  }
   const int i = stepIndex(x.step);
   if (i >= 0) ++attempts_[i];
   const bool good = x.outcome == Outcome::Correct;
@@ -285,6 +290,12 @@ void ExerciseView::on(Ns t, const out::Judged& x) {
     c_->setAlert(L::Caution, tr("%1: attempt %2 %3").arg(label(x.step)).arg(i < 0 ? 0 : attempts_[i]).arg(word), true);
   }
   steps();
+}
+
+void ExerciseView::on(Ns t, const out::AtcBeforePilot& x) {
+  early_.insert(x.tx);
+  c_->addNote(L::Caution, tr("ATC called before pilot"));
+  timeline_.append(QVariantList{time(t), tr("ATC"), tr("ATC called before pilot"), QString(), int(L::Caution)});
 }
 
 void ExerciseView::on(Ns, const out::PilotRequested& x) {

@@ -62,7 +62,7 @@ class SequenceEngine {
   void cancelTimer(in::Timer k, Outputs& o);
   void enter(const std::string& id, Outputs& o);
   void takeBranch(Outcome outcome, Outputs& o);
-  void say(const std::string& replyId, Outcome cause, std::uint64_t tx, bool unprompted, Outputs& o);
+  PilotUtterance& say(const std::string& replyId, Outcome cause, std::uint64_t tx, bool unprompted, Outputs& o);
   void stepTimedOut(Outputs& o);
   void finish(out::EndReason why, Outputs& o);
   void settle(Ns t, Outputs& o);
@@ -74,11 +74,19 @@ class SequenceEngine {
   Status status_ = Status::Ready;
   std::size_t step_ = 0;
   bool onEnterPending_ = false;
+  // D-322: the pilot's first call is due at a fixed time after Start, whatever is transmitted.
+  enum class First { None, Waiting, Requested, Begun } first_ = First::None;
+  std::string firstReply_;
+  std::uint64_t firstCall_ = 0;       // its utterance
+  std::set<std::uint64_t> early_;     // transmissions opened before it began, not yet judged
   bool callsExhausted_ = false;
   int pilotCalls_ = 0, sayAgain_ = 0;
   bool pttPresent_ = true;
   std::map<std::uint64_t, TxFacts> openTx_;            // opened and not yet recognised or cancelled
-  std::map<std::uint64_t, std::string> outstanding_;   // pilot utterances not finished: id -> text
+  struct Said { std::string text; bool owed = false; };
+  std::map<std::uint64_t, Said> outstanding_;          // pilot utterances not finished
+  std::map<std::uint64_t, std::uint64_t> cut_;         // D-325: cut and not owed -> latest transmission before the cut
+  std::uint64_t lastTx_ = 0;
   std::uint64_t nextUtterance_ = 1;
   std::array<TimerState, 3> timers_{};
 };

@@ -436,7 +436,63 @@ TEST(ExerciseRuntime, PressDuringPilotSpeechSilencesBeforeTxOpens) {
   r.up();
   r.pass(400);
   r.text(r.speech.finished.back(), r.taxi());
-  r.hearPilot();  // the kept call is said again, from the same sound
+  r.hearPilot();
+  EXPECT_TRUE(r.faults.empty());
+  // D-325: the answer, and not the cut call again.
+  const auto started = r.logged<in::PilotStarted>();
+  ASSERT_EQ(started.size(), 2u);
+  EXPECT_EQ(r.logged<out::PilotRequested>()[1].utterance.replyId, "READBACK_TAXI");
+  EXPECT_EQ(started[1].utterance, r.logged<out::PilotRequested>()[1].utterance.id);
+  EXPECT_TRUE(r.logged<out::AtcBeforePilot>().empty());  // the call had begun
+}
+
+// D-325
+TEST(ExerciseRuntime, ACutReadbackIsSaidAgainAfterTheNewAnswer) {
+  Rig r;
+  ASSERT_EQ(r.start(), "");
+  r.hearPilot();
+  r.say(r.taxi());
+  for (int t = 0; t < 5000 && !r.sounding; t += 10) r.pass(10);
+  ASSERT_TRUE(r.sounding);
+  r.pass(100);
+  r.down();
+  EXPECT_FALSE(r.sounding);
+  r.pass(1500);
+  r.up();
+  r.pass(400);
+  r.text(r.speech.finished.back(), "mumble");
+  r.hearPilot();
+  r.hearPilot();
+  const auto said = r.logged<out::PilotRequested>();
+  const auto started = r.logged<in::PilotStarted>();
+  ASSERT_GE(said.size(), 3u);
+  EXPECT_EQ(said[1].utterance.replyId, "READBACK_TAXI");
+  EXPECT_EQ(said[2].utterance.replyId, "SAY_AGAIN");
+  ASSERT_GE(started.size(), 4u);
+  EXPECT_EQ(started[2].utterance, said[2].utterance.id);  // the new one first
+  EXPECT_EQ(started[3].utterance, said[1].utterance.id);
+  EXPECT_TRUE(r.faults.empty());
+}
+
+// D-322: 3c run 1 pressed before the call was due.
+TEST(ExerciseRuntime, ThePilotCallsFirstThoughTheTraineeIsQuicker) {
+  Rig r;
+  ASSERT_EQ(r.start(), "");
+  r.pass(500);
+  const auto tx = r.transmit(2000);  // the call is due meanwhile
+  EXPECT_TRUE(r.sounding);           // after the release, without waiting for the text
+  r.text(tx, "mumble");
+  for (int t = 0; t < 8000 && r.sounding; t += 10) r.pass(10);
+  r.hearPilot();
+  const auto said = r.logged<out::PilotRequested>();
+  const auto started = r.logged<in::PilotStarted>();
+  ASSERT_GE(said.size(), 2u);
+  EXPECT_EQ(said[0].utterance.replyId, "REQUEST_TAXI");
+  EXPECT_EQ(said[1].utterance.replyId, "SAY_AGAIN");
+  ASSERT_GE(started.size(), 2u);
+  EXPECT_EQ(started[0].utterance, said[0].utterance.id);
+  EXPECT_EQ(started[1].utterance, said[1].utterance.id);
+  ASSERT_EQ(r.logged<out::AtcBeforePilot>().size(), 1u);
   EXPECT_TRUE(r.faults.empty());
 }
 

@@ -91,7 +91,7 @@ TEST_F(Departure, ShippedScenarioLoads) {
   EXPECT_EQ(e.scenario.initialStep, "TAXI");
   ASSERT_TRUE(e.scenario.step("LINE_UP"));
   ASSERT_TRUE(e.scenario.step("TAXI")->onEnter.has_value());
-  EXPECT_EQ(e.scenario.step("TAXI")->onEnter->delay, ms(2000));
+  EXPECT_EQ(e.scenario.step("TAXI")->onEnter->delay, ms(1000));
   EXPECT_TRUE(e.scenario.step("DONE")->final);
   EXPECT_EQ(e.scenario.step("TAXI")->timeout, ms(30'000));
   EXPECT_EQ(e.hash.size(), 16u);
@@ -127,6 +127,28 @@ TEST_F(Departure, OnePlaceholderReplyIsEnoughToRefuseAssessedMode) {
 TEST_F(Departure, ValidatedNeedsItsRecord) {
   scenario["validation"] = {{"status", "validated"}, {"sopRef", "TEST"}};
   expectError(kFile, "/validation", "validatedBy");
+}
+
+// O-3: what is given is read back, and a field is optional only where the intent says so.
+TEST_F(Departure, OptionalFieldNeedsItsReadback) {
+  ASSERT_TRUE(load()) << all();
+  EXPECT_EQ(e.scenario.step("TAXI")->expects[0].optional, std::vector<std::string>{"hold_short"});
+  EXPECT_TRUE(e.replies.count("READBACK_TAXI_HOLD_SHORT"));  // its clips are required too
+  const json good = scenario;
+  step(0)["responses"]["CORRECT"].erase("withField");
+  expectError(kFile, "/steps/0/responses", "withField/hold_short");
+  scenario = good;
+  step(0)["expects"][0]["optional"] = {"heading"};
+  expectError(kFile, "/steps/0/expects/0/optional", "no optional field heading");
+  scenario = good;
+  step(0)["expects"][0]["optional"] = {"hold_short", "runway"};
+  expectError(kFile, "/steps/0/expects/0/optional", "at most one");
+  scenario = good;
+  step(0)["responses"]["INCORRECT"]["withField"] = {{"hold_short", "QUERY"}};
+  expectError(kFile, "/steps/0/responses", "only for CORRECT");
+  scenario = good;
+  step(0)["responses"]["CORRECT"]["withField"]["hold_short"] = "NOWHERE";
+  expectError(kFile, "/steps/0/responses/CORRECT/withField/hold_short", "no reply named NOWHERE");
 }
 
 TEST_F(Departure, ErrorsNameFileAndPath) {
