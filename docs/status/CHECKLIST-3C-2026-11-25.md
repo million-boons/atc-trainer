@@ -39,11 +39,11 @@ With runway 27: taxiway B2 ("bravo two"), runway "two seven"; FALCON-732 is "fal
 
 | # | Do | Expect | Result |
 |---|---|---|---|
-| B1 | Start | The pilot calls first ("request taxi"), with the light radio effect; RX shown | |
+| B1 | Start, then **do not press until the pilot has called** (about 2 s; finding 2, not fixed yet) | The pilot calls first ("request taxi"), with the light radio effect; RX shown | |
 | B2 | Hold the right button, give the taxi instruction, release | TX while held; text and chips; readback; step 1 Done | |
 | B3 | Line up, then takeoff | The pilot calls "ready for departure" before line up; both steps Done | |
 | B4 | After the last readback | "Exercise complete"; **Result**: 3 of 3, attempts, response time, PTT, suspected STT apart, no pass mark | |
-| B5 | Run again | New values on the card | |
+| B5 | Run again | New values: read the callsign on the Exercise screen, not the Dashboard seen before (finding 1, not fixed yet) | |
 | B6 | Third run with Screen PTT, fourth with Space | The same | |
 
 ## C. Errors
@@ -76,6 +76,7 @@ The log of each exercise is `~/.local/state/atc-trainer/exercises/<session>.json
 
 ## Known, not a failure
 
+- Do not say "hold short" in the taxi instruction: the step does not take it and answers "query instruction" (O-3).
 - "nine" is heard where the text says "niner" (O-4, clips not regenerated).
 - Frequent "say again": best measured result is 25 of 40 instructions fully correct (06 §7), for one speaker. This acceptance is not a speech accuracy test.
 - A transmission without text after 10 s is shown as a system fault; until engine builds D-317 the result still counts it in the step's attempts and towards the say-again limit.
