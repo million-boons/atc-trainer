@@ -79,6 +79,19 @@ QString ExerciseView::label(const std::string& id) const {
   return s ? q(s->label) : q(id);
 }
 
+ExerciseContext ExerciseView::context() const {
+  const QVariantMap v = card(*s_.exercise, s_.seed);
+  return {.scenario = v["name"].toString(), .callsign = v["callsign"].toString(), .runway = v["runway"].toString(),
+          .taxiway = v["taxiway"].toString(), .type = v["type"].toString(), .rule = v["rule"].toString(),
+          .model = s_.model, .trainee = s_.trainee, .placeholder = s_.exercise->placeholder};
+}
+
+// D-125; after system faults in a row D-317.
+void ExerciseView::choice() {
+  if (choiceCalls_ > 0) c_->setChoice(tr("No ATC call"), tr("%1: %2 pilot calls without an ATC call.").arg(label(step_)).arg(choiceCalls_));
+  else c_->setChoice(tr("Speech recognition failed"), tr("%1: no result %2 times in a row. Not the trainee's error.").arg(label(step_)).arg(faultRun_));
+}
+
 void ExerciseView::steps() {
   QList<ExerciseStep> l;
   for (const auto& s : s_.exercise->scenario.steps)
@@ -102,6 +115,8 @@ void ExerciseView::prepare(Setup s) {
   step_.clear();
   done_ = calls_ = faults_ = 0;
   faultShown_ = false;
+  faultTx_ = 0;
+  faultRun_ = choiceCalls_ = 0;
   judged_ = 0;
   attempts_.clear();
   clearances_.clear();
@@ -113,12 +128,9 @@ void ExerciseView::prepare(Setup s) {
   delays_.clear();
   timeline_.clear();
   result_.clear();
-  const QVariantMap v = card(*s_.exercise, s_.seed);
-  for (int i = 0; i < v["steps"].toInt(); ++i) attempts_ << 0;
-  c_->begin({.scenario = v["name"].toString(), .callsign = v["callsign"].toString(), .runway = v["runway"].toString(),
-             .taxiway = v["taxiway"].toString(), .type = v["type"].toString(), .rule = v["rule"].toString(),
-             .model = s_.model, .placeholder = s_.exercise->placeholder},
-            false, s_.consent);
+  for (const auto& st : s_.exercise->scenario.steps)
+    if (!st.final) attempts_ << 0;
+  c_->begin(context(), false, s_.consent);
   steps();
   c_->setAlert(L::Ok, tr("Exercise not started"));
   c_->setPhase(ExerciseController::Starting);
@@ -131,11 +143,7 @@ void ExerciseView::refused(const QString& why) {
 
 void ExerciseView::started(bool assessed, QDateTime at) {
   at_ = std::move(at);
-  const QVariantMap v = c_->context();
-  c_->begin({.scenario = v["scenario"].toString(), .callsign = v["callsign"].toString(), .runway = v["runway"].toString(),
-             .taxiway = v["taxiway"].toString(), .type = v["type"].toString(), .rule = v["rule"].toString(),
-             .model = s_.model, .placeholder = s_.exercise->placeholder},
-            assessed, s_.consent);
+  c_->begin(context(), assessed, s_.consent);
   steps();
   c_->setAlert(L::Ok, tr("Exercise running"));
   c_->setPhase(ExerciseController::Running);
@@ -184,7 +192,12 @@ void ExerciseView::on(Ns t, const in::Recognised& x) {
   row_[p.tx] = int(timeline_.size());
   timeline_.append(QVariantList{at, tr("ATC"), heard_.text, QString(), 0});
   c_->setAlert(L::Ok, tr("Exercise running"));
-  if (x.sttFault.empty()) return;
+  if (x.sttFault.empty()) {
+    faultRun_ = 0;
+    return;
+  }
+  faultTx_ = p.tx;
+  ++faultRun_;
   if (!std::exchange(faultShown_, false)) ++faults_;  // the runtime may have reported it just before
   c_->setNotice(L::Fault, tr("Speech recognition failed: %1. Not your error.").arg(q(x.sttFault)));
   c_->setAlert(L::Fault, tr("Fault logged: speech recognition"));
@@ -217,7 +230,7 @@ void ExerciseView::on(Ns, const in::PttPresence& x) {
     c_->setPhase(ExerciseController::Paused);
   } else if (c_->phase() == ExerciseController::Paused) {
     c_->setPhase(ExerciseController::Running);
-    if (c_->choice()) c_->setChoice(label(step_), choiceCalls_);
+    if (c_->choice()) choice();
     else c_->setAlert(L::Ok, tr("Exercise running"));
   }
 }
@@ -229,6 +242,7 @@ void ExerciseView::on(Ns, const in::InstructorContinue&) {
 
 void ExerciseView::on(Ns, const out::StepEntered& x) {
   step_ = x.step;
+  faultRun_ = 0;
   calls_ = 0;
   const int i = stepIndex(x.step);
   done_ = i < 0 ? int(attempts_.size()) : i;
@@ -238,11 +252,18 @@ void ExerciseView::on(Ns, const out::StepEntered& x) {
 void ExerciseView::on(Ns t, const out::Judged& x) {
   if (x.outcome == Outcome::Timeout) {
     c_->addNote(L::Caution, tr("No ATC call for %1 s").arg(x.waited / ms(1000)));
-    timeline_.append(QVariantList{time(t), tr("NO CALL"), tr("No ATC call for %1 s").arg(x.waited / ms(1000)), label(x.step), int(L::Caution)});
+    timeline_.append(QVariantList{time(t), tr("ATC"), tr("No ATC call for %1 s").arg(x.waited / ms(1000)), tr("MISSED RESPONSE"), int(L::Caution)});
     return;
   }
   judged_ = x.tx;
   calls_ = 0;
+  if (x.tx && x.tx == faultTx_) {  // the system failed: nothing about the trainee (D-317)
+    if (const auto r = row_.find(x.tx); r != row_.end()) {
+      timeline_[r->second][3] = tr("SYSTEM FAULT, not counted");
+      timeline_[r->second][4] = int(L::Fault);
+    }
+    return;
+  }
   const int i = stepIndex(x.step);
   if (i >= 0) ++attempts_[i];
   const bool good = x.outcome == Outcome::Correct;
@@ -272,7 +293,7 @@ void ExerciseView::on(Ns, const out::PilotRequested& x) {
     const auto* s = s_.exercise->scenario.step(step_);
     ++calls_;
     c_->setNotice(L::Caution, tr("The pilot is calling again (%1 of %2).").arg(calls_).arg(s ? s->maxPilotCalls : calls_));
-  } else if (!x.utterance.unprompted && (x.utterance.cause == Outcome::Ambiguous || x.utterance.cause == Outcome::Unintelligible)) {
+  } else if (!x.utterance.unprompted && x.utterance.tx != faultTx_ && (x.utterance.cause == Outcome::Ambiguous || x.utterance.cause == Outcome::Unintelligible)) {
     ++sayAgain_[step_];
   }
 }
@@ -293,7 +314,10 @@ void ExerciseView::on(Ns, const out::TimerCancelled& x) {
 }
 
 void ExerciseView::on(Ns, const out::InstructorAlert& x) {
-  if (x.choice) return c_->setChoice(label(step_), choiceCalls_ = calls_);
+  if (x.choice) {
+    choiceCalls_ = calls_;
+    return choice();
+  }
   const auto* s = s_.exercise->scenario.step(step_);
   c_->setNotice(L::Caution, tr("Instructor: speech was not understood %1 times in this step.").arg(s ? s->maxSayAgain : 0));
   c_->setAlert(L::Caution, tr("Instructor attention: say-again limit"));
@@ -314,14 +338,17 @@ void ExerciseView::ended(const ExerciseResult& r, QDateTime at) {
   const auto n = [](int i) { return QString::number(i); };
 
   QVariantList stepRows;
-  int done = 0;
+  int done = 0, missed = 0;
   for (const auto& s : r.steps) {
     QStringList errors;
     for (const auto& [o, count] : s.errors) {
       const QString word = q(toString(o)).replace('_', ' ');
       errors << (count > 1 ? tr("%1 x%2").arg(word).arg(count) : word);
     }
-    if (!s.missed.empty()) errors << tr("no call x%1").arg(s.missed.size());
+    // Missed responses are a metric of their own, never an incorrect instruction (D-127, D-424).
+    Ns silence = 0;
+    for (const auto& m : s.missed) silence += m.waited;
+    missed += int(s.missed.size());
     done += s.completed;
     const auto again = sayAgain_.find(s.id);
     stepRows << QVariantMap{{"name", tr("%1 %2").arg(stepRows.size() + 1).arg(q(s.label))},
@@ -329,7 +356,9 @@ void ExerciseView::ended(const ExerciseResult& r, QDateTime at) {
                             {"outcome", s.completed ? tr("Correct") : s.reached ? tr("Not completed") : tr("Not reached")},
                             {"attempts", s.attempts},
                             {"errors", !s.reached ? QStringLiteral("-") : errors.isEmpty() ? tr("none") : errors.join(", ")},
-                            {"response", s.responseTime ? seconds(*s.responseTime) : QStringLiteral("-")},
+                            {"missed", s.missed.empty() ? QStringLiteral("0") : tr("%1, %2").arg(s.missed.size()).arg(seconds(silence))},
+                            // From the first call left unanswered. Never answered: at least the silence.
+                            {"response", s.responseTime ? seconds(*s.responseTime) : silence > 0 ? tr("> %1").arg(seconds(silence)) : QStringLiteral("-")},
                             {"sayAgain", n(again == sayAgain_.end() ? 0 : again->second)}};
   }
   QStringList suspected;
@@ -357,8 +386,8 @@ void ExerciseView::ended(const ExerciseResult& r, QDateTime at) {
   }
   const QVariantMap ctx = c_->context();
   result_ = {{"title", title}, {"level", level},
-             {"sub", tr("%1   %2   %3 to %4").arg(ctx["scenario"].toString(), ctx["callsign"].toString(), QLocale::c().toString(at_, "d MMM HH:mm"), at.toString("HH:mm"))},
-             {"stepsDone", tr("%1 of %2").arg(done).arg(r.steps.size())}, {"duration", clock(r.duration)}, {"steps", stepRows}, {"ptt", ptt},
+             {"sub", tr("%1   %2   %3   %4 to %5").arg(c_->who(), ctx["scenario"].toString(), ctx["callsign"].toString(), QLocale::c().toString(at_, "d MMM HH:mm"), at.toString("HH:mm"))},
+             {"stepsDone", tr("%1 of %2").arg(done).arg(r.steps.size())}, {"missed", n(missed)}, {"duration", clock(r.duration)}, {"steps", stepRows}, {"ptt", ptt},
              {"suspectedLevel", int(suspected.isEmpty() ? L::None : L::Caution)},
              {"suspectedTitle", suspected.isEmpty() ? tr("None") : tr("%1, not counted against the trainee").arg(suspected.size())},
              {"suspectedText", suspected.join("\n")}, {"speech", speech}};

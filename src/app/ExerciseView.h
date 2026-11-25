@@ -21,6 +21,7 @@ class ExerciseView {
     std::shared_ptr<const atc::Exercise> exercise;
     std::uint64_t seed = 1;
     QString model;         // shown name
+    QString trainee;       // ID; empty: guest
     bool consent = false;  // of the trainee on record
   };
   explicit ExerciseView(ExerciseController* c) : c_(c) {}
@@ -61,6 +62,8 @@ class ExerciseView {
   QString time(atc::Ns t) const;
   int stepIndex(const std::string& id) const;  // among the steps that are not final; -1 otherwise
   QString label(const std::string& id) const;
+  ExerciseContext context() const;
+  void choice();
   void steps();
   void waiting(std::optional<atc::Ns> since);
 
@@ -81,6 +84,8 @@ class ExerciseView {
   QList<double> delays_;
   int faults_ = 0;
   bool faultShown_ = false;
+  std::uint64_t faultTx_ = 0;                    // latest transmission without a result: no attempt (D-317)
+  int faultRun_ = 0;                             // such transmissions in a row
   QList<QVariantList> timeline_;                 // time, who, text, outcome, level
   QVariantMap result_;
 };

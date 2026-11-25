@@ -6,7 +6,9 @@ Item {
     id: s
     property LabController lab
     property ExerciseController ex
+    property AccessController access
     property bool askStop: false
+    property bool askPin: false    // End in Assessed needs the instructor (D-125)
     property bool canStart: true   // still ready: something may have changed while the Start dialog is open
     readonly property int gap: Theme.s12
     readonly property int leftW: Theme.px(268)
@@ -155,18 +157,53 @@ Item {
 
     // ---- dialogs
     // The instructor's choice leaves the radio bar free: a transmission may end the waiting (D-125).
+    Connections { target: s.ex; function onChanged() { if (!s.ex.choice) s.askPin = false } }
     Loader {
         x: 0; y: 0; width: s.width; height: bar.y
         active: s.ex.choice && !s.askStop
-        sourceComponent: ModalPanel {
-            title: qsTr("Instructor: no ATC call")
-            Label { width: parent.width; wrapMode: Text.WordWrap; text: s.ex.choiceText }
+        sourceComponent: s.askPin ? pinDialog : choiceDialog
+    }
+    Component {
+        id: choiceDialog
+        ModalPanel {
+            title: qsTr("Instructor: %1").arg(s.ex.choiceTitle)
+            Label { width: parent.width; wrapMode: Text.WordWrap; visible: text !== ""; text: s.ex.choiceText }
             Label { width: parent.width; wrapMode: Text.WordWrap; color: Theme.textSecondary
-                    text: qsTr("Continue: the pilot calls again, same step. A transmission also continues the exercise.") }
+                    text: qsTr("Continue: the exercise goes on in the same step. A transmission also continues it.") }
             Row {
                 spacing: Theme.s12
                 PrimaryButton { text: qsTr("Continue"); focusPolicy: Qt.NoFocus; onClicked: s.ex.continueExercise() }
-                DangerButton { text: qsTr("End exercise"); focusPolicy: Qt.NoFocus; onClicked: s.askStop = true }
+                DangerButton { text: qsTr("End exercise"); focusPolicy: Qt.NoFocus
+                               onClicked: { if (s.ex.assessed) { s.access.clearMessage(); s.askPin = true } else s.askStop = true } }
+            }
+        }
+    }
+    Component {
+        id: pinDialog
+        ModalPanel {
+            id: pd
+            property string pin
+            title: qsTr("End exercise: instructor PIN")
+            // Keypad only: the keyboard stays free, Space is PTT.
+            Label { text: pd.pin ? "\u2022".repeat(pd.pin.length) : qsTr("6 to 12 digits"); mono: pd.pin !== ""
+                    height: Theme.px(28); color: pd.pin ? Theme.textPrimary : Theme.textSecondary }
+            KeyPad {
+                enabled: !s.access.busy
+                onKey: (digit) => { if (pd.pin.length < 12) pd.pin += digit }
+                onErase: pd.pin = pd.pin.slice(0, -1)
+                onClear: pd.pin = ""
+            }
+            Row {
+                spacing: Theme.s8
+                height: Theme.px(22)
+                StateIcon { level: s.access.message ? LabController.Caution : 0; anchors.verticalCenter: parent.verticalCenter }
+                Label { height: parent.height; text: s.access.busy ? qsTr("Checking the PIN") : s.access.message; font.pixelSize: Theme.small }
+            }
+            Row {
+                spacing: Theme.s12
+                DangerButton { text: qsTr("End exercise"); focusPolicy: Qt.NoFocus; enabled: pd.pin.length >= 6 && !s.access.busy
+                               onClicked: { s.access.confirmInstructor(pd.pin); pd.pin = "" } }
+                SecondaryButton { text: qsTr("Cancel"); focusPolicy: Qt.NoFocus; enabled: !s.access.busy; onClicked: s.askPin = false }
             }
         }
     }

@@ -108,6 +108,8 @@ TEST(Exercise, InstructorChoiceTellsTheTraineeOnlyThatTheInstructorKnows) {  // 
     c.continueExercise();
     EXPECT_EQ(goes, 1);
     c.stop();
+    EXPECT_EQ(stops, assessed ? 0 : 1);  // Assessed needs the instructor's PIN
+    if (assessed) c.endConfirmed();
     EXPECT_EQ(stops, 1);
     c.setPhase(C::Paused);  // the PTT dialog comes first
     EXPECT_FALSE(c.choice());
@@ -116,7 +118,21 @@ TEST(Exercise, InstructorChoiceTellsTheTraineeOnlyThatTheInstructorKnows) {  // 
     c.continueExercise();
     EXPECT_EQ(goes, 1);
     EXPECT_EQ(c.alert(), "Exercise running");
+    c.endConfirmed();  // the choice is over
+    EXPECT_EQ(stops, 1);
   }
+}
+
+TEST(Exercise, AGuestHasNoAudio) {  // D-127
+  C c;
+  c.setAudioConnected();
+  c.begin({}, false, true);
+  EXPECT_FALSE(c.audioSaved());
+  EXPECT_TRUE(c.audioText().contains("guest"));
+  EXPECT_EQ(c.who(), "Guest");
+  c.begin({.trainee = "S01"}, false, true);
+  EXPECT_TRUE(c.audioSaved());
+  EXPECT_EQ(c.who(), "S01");
 }
 
 TEST(Exercise, UncertainValueIsShownAsHeard) {

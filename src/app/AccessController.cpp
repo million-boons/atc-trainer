@@ -103,7 +103,14 @@ bool AccessController::loginTrainee(const QString& id) {
 }
 
 void AccessController::loginInstructor(const QString& pin) {
-  if (busy_ || transmitting()) return;
+  if (!busy_ && !transmitting()) checkPin(pin, true);
+}
+
+void AccessController::confirmInstructor(const QString& pin) {
+  if (!busy_) checkPin(pin, false);
+}
+
+void AccessController::checkPin(const QString& pin, bool login) {
   if (!pinSet() || !b_.checkPin) {
     refuse(tr("No instructor PIN is set on this machine."));
     return;
@@ -117,13 +124,13 @@ void AccessController::loginInstructor(const QString& pin) {
   message_.clear();
   emit changed();
   if (worker_.joinable()) worker_.join();  // finished: its answer has arrived
-  worker_ = std::thread([this, check = b_.checkPin, p = pin.toStdString()] {
+  worker_ = std::thread([this, login, check = b_.checkPin, p = pin.toStdString()] {
     const bool ok = check(p);
-    QMetaObject::invokeMethod(this, [this, ok] { pinChecked(ok); }, Qt::QueuedConnection);
+    QMetaObject::invokeMethod(this, [this, ok, login] { pinChecked(ok, login); }, Qt::QueuedConnection);
   });
 }
 
-void AccessController::pinChecked(bool ok) {
+void AccessController::pinChecked(bool ok, bool login) {
   busy_ = false;
   if (!ok) {
     const Ns now = clock_();
@@ -132,6 +139,12 @@ void AccessController::pinChecked(bool ok) {
     return;
   }
   guard_.succeeded();
+  if (!login) {  // who is logged in does not change
+    message_.clear();
+    emit changed();
+    emit confirmed();
+    return;
+  }
   if (transmitting()) return;  // a press during the check
   role_ = Role::Instructor;
   lastInput_ = clock_();

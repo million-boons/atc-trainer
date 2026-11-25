@@ -29,7 +29,7 @@ Item {
                 Label { text: qsTr("%1   %2").arg(s.ex.modeText).arg(s.r.sub || ""); color: Theme.textSecondary; font.pixelSize: Theme.caption }
             }
             Repeater {
-                model: [[s.r.stepsDone, qsTr("steps completed")], [s.r.duration, qsTr("duration")]]
+                model: [[s.r.stepsDone, qsTr("steps completed")], [s.r.missed, qsTr("missed responses")], [s.r.duration, qsTr("duration")]]
                 Column {
                     anchors.verticalCenter: parent.verticalCenter
                     Label { mono: true; text: modelData[0] || "-"; font { pixelSize: Theme.h1; weight: Font.Bold } }
@@ -52,11 +52,11 @@ Item {
         x: s.gap; y: s.midY; width: s.midW
         height: Math.round(Theme.px(36 + 30) + Math.min(4, (s.r.steps || []).length) * Theme.px(44) + 2 * Theme.line)
         title: qsTr("STEPS")
-        readonly property var cols: [0.17, 0.2, 0.11, 0.27, 0.12, 0.13]
+        readonly property var cols: [0.15, 0.18, 0.10, 0.22, 0.14, 0.11, 0.10]
         Row {
             x: Theme.s12; width: parent.width - 2 * x; height: Theme.px(30)
             Repeater {
-                model: [qsTr("Step"), qsTr("Outcome"), qsTr("Attempts"), qsTr("Trainee errors"), qsTr("Response"), qsTr("Say again")]
+                model: [qsTr("Step"), qsTr("Outcome"), qsTr("Attempts"), qsTr("Trainee errors"), qsTr("Missed responses"), qsTr("Response"), qsTr("Say again")]
                 Label { width: parent.width * steps.cols[index]; height: parent.height; text: modelData
                         color: Theme.textSecondary; font.pixelSize: Theme.caption }
             }
@@ -82,9 +82,10 @@ Item {
                         Label { text: line.d.outcome; height: parent.height; font.pixelSize: Theme.small }
                     }
                     Label { width: parent.width * steps.cols[2]; height: parent.height; mono: true; text: line.d.attempts; font.pixelSize: Theme.small }
-                    Label { width: parent.width * steps.cols[3]; height: parent.height; text: line.d.errors; font.pixelSize: Theme.small }
-                    Label { width: parent.width * steps.cols[4]; height: parent.height; mono: true; text: line.d.response; font.pixelSize: Theme.small }
-                    Label { width: parent.width * steps.cols[5]; height: parent.height; mono: true; text: line.d.sayAgain; font.pixelSize: Theme.small }
+                    Label { width: parent.width * steps.cols[3]; height: parent.height; text: line.d.errors; font.pixelSize: Theme.small; wrapMode: Text.WordWrap; maximumLineCount: 2 }
+                    Label { width: parent.width * steps.cols[4]; height: parent.height; mono: true; text: line.d.missed; font.pixelSize: Theme.small }
+                    Label { width: parent.width * steps.cols[5]; height: parent.height; mono: true; text: line.d.response; font.pixelSize: Theme.small }
+                    Label { width: parent.width * steps.cols[6]; height: parent.height; mono: true; text: line.d.sayAgain; font.pixelSize: Theme.small }
                 }
             }
         }

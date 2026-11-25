@@ -72,10 +72,10 @@ void ExerciseController::setAlert(int level, const QString& t, bool verdict) {
   emit changed();
 }
 
-void ExerciseController::setChoice(const QString& step, int pilotCalls) {
+void ExerciseController::setChoice(const QString& title, const QString& text) {
   choice_ = true;
-  choiceStep_ = step;
-  choiceCalls_ = pilotCalls;
+  choiceTitle_ = title;
+  choiceText_ = text;
   notice_ = {LabController::Caution, tr("Instructor notified")};
   alert_ = {LabController::Caution, tr("Instructor notified")};
   emit changed();
@@ -87,10 +87,6 @@ void ExerciseController::clearChoice() {
   notice_ = {};
   alert_ = {LabController::Ok, tr("Exercise running")};
   emit changed();
-}
-
-QString ExerciseController::choiceText() const {
-  return hide() ? tr("No ATC call.") : tr("%1: %2 pilot calls without an ATC call.").arg(choiceStep_).arg(choiceCalls_);
 }
 
 int ExerciseController::alertLevel() const { return hide() && alert_.verdict ? int(LabController::Ok) : alert_.level; }
@@ -118,7 +114,7 @@ void ExerciseController::setResult(QVariantMap summary, QList<QVariantList> time
 
 QVariantMap ExerciseController::context() const {
   return {{"scenario", ctx_.scenario}, {"callsign", ctx_.callsign}, {"runway", ctx_.runway}, {"taxiway", ctx_.taxiway},
-          {"type", ctx_.type}, {"rule", ctx_.rule}, {"model", ctx_.model}};
+          {"type", ctx_.type}, {"rule", ctx_.rule}, {"model", ctx_.model}, {"trainee", ctx_.trainee}};
 }
 
 QString ExerciseController::assessedNote() const {
@@ -146,7 +142,11 @@ void ExerciseController::start(bool assessed) {
 }
 
 void ExerciseController::stop() {
-  if (pttLive()) emit stopRequested();
+  if (pttLive() && !(choice() && assessed_)) emit stopRequested();
+}
+
+void ExerciseController::endConfirmed() {
+  if (choice()) emit stopRequested();
 }
 
 void ExerciseController::continueExercise() {
