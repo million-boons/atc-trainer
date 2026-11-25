@@ -15,6 +15,7 @@ class VoiceBank {
   static constexpr int kRate = 16000;
   struct Clip {
     std::vector<std::vector<std::int16_t>> takes;  // primary first, then alternates; rejected ones are not loaded
+    std::string words{};  // what the manifest says the clip says; may be empty
   };
 
   // The speaker's answer today (D-133, D-135). Empty: nobody may be used.

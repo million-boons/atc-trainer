@@ -100,4 +100,21 @@ bool clipList(const Exercise& e, const SpokenForms& f, std::vector<ClipLine>& ou
   return errors.empty();
 }
 
+bool checkWords(const Exercise& e, const SpokenForms& f, const VoiceBank& bank, std::vector<LoadError>& errors) {
+  std::vector<ClipLine> lines;
+  std::vector<std::string> bad;
+  if (!clipList(e, f, lines, bad)) {
+    for (auto& b : bad) errors.push_back({e.scenario.id, "/", b});
+    return false;
+  }
+  bool ok = true;
+  for (const auto& l : lines) {
+    const auto* c = bank.find(l.id);
+    if (!c || c->words.empty() || c->words == l.words) continue;
+    errors.push_back({bank.manifestFile(), "/clips", l.id + " says \"" + c->words + "\", the data says \"" + l.words + "\""});
+    ok = false;
+  }
+  return ok;
+}
+
 }  // namespace atc

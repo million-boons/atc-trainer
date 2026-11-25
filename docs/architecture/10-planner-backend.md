@@ -89,7 +89,7 @@ sequenceDiagram
 
 ## 7. Rules that are kept in the backend
 
-- The briefing is cut to nothing: more than 200 characters, or a control character, is refused. It goes only to the card; never to the parser, the engine, the model, the prompt or the log.
+- A briefing with more than 200 characters, or with a control character, is refused. It goes only to the card; never to the parser, the engine, the model, the prompt or the log.
 - Names unique (without regard to upper and lower case), 1 to 40 characters; reply delays 0.3 to 5.0 s in steps of 0.1 s, from not above to; radio one of four (D-146, D-147).
 - Presets: edited by the instructor; a saved plan keeps its values (P-6). Starting values D-142.
 - Personal data: IDs only, owner-only files, nothing leaves the machine, nothing in git.

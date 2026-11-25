@@ -11,5 +11,6 @@
 #include "runtime/ExerciseRuntime.h"
 #include "runtime/JsonlEventLog.h"
 #include "scenario/Scenario.h"
+#include "voice/ClipList.h"
 #include "voice/PhraseTemplate.h"
 #pragma pop_macro("slots")

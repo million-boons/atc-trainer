@@ -2,10 +2,13 @@
 
 #include <utility>
 
+#include "voice/ClipList.h"
+
 namespace atc {
 
-ExerciseCheck::ExerciseCheck(std::string dataDir, std::string voicesDir, Report report)
-    : data_(std::move(dataDir)), voices_(std::move(voicesDir)), report_(std::move(report)), thread_([this] { run(); }) {}
+ExerciseCheck::ExerciseCheck(std::string dataDir, std::string voicesDir, Report report, VoiceBank::MayUse mayUse, Folder phraseology)
+    : data_(std::move(dataDir)), voices_(std::move(voicesDir)), report_(std::move(report)), mayUse_(std::move(mayUse)),
+      phraseology_(std::move(phraseology)), thread_([this] { run(); }) {}
 
 ExerciseCheck::~ExerciseCheck() {
   {
@@ -43,7 +46,7 @@ void ExerciseCheck::run() {
       file = *std::exchange(next_, std::nullopt);
       generation = generation_;
     }
-    const CheckResult c = check(data_, voices_, file);
+    const CheckResult c = check(data_, voices_, file, mayUse_, phraseology_ ? phraseology_() : std::string());
     std::lock_guard r(reporting_);
     {
       std::lock_guard l(m_);
@@ -54,16 +57,25 @@ void ExerciseCheck::run() {
   }
 }
 
-CheckResult ExerciseCheck::check(const std::string& dataDir, const std::string& voicesDir, const std::string& scenarioFile) {
+CheckResult ExerciseCheck::check(const std::string& dataDir, const std::string& voicesDir, const std::string& scenarioFile,
+                                 const VoiceBank::MayUse& mayUse, const std::string& phraseology) {
   CheckResult c;
   c.scenarioFile = scenarioFile;
   c.state = CheckResult::State::Failed;
   auto e = std::make_shared<Exercise>();
-  if (!loadExercise(scenarioSources(dataDir, scenarioFile), *e, c.errors)) return c;
+  ScenarioSources from = scenarioSources(dataDir, scenarioFile);
+  if (!phraseology.empty()) from.phraseologyDir = phraseology;
+  if (!loadExercise(from, *e, c.errors)) return c;
   auto b = std::make_shared<VoiceBank>();
-  if (!b->load(voicesDir, c.errors)) return c;
+  if (!b->load(voicesDir, c.errors, mayUse)) return c;
+  SpokenForms forms;
+  if (std::string why; !loadSpokenForms(from.phraseologyDir, forms, why)) {
+    c.errors.push_back({from.phraseologyDir, "/", why});
+    return c;
+  }
   std::vector<LoadError> gaps;
-  if (!checkCoverage(*e, *b, gaps)) {
+  const bool covered = checkCoverage(*e, *b, gaps), said = checkWords(*e, forms, *b, gaps);
+  if (!covered || !said) {
     for (const auto& g : gaps) {
       if (g.path == "/clips") c.missing.push_back(g.what);
       else c.errors.push_back(g);

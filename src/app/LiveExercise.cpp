@@ -57,9 +57,25 @@ void LiveExercise::connectRadio(ExerciseRadio radio, ExerciseStatus status, Stat
   connect(feed, &StatusFeed::startExerciseRequested, this, &LiveExercise::prepare);
   connect(feed, &StatusFeed::stopExerciseRequested, &c_, &ExerciseController::stop);
   if (access_) connect(access_.data(), &AccessController::confirmed, &c_, &ExerciseController::endConfirmed);
+  connect(&c_, &ExerciseController::phaseChanged, this, [this] {
+    if (recheck_) recheck();
+  });
   if (cfg_.check) return checked(cfg_.check(cfg_.scenarioFile));
-  check_ = std::make_unique<ExerciseCheck>(cfg_.data, cfg_.voices, [this](const CheckResult& r) { ui([this, r] { checked(r); }); });
+  check_ = std::make_unique<ExerciseCheck>(cfg_.data, cfg_.voices, [this](const CheckResult& r) { ui([this, r] { checked(r); }); }, cfg_.mayUse, cfg_.phraseology);
   check_->select(cfg_.scenarioFile);
+}
+
+bool LiveExercise::active() const {
+  const auto p = c_.phase();
+  return starting_ || (p != ExerciseController::Idle && p != ExerciseController::Result);
+}
+
+void LiveExercise::recheck() {
+  if (!cfg_.check && !check_) return;
+  recheck_ = active();
+  if (recheck_) return;
+  if (cfg_.check) checked(cfg_.check(cfg_.scenarioFile));
+  else check_->select(cfg_.scenarioFile);
 }
 
 void LiveExercise::checked(const CheckResult& r) {

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <utility>
 
 #include "audio/UtteranceChecks.h"
@@ -10,6 +11,7 @@ namespace atc {
 
 using S = TransmissionController::State;
 using K = PttNote::Kind;
+using SK = StudioNote::Kind;
 
 RadioCore::RadioCore(RadioConfig cfg, RadioDevices dev, Events ev, std::function<Ns()> clock)
     : cfg_(std::move(cfg)), dev_(std::move(dev)), ev_(std::move(ev)), clock_(std::move(clock)),
@@ -26,6 +28,7 @@ void RadioCore::stop() {
   stop_ = true;
   cv_.notify_one();
   if (thread_.joinable()) thread_.join();
+  endStudio("the program ended");  // a take that is being recorded is handed over
   if (player_) player_->stop();
   player_.reset();
 }
@@ -119,13 +122,13 @@ void RadioCore::processed(std::uint64_t tx, std::optional<Reply> reply) {
 
 void RadioCore::requestPilot(Reply r) {
   post([this, r = std::move(r)]() mutable {
-    if (testing_ || swallowed_) deferred_.push_back(std::move(r));
+    if (testing_ || studio_ || swallowed_) deferred_.push_back(std::move(r));
     else tx_->requestPilot(std::move(r), clock_());
   });
 }
 
 void RadioCore::flushPilot() {
-  if (testing_ || swallowed_) return;
+  if (testing_ || studio_ || swallowed_) return;
   for (auto& r : std::exchange(deferred_, {})) tx_->requestPilot(std::move(r), clock_());
 }
 
@@ -133,7 +136,7 @@ bool RadioCore::idle() const { return tx_->state() == S::Idle && !held_ && !clos
 
 void RadioCore::playLocal(LocalSound what, std::vector<std::int16_t> samples, int rate) {
   post([this, what, rate, pcm = std::move(samples)]() mutable {
-    if (!player_ || !idle() || testing_) {
+    if (!player_ || !idle() || testing_ || recording_ || roomUntil_) {
       if (ev_.local) ev_.local(what, LocalEnd::Refused);
       return;
     }
@@ -206,7 +209,7 @@ void RadioCore::playerFinished(PlayId id, bool completed) {
 void RadioCore::setPttTest(bool on) {
   post([this, on] {
     if (on == testing_) return;
-    if (on && !idle()) {
+    if (on && !free()) {
       if (ev_.pttTest) ev_.pttTest({.kind = PttTest::Kind::Refused});
       return;
     }
@@ -216,6 +219,103 @@ void RadioCore::setPttTest(bool on) {
   });
 }
 
+void RadioCore::setStudio(bool on, std::string why) {
+  post([this, on, why = std::move(why)]() mutable {
+    if (!on) return endStudio(std::move(why));
+    if (studio_) return;
+    if (!free()) return studioNote({.kind = SK::Refused, .why = "the radio is in use"});
+    if (mic_.state != CaptureState::Running) return studioNote({.kind = SK::Refused, .why = "no microphone"});
+    endLocal(LocalEnd::Interrupted);
+    studio_ = true;
+    studioPedal_ = false;
+    roomUntil_ = clock_() + cfg_.studioRoomTone;
+    roomSum_ = 0;
+    roomCount_ = 0;
+    studioCursor_ = ring_.newestIndex();
+    studioNote({.kind = SK::Started});
+  });
+}
+
+void RadioCore::setStudioPedal(bool on) {
+  post([this, on] { studioPedal_ = studio_ && on; });
+}
+
+void RadioCore::studioRecord() {
+  post([this, t = clock_()] { startTake(t); });
+}
+
+void RadioCore::studioStop(std::string why) {
+  post([this, t = clock_(), why = std::move(why)]() mutable {
+    if (!recording_ || takeEnd_) return;
+    takeEnd_ = std::max(studioCursor_, ring_.indexAt(t));
+    takeDeadline_ = clock_() + cfg_.lastAudioWait;
+    takeWhy_ = std::move(why);
+  });
+}
+
+void RadioCore::startTake(Ns from) {
+  if (!studio_ || recording_) return;
+  if (roomUntil_) return studioNote({.kind = SK::NotRecording, .why = "the room tone is being measured"});
+  endLocal(LocalEnd::Interrupted);  // the microphone must not hear it
+  recording_ = true;
+  takeEnd_.reset();
+  takeWhy_.clear();
+  take_.clear();
+  studioCursor_ = std::max(ring_.indexAt(from), ring_.keptFrom());
+  takeGap_ = studioCursor_ > ring_.indexAt(from);  // a press that was handled late
+  studioNote({.kind = SK::Recording});
+}
+
+void RadioCore::endTake(std::string why) {
+  if (!recording_) return;
+  recording_ = byPedal_ = false;
+  takeEnd_.reset();
+  StudioAudio a{.samples = std::exchange(take_, {}), .rate = cfg_.rate, .gap = takeGap_, .why = why};
+  studioNote({.kind = SK::NotRecording, .why = std::move(why)});
+  if (ev_.studioTake) ev_.studioTake(std::move(a));
+}
+
+void RadioCore::endStudio(std::string why) {
+  if (!studio_) return;
+  endTake(why.empty() ? "the session ended" : why);
+  endLocal(LocalEnd::Interrupted);
+  studio_ = studioPedal_ = false;
+  roomUntil_.reset();
+  studioNote({.kind = SK::Ended, .why = std::move(why)});
+  flushPilot();
+}
+
+// Takes the new audio out of the ring, which therefore never holds more than the pre-roll (D-312).
+void RadioCore::studioStep(Ns now) {
+  if (!studio_) return;
+  if (mic_.state != CaptureState::Running) return endStudio("the microphone was lost");
+  if (!roomUntil_ && !recording_) return;
+  std::int64_t to = ring_.newestIndex();
+  if (takeEnd_) to = std::min(to, *takeEnd_);
+  const std::int64_t limit = studioLimit() - std::int64_t(take_.size());
+  if (recording_) to = std::min(to, studioCursor_ + limit);
+  if (to > studioCursor_) {
+    auto c = ring_.extractIndex(studioCursor_, to);
+    studioCursor_ = to;
+    if (recording_) {
+      takeGap_ = takeGap_ || c.gap || c.missingHead || c.missingTail;
+      take_.insert(take_.end(), c.samples.begin(), c.samples.end());
+    } else {
+      for (const double x : c.samples) roomSum_ += x * x;
+      roomCount_ += c.samples.size();
+    }
+  }
+  if (roomUntil_ && now >= *roomUntil_) {
+    roomUntil_.reset();
+    const double rms = roomCount_ ? std::sqrt(roomSum_ / double(roomCount_)) / 32768.0 : 0;
+    studioNote({.kind = SK::RoomTone, .dbfs = rms > 1e-6 ? 20 * std::log10(rms) : -120});
+  } else if (recording_ && std::int64_t(take_.size()) >= studioLimit()) {
+    endTake("the time limit of a take");
+  } else if (takeEnd_ && (studioCursor_ >= *takeEnd_ || now > takeDeadline_)) {
+    endTake(takeWhy_);
+  }
+}
+
 void RadioCore::build() {
   ptt_.emplace(cfg_.ptt, PttInputManager::Callbacks{
       [this](Ns t, const std::string& src) {
@@ -223,6 +323,14 @@ void RadioCore::build() {
         stuck_ = false;
         owner_ = src;
         pressT_ = t;
+        if (studio_) {  // never a transmission
+          swallowed_ = studioPress_ = true;
+          if (studioPedal_ && src == cfg_.pttSource && !recording_) {
+            startTake(t);
+            byPedal_ = recording_;
+          }
+          return;
+        }
         endLocal(LocalEnd::Interrupted);  // the microphone must not hear it
         if (testing_) {
           swallowed_ = true;
@@ -241,7 +349,12 @@ void RadioCore::build() {
         }
         releaseT_ = t;
         if (std::exchange(swallowed_, false)) {
-          if (ev_.pttTest) ev_.pttTest({.kind = PttTest::Kind::Up, .source = src, .held = held, .reason = why});
+          if (recording_ && byPedal_ && !takeEnd_) {
+            takeEnd_ = std::max(studioCursor_, ring_.indexAt(t));
+            takeDeadline_ = clock_() + cfg_.lastAudioWait;
+            takeWhy_ = why == ReleaseReason::DeviceLost ? "the PTT device was lost" : "";
+          }
+          if (ev_.pttTest && !std::exchange(studioPress_, false)) ev_.pttTest({.kind = PttTest::Kind::Up, .source = src, .held = held, .reason = why});
           flushPilot();
           return;
         }
@@ -316,6 +429,7 @@ void RadioCore::step() {
   tx_->tick(now);
   if (closing_ && (ring_.newestIndex() >= closing_->endIndex || now > closing_->deadline)) closeNow();
   else if (streaming_) feed(closing_ ? std::min(closing_->endIndex, ring_.newestIndex()) : ring_.newestIndex());
+  studioStep(now);
   // D-312: without a transmission only the pre-roll exists; older audio is erased at each step.
   if (!closing_ && tx_->state() != S::TxOpen && tx_->state() != S::TxTail)
     ring_.discardBefore(ring_.newestIndex() - cfg_.tx.preRoll * cfg_.rate / 1'000'000'000);
@@ -371,6 +485,8 @@ void RadioCore::publish(Ns now) {
   s.owner = owner_;
   s.otherDown = other_;
   s.testing = testing_;
+  s.studio = studio_;
+  s.recording = recording_;
   s.ptt = link_;
   s.pttError = pttError_;
   s.pulse = pulse_;

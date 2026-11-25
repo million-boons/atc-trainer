@@ -31,6 +31,8 @@ struct RadioSnapshot {
   std::string owner;       // source of the latest press
   bool otherDown = false;
   bool testing = false;    // PTT test: presses do not transmit
+  bool studio = false;     // Studio session: presses do not transmit
+  bool recording = false;  // a Studio take is being recorded; the RECORDING indicator follows this (D-331)
   PttLink ptt = PttLink::NotSet;
   std::string pttError;
   bool pulse = false;      // pulse-type device suspected
@@ -63,7 +65,7 @@ struct RadioTx {
   bool recognising = false;         // a speech result will come
 };
 
-enum class LocalSound { Recording, Tone };
+enum class LocalSound { Recording, Tone, Studio };
 enum class LocalEnd { Started, Completed, Interrupted, Refused, Failed };
 
 struct PttTest {
@@ -72,6 +74,20 @@ struct PttTest {
   std::string source{};
   Ns held = 0;
   ReleaseReason reason = ReleaseReason::Normal;
+};
+
+// Studio session (D-331): the only recording without PTT. Never recognised, never a transmission.
+struct StudioNote {
+  enum class Kind { Started, Refused, RoomTone, Recording, NotRecording, Ended };
+  Kind kind;
+  std::string why{};   // Refused, NotRecording, Ended; empty: as asked
+  double dbfs = -120;  // RoomTone: RMS
+};
+struct StudioAudio {
+  std::vector<std::int16_t> samples{};  // from Record to Stop, nothing from before
+  int rate = 0;
+  bool gap = false;     // audio was lost
+  std::string why{};    // empty: stopped as asked
 };
 
 struct PilotSound {
@@ -87,6 +103,7 @@ struct RadioConfig {
   Ns publishEvery = ms(40);
   Ns lastAudioWait = ms(1000);  // for the tail to be captured
   Ns pilotCutNotice = ms(2000);
+  Ns studioRoomTone = ms(2000), studioLimit = ms(20'000);  // ST-7
   std::string pttSource = "RIGHT", otherSource = "LEFT";
 };
 
@@ -112,6 +129,8 @@ class RadioCore {
     std::function<void(const std::string&)> outputFault;
     std::function<void(LocalSound, LocalEnd)> local;
     std::function<void(const PttTest&)> pttTest;
+    std::function<void(const StudioNote&)> studio;
+    std::function<void(StudioAudio&&)> studioTake;
     std::function<void(const OutputStatus&)> output;
     std::function<PilotSound(const Reply&)> pilotSound;  // from memory, at once
     std::function<void(Ns now)> tick;  // every step, after what was queued
@@ -135,6 +154,12 @@ class RadioCore {
   void stopLocal();
   // While on, a press is measured and reported and never opens a transmission.
   void setPttTest(bool on);
+  // Studio session. Refused unless the radio is free and the microphone runs. While on, no press transmits;
+  // with the pedal on, the PTT device starts and stops a recording. Ending it drops to the rule of D-312 at once.
+  void setStudio(bool on, std::string why = {});
+  void setStudioPedal(bool on);
+  void studioRecord();
+  void studioStop(std::string why = {});
 
   // Runs f on the core thread, in order with everything else that is queued.
   void call(std::function<void()> f) { post(std::move(f)); }
@@ -144,7 +169,7 @@ class RadioCore {
   int rate() const { return cfg_.rate; }
   const std::string& pttSource() const { return cfg_.pttSource; }
   PttLink pttLink() const { return link_; }
-  bool free() const { return idle() && !testing_; }  // nothing open, held, waiting or speaking; no PTT test
+  bool free() const { return idle() && !testing_ && !studio_; }  // nothing open, held, waiting or speaking; no PTT test, no Studio
   // Both also end Lab playback.
   bool setRules(PressRule pressDuringPilot, bool repeatInterruptedReply);
   void dropPilot();
@@ -175,6 +200,12 @@ class RadioCore {
   void startPilot(const Reply& r, PlaybackId id);
   void playerFinished(PlayId id, bool completed);
   void flushPilot();
+  void studioNote(StudioNote n) { if (ev_.studio) ev_.studio(n); }
+  void startTake(Ns from);
+  void endTake(std::string why);
+  void endStudio(std::string why);
+  void studioStep(Ns now);
+  std::int64_t studioLimit() const { return cfg_.studioLimit * cfg_.rate / 1'000'000'000; }
 
   const RadioConfig cfg_;
   RadioDevices dev_;
@@ -196,7 +227,17 @@ class RadioCore {
   PttLink link_ = PttLink::NotSet;
   bool testing_ = false;
   bool heldAtOpen_ = false;        // the device was opened with its key down: ready when it is seen released
-  bool swallowed_ = false;         // the held press belongs to a test
+  bool swallowed_ = false;         // the held press belongs to a test or to the Studio
+  bool studio_ = false, studioPedal_ = false, byPedal_ = false, studioPress_ = false;
+  std::optional<Ns> roomUntil_;    // room tone is being measured; its audio is not kept
+  double roomSum_ = 0;
+  std::uint64_t roomCount_ = 0;
+  bool recording_ = false, takeGap_ = false;
+  std::optional<std::int64_t> takeEnd_;  // asked to stop: waiting for the audio up to here
+  Ns takeDeadline_ = 0;
+  std::string takeWhy_;
+  std::vector<std::int16_t> take_;
+  std::int64_t studioCursor_ = 0;
   std::vector<Reply> deferred_;    // pilot calls asked for during a test
   std::uint64_t curId_ = 0;
   bool streaming_ = false;

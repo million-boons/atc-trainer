@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "app/LabChecks.h"
+#include "app/StudioService.h"
 #include "audio/SideTone.h"
 
 using namespace atc;
@@ -39,6 +40,13 @@ LiveBackend::LiveBackend(LabController* lab, SttController* stt, LiveConfig cfg,
   }
   core_ = std::make_unique<RadioCore>(cfg_.radio, std::move(dev), runtime_ ? runtime_->wrap(events()) : events());
   if (runtime_) runtime_->attach(*core_);
+  if (cfg_.studio)
+    cfg_.studio->connect({.session = [this](bool on, const std::string& why) { core_->setStudio(on, why); },
+                          .pedal = [this](bool on) { core_->setStudioPedal(on); },
+                          .record = [this] { core_->studioRecord(); },
+                          .stop = [this] { core_->studioStop(); },
+                          .stopPlay = [this] { core_->stopLocal(); },
+                          .play = [this](std::vector<std::int16_t> s, int rate) { core_->playLocal(LocalSound::Studio, std::move(s), rate); }});
   status_ = new StatusController(lab, cfg_.status,
                                  {[this](bool on) { core_->setPttTest(on); },
                                   [this] { core_->playLocal(LocalSound::Tone, makeSideTone({.lengthMs = 1000}), SideToneConfig{}.rate); },
@@ -66,7 +74,8 @@ LiveBackend::LiveBackend(LabController* lab, SttController* stt, LiveConfig cfg,
 
 LiveBackend::~LiveBackend() {
   if (recordings_) recordings_->setPlayer({});
-  core_->stop();
+  if (cfg_.studio) cfg_.studio->connect({});
+  core_->stop();  // hands over a take that is being recorded
 }
 
 void LiveBackend::result(quint64 tx, const QString& model, const QString& config, const QString& text, const QStringList& words,
@@ -124,7 +133,10 @@ void LiveBackend::notice(L::Level l, const QString& n, L::Level al, const QStrin
 
 RadioCore::Events LiveBackend::events() {
   RadioCore::Events e;
-  e.snapshot = [this](const RadioSnapshot& s) { ui([this, s] { snapshot(s); }); };
+  e.snapshot = [this](const RadioSnapshot& s) {
+    if (cfg_.studio) cfg_.studio->onSnapshot(s);
+    ui([this, s] { snapshot(s); });
+  };
   e.note = [this](const PttNote& n) { note(n); };
   e.pressed = [this] { notice(L::None, {}, L::Ok, tr("Ready")); };
   e.txOpened = [this](std::uint64_t id, Ns, bool on) {
@@ -151,7 +163,13 @@ RadioCore::Events LiveBackend::events() {
       notice(L::Fault, tr("Pilot voice stopped: playback did not finish in time."), L::Fault, tr("Pilot voice fault: stopped by the time limit"));
   };
   e.outputFault = [this](const std::string& why) { notice(L::Fault, tr("Audio output: %1.").arg(q(why)), L::Fault, tr("Audio output fault")); };
+  e.studio = [this](const StudioNote& n) { if (cfg_.studio) cfg_.studio->onStudio(n); };
+  e.studioTake = [this](StudioAudio&& a) { if (cfg_.studio) cfg_.studio->onTake(std::move(a)); };
   e.local = [this](LocalSound what, LocalEnd end) {
+    if (what == LocalSound::Studio) {
+      if (cfg_.studio) cfg_.studio->onPlay(end);
+      return;
+    }
     ui([this, what, end] {
       if (what == LocalSound::Tone) status_->onTone(end);
       else if (end == LocalEnd::Started) lab_->setNotice(L::None, {});

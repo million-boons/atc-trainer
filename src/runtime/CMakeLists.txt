@@ -10,3 +10,10 @@ if(TARGET sim_cli AND TARGET parse_cli)
   add_library(atc_exercise STATIC ExerciseRuntime.cpp ExerciseCheck.cpp JsonlEventLog.cpp)
   target_link_libraries(atc_exercise PUBLIC atc_runtime atc_engine atc_parser atc_voice)
 endif()
+# Phraseology Studio without a screen (09, D-331). Qt-free, although the service speaks the screen's interface.
+if(TARGET atc_exercise AND TARGET atc_storage)
+  add_library(atc_studio STATIC ${CMAKE_SOURCE_DIR}/src/app/StudioService.cpp ${CMAKE_SOURCE_DIR}/src/voice/TakeStore.cpp
+    ${CMAKE_SOURCE_DIR}/src/phraseology/PhraseologyEdit.cpp ${CMAKE_SOURCE_DIR}/src/storage/DataCopy.cpp)
+  target_include_directories(atc_studio SYSTEM PRIVATE ${TP}/json)
+  target_link_libraries(atc_studio PUBLIC atc_exercise atc_storage)
+endif()

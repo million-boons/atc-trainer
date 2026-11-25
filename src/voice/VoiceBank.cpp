@@ -131,7 +131,7 @@ bool VoiceBank::load(const std::string& dir, std::vector<LoadError>& errors, con
     }
     if (primary.size() > 1) fail(path, id + " has more than one primary take");
     for (auto& a : alternate) primary.push_back(std::move(a));
-    if (!primary.empty()) b.clips_[id].takes = std::move(primary);
+    if (!primary.empty()) b.clips_[id] = {std::move(primary), text(c, "words")};
   }
   if (!errors.empty()) return false;
   *this = std::move(b);

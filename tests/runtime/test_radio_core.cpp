@@ -70,6 +70,8 @@ struct Rig {
   std::vector<std::string> faults;
   std::vector<LocalEnd> local;
   std::vector<PttTest> tests;
+  std::vector<StudioNote> studio;
+  std::vector<StudioAudio> takes;
   bool haveAudio = true;
   std::function<void()> onPilotStarted;
   Ns startedAt = 0;
@@ -106,6 +108,8 @@ struct Rig {
     e.outputFault = [this](const std::string& s) { faults.push_back(s); };
     e.local = [this](LocalSound, LocalEnd l) { local.push_back(l); };
     e.pttTest = [this](const PttTest& t) { tests.push_back(t); };
+    e.studio = [this](const StudioNote& n) { studio.push_back(n); };
+    e.studioTake = [this](StudioAudio&& a) { takes.push_back(std::move(a)); };
     e.pilotSound = [this](const Reply&) { return haveAudio ? PilotSound{std::vector<std::int16_t>(160, 1000), 16000} : PilotSound{}; };
     cfg.publishEvery = ms(10);
     core = std::make_unique<RadioCore>(cfg, std::move(d), std::move(e), [this] { return now; });
@@ -605,6 +609,255 @@ TEST(RadioCore, WithoutPttNothingIsRecognisedRecordedOrWritten) {
 }
 
 // A press handled late finds less pre-roll, never less speech, and that is not reported as lost audio.
+// ---- Studio session (D-331)
+
+namespace {
+using SK = StudioNote::Kind;
+int count(const Rig& r, SK k) { return int(std::count_if(r.studio.begin(), r.studio.end(), [k](auto& n) { return n.kind == k; })); }
+// A session past its room tone.
+void session(Rig& r, bool pedal = false) {
+  r.micStatus({CaptureState::Running, "", "", ""});
+  r.core->setStudio(true);
+  r.run(2200);
+  ASSERT_EQ(count(r, SK::RoomTone), 1);
+  r.core->setStudioPedal(pedal);
+  r.run(10);
+}
+void transmitsNothing(const Rig& r) {
+  EXPECT_EQ(r.speech.begins, 0);
+  EXPECT_EQ(r.speech.samples, 0u);
+  EXPECT_EQ(r.pressed, 0);
+  EXPECT_TRUE(r.opened.empty() && r.closed.empty() && r.cancelled.empty() && r.tests.empty());
+}
+}  // namespace
+
+TEST(RadioCore, StudioRecordsFromRecordToStopAndNeverTransmits) {
+  Rig r;
+  session(r);
+  EXPECT_TRUE(r.snap.studio);
+  EXPECT_FALSE(r.snap.recording);
+  EXPECT_NEAR(r.studio[1].dbfs, -23.8, 1.0);  // 3000 of 32768, as a sine
+  r.level = 5000;
+  r.run(500);  // not in the take
+  r.level = 1000;
+  r.core->studioRecord();
+  r.run(1000);
+  EXPECT_TRUE(r.snap.recording);
+  r.core->studioStop();
+  r.run(200);
+  EXPECT_FALSE(r.snap.recording);
+  ASSERT_EQ(r.takes.size(), 1u);
+  EXPECT_NEAR(double(r.takes[0].samples.size()), 16000, 320);
+  EXPECT_EQ(r.takes[0].rate, 16000);
+  EXPECT_FALSE(r.takes[0].gap);
+  EXPECT_EQ(r.takes[0].why, "");
+  EXPECT_LE(*std::max_element(r.takes[0].samples.begin() + 320, r.takes[0].samples.end() - 320), 1000);  // nothing from before
+  transmitsNothing(r);
+  r.core->setStudio(false);
+  r.run(50);
+  EXPECT_FALSE(r.snap.studio);
+  EXPECT_EQ(count(r, SK::Ended), 1);
+  r.speak();  // control: the radio works again
+  EXPECT_EQ(r.closed.size(), 1u);
+  EXPECT_EQ(r.speech.begins, 1);
+}
+
+TEST(RadioCore, StudioPedalRecordsAndWithThePedalOffAPressDoesNothing) {
+  Rig r;
+  session(r);
+  r.down(); r.run(500); r.up(); r.run(300);
+  EXPECT_TRUE(r.takes.empty());
+  EXPECT_EQ(count(r, SK::Recording), 0);
+  r.core->setStudioPedal(true);
+  r.down(); r.run(700);
+  EXPECT_TRUE(r.snap.recording);
+  r.up(); r.run(300);
+  ASSERT_EQ(r.takes.size(), 1u);
+  EXPECT_NEAR(double(r.takes[0].samples.size()), 11200, 320);
+  r.core->press("SCREEN"); r.run(300); r.core->release("SCREEN"); r.run(300);  // only the PTT device records
+  EXPECT_EQ(r.takes.size(), 1u);
+  r.core->studioRecord(); r.run(300);
+  r.down(); r.run(100); r.up(); r.run(300);  // the button started it, so the pedal does not stop it
+  EXPECT_TRUE(r.snap.recording);
+  r.core->studioStop(); r.run(200);
+  EXPECT_EQ(r.takes.size(), 2u);
+  transmitsNothing(r);
+}
+
+TEST(RadioCore, StudioNeedsAFreeRadioAndAMicrophone) {
+  Rig r;
+  r.micStatus({CaptureState::Lost, "", "", ""});
+  r.core->setStudio(true);
+  r.run(10);
+  EXPECT_EQ(count(r, SK::Refused), 1);
+  r.micStatus({CaptureState::Running, "", "", ""});
+  r.run(10);
+  r.down(); r.run(100);
+  r.core->setStudio(true); r.run(10);
+  EXPECT_EQ(count(r, SK::Refused), 2);  // a transmission
+  r.up(); r.run(400);
+  r.pilotNow(1);
+  r.core->setStudio(true); r.run(10);
+  EXPECT_EQ(count(r, SK::Refused), 3);  // the pilot
+  r.finish();
+  r.core->setPttTest(true); r.run(10);
+  r.core->setStudio(true); r.run(10);
+  EXPECT_EQ(count(r, SK::Refused), 4);  // a PTT test
+  r.core->setPttTest(false); r.run(10);
+  EXPECT_EQ(count(r, SK::Started), 0);
+  r.core->setStudio(true); r.run(10);
+  EXPECT_EQ(count(r, SK::Started), 1);
+  EXPECT_FALSE(r.core->free());  // no exercise can start
+  r.core->setPttTest(true); r.run(10);
+  EXPECT_EQ(r.tests.back().kind, TK::Refused);
+}
+
+TEST(RadioCore, StudioRefusesToRecordDuringTheRoomTone) {
+  Rig r;
+  r.micStatus({CaptureState::Running, "", "", ""});
+  r.core->setStudio(true);
+  r.run(500);
+  r.core->studioRecord();
+  r.run(10);
+  EXPECT_EQ(count(r, SK::Recording), 0);
+  EXPECT_FALSE(r.studio.back().why.empty());
+  r.core->playLocal(LocalSound::Recording, std::vector<std::int16_t>(160, 1), 16000);
+  r.run(10);
+  EXPECT_EQ(r.local.back(), LocalEnd::Refused);  // nor is anything played into it
+  r.core->setStudio(false);
+  r.run(3000);
+  EXPECT_EQ(count(r, SK::RoomTone), 0);
+  EXPECT_EQ(count(r, SK::Ended), 1);
+  r.core->setStudio(false);
+  r.run(10);
+  EXPECT_EQ(count(r, SK::Ended), 1);  // twice is harmless
+}
+
+TEST(RadioCore, StudioTakeEndsAtTheLimitAndWithItsReasons) {
+  RadioConfig cfg;
+  cfg.studioLimit = ms(3000);
+  Rig r(cfg);
+  session(r, true);
+  r.core->studioRecord();
+  r.run(5000);
+  ASSERT_EQ(r.takes.size(), 1u);
+  EXPECT_EQ(r.takes[0].samples.size(), 48000u);
+  EXPECT_NE(r.takes[0].why, "");
+  EXPECT_TRUE(r.snap.studio);
+  r.down(); r.run(500);
+  r.ptt.lost(r.now);
+  r.run(300);
+  ASSERT_EQ(r.takes.size(), 2u);
+  EXPECT_NE(r.takes[1].why, "");
+  EXPECT_FALSE(r.snap.recording);
+  r.core->studioRecord();
+  r.run(500);
+  r.core->setStudio(false, "logged out");
+  r.run(10);
+  ASSERT_EQ(r.takes.size(), 3u);
+  EXPECT_EQ(r.takes[2].why, "logged out");
+  EXPECT_NEAR(double(r.takes[2].samples.size()), 8000, 320);
+  EXPECT_EQ(r.studio.back().kind, SK::Ended);
+}
+
+TEST(RadioCore, StudioEndsWithTheMicrophone) {
+  Rig r;
+  session(r);
+  r.core->studioRecord();
+  r.run(500);
+  r.micStatus({CaptureState::Lost, "", "", ""});
+  r.run(20);
+  ASSERT_EQ(r.takes.size(), 1u);
+  EXPECT_NE(r.takes[0].why, "");
+  EXPECT_EQ(count(r, SK::Ended), 1);
+  EXPECT_FALSE(r.snap.studio);
+}
+
+TEST(RadioCore, LostAudioIsMarkedInAStudioTake) {
+  Rig r;
+  session(r);
+  r.core->studioRecord();
+  r.run(300);
+  r.ring->pushGap(800);
+  r.run(300);
+  r.core->studioStop();
+  r.run(200);
+  ASSERT_EQ(r.takes.size(), 1u);
+  EXPECT_TRUE(r.takes[0].gap);
+}
+
+TEST(RadioCore, StudioPlaybackStopsForARecording) {
+  Rig r;
+  session(r);
+  r.core->playLocal(LocalSound::Recording, std::vector<std::int16_t>(1600, 1), 16000);
+  r.run(20);
+  EXPECT_EQ(r.local.back(), LocalEnd::Started);
+  r.core->studioRecord();
+  r.run(20);
+  EXPECT_EQ(r.local.back(), LocalEnd::Interrupted);
+  EXPECT_EQ(r.sounding, 0u);
+  r.core->playLocal(LocalSound::Recording, std::vector<std::int16_t>(1600, 1), 16000);
+  r.run(20);
+  EXPECT_EQ(r.local.back(), LocalEnd::Refused);
+}
+
+TEST(RadioCore, EndingTheStudioWithTheKeyHeldOpensNothing) {
+  Rig r;
+  session(r, true);
+  r.down(); r.run(300);
+  r.core->setStudio(false);
+  r.run(300);
+  r.up(); r.run(300);
+  transmitsNothing(r);
+  EXPECT_EQ(r.takes.size(), 1u);
+  r.speak();
+  EXPECT_EQ(r.closed.size(), 1u);
+}
+
+TEST(RadioCore, ThePilotWaitsForTheStudio) {
+  Rig r;
+  session(r);
+  r.pilotNow(7);
+  r.run(500);
+  EXPECT_TRUE(r.started.empty());
+  r.core->setStudio(false);
+  r.run(50);
+  EXPECT_EQ(r.started, std::vector<std::uint64_t>{7});
+}
+
+// ST-1 (c): the rule of D-312 holds between takes, during a take and at once after the session.
+TEST(RadioCore, TheMicrophoneIsUnderD312InAndAfterTheStudio) {
+  Rig r;
+  const std::size_t keep = 4800, block = 160;
+  const auto rule = [&](const char* when) {
+    EXPECT_LE(r.ring->nonZeroStored(), keep + block) << when;
+    EXPECT_EQ(r.ring->extract(r.now - ms(5000), r.now - ms(400)).samples.size(), 0u) << when;
+  };
+  NoFileWrites guard;
+  session(r, true);
+  rule("after the room tone");
+  r.run(5000);
+  rule("session, not recording");
+  r.core->studioRecord();
+  r.run(3000);
+  rule("the buffer while recording");
+  ASSERT_TRUE(r.snap.recording);
+  r.core->setStudio(false);  // the screen is left
+  r.core->step();
+  rule("at once after the end");
+  EXPECT_FALSE(r.snap.recording || r.snap.studio);
+  ASSERT_EQ(r.takes.size(), 1u);
+  const std::size_t got = r.takes[0].samples.size();
+  r.run(5000);
+  rule("later");
+  r.core->studioRecord();
+  r.down(); r.run(50); r.up(); r.run(500);  // a press is PTT again, and the pedal no longer records
+  EXPECT_EQ(r.takes.size(), 1u);
+  EXPECT_EQ(r.takes[0].samples.size(), got);
+  EXPECT_EQ(count(r, SK::Recording), 1);
+  EXPECT_EQ(fileWrites, 0);
+}
+
 TEST(RadioCore, LatePressShortensOnlyThePreRoll) {
   Rig r;
   r.run(2000);

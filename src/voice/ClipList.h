@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "voice/PhraseTemplate.h"
+#include "voice/VoiceBank.h"
 
 namespace atc {
 
@@ -25,5 +26,9 @@ struct ClipLine {
 };
 // Every clip the exercise can ask for, with the words to record. Reply text only; nothing is invented.
 bool clipList(const Exercise& e, const SpokenForms& f, std::vector<ClipLine>& out, std::vector<std::string>& errors);
+
+// Every clip of the exercise that the bank has says the words of the data (D-331, ST-4; "nine" for "niner" was not
+// noticed before). A clip whose words the manifest does not give is not compared.
+bool checkWords(const Exercise& e, const SpokenForms& f, const VoiceBank& bank, std::vector<LoadError>& errors);
 
 }  // namespace atc

@@ -21,12 +21,16 @@ struct LiveExerciseSetup {
   atc::ExerciseRuntime::Callbacks callbacks;  // must stay callable until the backend is gone
 };
 
+// The Studio's service, if there is one. It must stay until the backend is gone.
+namespace atc { class StudioService; }
+
 struct LiveConfig {
   atc::RealDeviceConfig devices;
   atc::RadioConfig radio;
   QString pttName;  // shown in the event log header
   StatusConfig status;
   std::optional<LiveExerciseSetup> exercise;  // empty: this program runs no exercise
+  atc::StudioService* studio = nullptr;
 };
 
 // The Speech Lab and the status tiles as clients of RadioCore. RadioCore runs on its own

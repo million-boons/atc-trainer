@@ -63,11 +63,11 @@ if(TARGET atc_pulse)
   target_compile_definitions(atc_trainer PRIVATE ATC_HAVE_PULSE)
 endif()
 # Live backend: needs the microphone, PTT and speech libraries.
-if(TARGET atc_stt AND TARGET atc_pulse AND TARGET atc_evdev AND TARGET atc_exercise)
+if(TARGET atc_stt AND TARGET atc_pulse AND TARGET atc_evdev AND TARGET atc_studio)
   target_sources(atc_trainer PRIVATE ${APP}/LiveBackend.h ${APP}/LiveBackend.cpp
     ${APP}/StatusController.h ${APP}/StatusController.cpp ${APP}/LiveExercise.h ${APP}/LiveExercise.cpp
     ${APP}/ExerciseView.h ${APP}/ExerciseView.cpp)
-  target_link_libraries(atc_trainer PRIVATE atc_devices atc_exercise)
+  target_link_libraries(atc_trainer PRIVATE atc_devices atc_exercise atc_studio)
   target_compile_definitions(atc_trainer PRIVATE ATC_HAVE_LIVE)
 endif()
 

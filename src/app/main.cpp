@@ -1,4 +1,6 @@
 #include <QCommandLineParser>
+#include <QDate>
+#include <QDateTime>
 #include <QFile>
 #include <QFontDatabase>
 #include <QGuiApplication>
@@ -19,9 +21,13 @@
 #include "app/MockBackend.h"
 #ifdef ATC_HAVE_LIVE
 #include "app/LiveBackend.h"
+#include "app/StudioService.h"
+#include "storage/ConsentView.h"
+#include "storage/DataCopy.h"
 #include "stt/SttFactory.h"
 #endif
 #include "app/SettingsController.h"
+#include "app/StudioController.h"
 #include "app/SttController.h"
 #include "core/PathResolver.h"
 #ifdef ATC_HAVE_STT
@@ -103,7 +109,8 @@ int main(int argc, char** argv) {
   stt.setCatalogError("built without the speech engines (tools/fetch_stt.sh)");
 #endif
   // Login, trainee records, settings and recordings (1c). Before the backends, which use them.
-  AccessController access(useMock ? mockAccess() : realAccess(paths.writable));
+  const AccessBackend accessBackend = useMock ? mockAccess() : realAccess(paths.writable);
+  AccessController access(accessBackend);
   access.setLab(&lab);
   access.setIdleLimit(atc::ms(60'000) * std::max(1, cfg["instructorIdleMinutes"].toInt(10)));
   app.installEventFilter(&access);
@@ -118,7 +125,12 @@ int main(int argc, char** argv) {
     mockBackend->attach(&access, &recordings);
   }
 #ifdef ATC_HAVE_LIVE
+  // Order: the radio stops first (live), then the Studio's worker, then what it reports to.
+  auto consent = std::make_shared<atc::ConsentView>();
+  auto phraseology = std::make_shared<atc::DataCopy>(paths.data + "/phraseology", paths.writable);
+  StudioController studio(&access);
   std::unique_ptr<LiveExercise> exercise;  // before the backend, which calls it until its radio has stopped
+  std::unique_ptr<atc::StudioService> studioService;
   std::unique_ptr<LiveBackend> live;
   if (!useMock) {
     LiveConfig lc;
@@ -143,7 +155,7 @@ int main(int argc, char** argv) {
               atc::describeModel, atc::availableMemoryMb);
     LiveExerciseSetup setup;
     std::string rulesError;
-    if (!atc::loadParserRules(paths.data + "/phraseology/placeholder.json", setup.rules, rulesError)) {
+    if (!atc::loadParserRules(phraseology->dir() + "/placeholder.json", setup.rules, rulesError)) {
       qCritical("no exercise: %s", rulesError.c_str());
     } else {
       LiveExerciseConfig ec;
@@ -153,6 +165,8 @@ int main(int argc, char** argv) {
       ec.scenarioFile = paths.data + "/scenarios/" + cfg["scenario"].toString("DEPARTURE-01").toStdString() + ".json";
       ec.model = cfg["exerciseModel"].toString(at(ec.model)).toStdString();
       ec.pttMissingBlocks = lc.status.pttMissingBlocks;
+      ec.mayUse = [consent](const std::string& id) { return consent->mayUse(id); };
+      ec.phraseology = [phraseology] { return phraseology->dir(); };
       const std::string effect = cfg["radioEffect"].toString("light").toStdString();
       if (const auto r = atc::radioIntensityFromString(effect)) ec.radio = *r;
       else qWarning("radioEffect \"%s\" is not known; using light", effect.c_str());
@@ -160,6 +174,34 @@ int main(int argc, char** argv) {
       exercise = std::make_unique<LiveExercise>(ec, &stt, &lab, &access, &settings);
       setup.callbacks = exercise->callbacks();
       lc.exercise = std::move(setup);
+    }
+    const auto answers = [&accessBackend, consent] { return consent->set(accessBackend.people ? accessBackend.people() : std::vector<atc::Person>{}, accessBackend.versions); };
+    answers();
+    if (exercise) {  // the Studio (09, D-331)
+      atc::StudioService::Config sc;
+      sc.data = paths.data;
+      sc.phraseology = paths.data + "/phraseology";
+      sc.writable = paths.writable;
+      sc.activeBank = paths.voices;
+      sc.voice = cfg["studioVoice"].toString("studio-1").toStdString();  // a new bank, never the one of the exercise (ST-2)
+      sc.bank = paths.writable + "/voices/" + sc.voice;
+      sc.pending = paths.writable + "/voices-pending/" + sc.voice;
+      sc.minFreeMb = cfg["recordingsMinFreeMb"].toInt(200);
+      LiveExercise* ex = exercise.get();
+      studioService = std::make_unique<atc::StudioService>(
+          sc, consent, phraseology,
+          atc::StudioService::Rules{.instructor = [&access] { return access.instructor(); },
+                                    .exerciseActive = [ex] { return ex->active(); },
+                                    .today = [] { return QDate::currentDate().toString(Qt::ISODate).toStdString(); },
+                                    .nowMs = [] { return QDateTime::currentMSecsSinceEpoch(); },
+                                    .changed = [ex] { QMetaObject::invokeMethod(ex, [ex] { ex->recheck(); }, Qt::QueuedConnection); }});
+      lc.studio = studioService.get();
+      studio.setBackend(studioService->backend());
+      QObject::connect(&access, &AccessController::changed, ex, [answers, ex, service = studioService.get()] {
+        const bool differs = answers();
+        service->consentChanged();  // also at log-out
+        if (differs) ex->recheck();
+      });
     }
     live = std::make_unique<LiveBackend>(&lab, &stt, lc, &recordings);
     live->start();
@@ -194,7 +236,12 @@ int main(int argc, char** argv) {
 #ifdef ATC_HAVE_LIVE
   if (exercise) exerciseView = exercise->controller();
 #endif
+  StudioController* studioView = nullptr;
+#ifdef ATC_HAVE_LIVE
+  if (studioService) studioView = &studio;
+#endif
   engine.setInitialProperties({{"lab", QVariant::fromValue(&lab)},
+                               {"studio", QVariant::fromValue(studioView)},
                                {"exercise", QVariant::fromValue(exerciseView)},
                                {"mock", QVariant::fromValue(mockBackend.get())},
                                {"stt", QVariant::fromValue(&stt)},

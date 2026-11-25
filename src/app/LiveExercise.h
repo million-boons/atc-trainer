@@ -23,6 +23,8 @@ struct LiveExerciseConfig {
   atc::RadioIntensity radio = atc::RadioIntensity::Light;
   bool pttMissingBlocks = true;  // configuration; the instructor's option comes from SettingsController
   std::function<std::unique_ptr<atc::IEventLog>()> makeLog;  // empty: JSON Lines in `logs`
+  atc::VoiceBank::MayUse mayUse;             // the speaker's answer today (D-133); called on the check's thread
+  atc::ExerciseCheck::Folder phraseology;    // the folder in use (D-318); empty: data/phraseology
   std::function<atc::CheckResult(const std::string&)> check;  // tests: the result at once; empty: ExerciseCheck
 };
 
@@ -52,6 +54,10 @@ class LiveExercise : public QObject {
   atc::ExerciseRuntime::Callbacks callbacks();
   // Last. Then the coverage check runs (D-115).
   void connectRadio(ExerciseRadio radio, ExerciseStatus status, StatusFeed* feed);
+  // Wording, clips or a consent changed: check again. While an exercise or its Start dialog is open, as soon as it is
+  // over; nothing of this can change during an exercise.
+  void recheck();
+  bool active() const;  // the Start dialog or an exercise
 
  private:
   template <class F> void ui(F f) { QMetaObject::invokeMethod(this, std::move(f), Qt::QueuedConnection); }
@@ -74,7 +80,7 @@ class LiveExercise : public QObject {
   QTimer second_;
   atc::PreparedExercise ready_;
   std::uint64_t seed_ = 1;
-  bool starting_ = false, assessed_ = false;
+  bool starting_ = false, assessed_ = false, recheck_ = false;
   QDateTime startedAt_;
   std::unique_ptr<atc::ExerciseCheck> check_;  // last: joins its thread before the rest goes
 };
