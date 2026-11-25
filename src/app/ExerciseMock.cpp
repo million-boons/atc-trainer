@@ -39,7 +39,7 @@ void result(ExerciseController& c, bool stopped) {
     steps << stepRow("2 Line up", L::Ok, t("Correct"), 3, t("INCORRECT runway"), "5.2 s", "1")
           << stepRow("3 Takeoff", L::Ok, t("Correct"), 1, t("none"), "3.6 s", "0");
   const QVariantList ptt{row(t("Transmissions"), stopped ? "3" : "5"), row(t("Spoke before keying"), "1"), row(t("Released early"), "0"),
-                         row(t("Short taps"), "1"), row(t("No speech"), "0"), row(t("Keyed over the pilot"), "1"), row(t("Key to speech, median"), "0.41 s"),
+                         row(t("Short taps"), "1"), row(t("No speech"), "0"), row(t("Keyed over the pilot"), "1"), row(t("Called before the pilot"), "0"), row(t("Key to speech, median"), "0.41 s"),
                          row(t("Fallback PTT used"), t("no"))};
   const QVariantList speech{row(t("Speech model"), "Whisper tiny + generated prompt"), row(t("Release to text, median"), "2.1 s"), row(t("Faults during exercise"), "0")};
   QList<QVariantList> line{
@@ -167,7 +167,7 @@ void show(ExerciseController& c, const QString& id, bool assessed, bool consent)
     c.setChoice(t("No ATC call"), t("Line up: 2 pilot calls without an ATC call."));
   } else if (id == "excut") {
     call(c); taxi(c);
-    c.setNotice(L::Caution, t("You keyed over the pilot. The reply will be repeated."));
+    c.setNotice(L::Caution, t("You keyed over the pilot. The readback will be repeated after the answer to you."));
   } else if (id == "exlimit") {
     steps(1, 1, 3, 0);
     taxi(c);

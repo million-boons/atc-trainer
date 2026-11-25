@@ -265,13 +265,103 @@ TEST_F(View, ARecogniserFaultIsASystemFaultCountedOnce) {
   EXPECT_EQ(c.result()["speech"].toList()[2].toMap()["value"].toString(), "1");
 }
 
-TEST_F(View, AKeyedOverReplyIsRepeatedAndShownAgain) {
+TEST_F(View, KeyOverNoticeSaysWhatThePilotWillDo) {  // D-325
   go();
+  const auto over = [this](std::uint64_t utterance, bool owed) {
+    PilotUtterance u;
+    u.id = utterance;
+    u.text = "reply";
+    u.owed = owed;
+    v.output(sim->now(), out::PilotRequested{u});
+    v.input(sim->now(), in::PilotStarted{utterance});
+    v.input(sim->now(), in::PilotEnded{utterance, in::PilotEnd::Interrupted});
+    v.input(sim->now(), in::TxOpened{utterance + 100, sim->now(), false});  // the press that cut it
+  };
+  over(51, true);
+  EXPECT_TRUE(c.notice().contains("readback will be repeated")) << c.notice().toStdString();  // still there after TxOpened
+  in::Recognised r;
+  r.instruction.tx = 151;
+  v.input(sim->now(), r);
+  v.input(sim->now(), in::TxOpened{152, sim->now(), false});
+  EXPECT_TRUE(c.notice().isEmpty());  // of the transmission before
+  over(53, false);
+  EXPECT_TRUE(c.notice().contains("answers what you say now")) << c.notice().toStdString();
+  EXPECT_FALSE(c.notice().contains("repeated"));
+  v.input(sim->now(), in::TxCancelled{153});
+  EXPECT_TRUE(c.notice().startsWith("Short tap")) << c.notice().toStdString();
   const int rows = c.transcript()->rowCount();
-  v.input(sim->now(), in::PilotEnded{1, in::PilotEnd::Interrupted});
-  EXPECT_TRUE(c.notice().contains("will be repeated"));
-  v.input(sim->now(), in::PilotStarted{1});
+  v.input(sim->now(), in::PilotStarted{53});  // said again, shown again
   EXPECT_EQ(c.transcript()->rowCount(), rows + 1);
+}
+
+TEST_F(View, ThePilotCallsFirst) {  // D-322
+  v.started(false, QDateTime(QDate(2026, 11, 25), QTime(10, 41, 0)));
+  v.input(ms(0), in::Started{});
+  EXPECT_EQ(c.notice(), "The pilot calls first.");
+  EXPECT_EQ(c.noticeLevel(), int(LabController::None));
+  v.output(ms(0), out::StepEntered{"TAXI"});
+  v.input(ms(400), in::TxOpened{1, ms(400), false});
+  v.output(ms(3000), out::AtcBeforePilot{1});
+  EXPECT_TRUE(c.notice().contains("Wait for the call"));
+  PilotUtterance u;
+  u.id = 1;
+  u.text = "request taxi";
+  u.unprompted = u.first = true;
+  v.output(ms(3000), out::PilotRequested{u});
+  v.input(ms(3200), in::PilotStarted{1});
+  EXPECT_TRUE(c.notice().isEmpty());
+  in::Recognised r;
+  r.instruction.tx = 1;
+  v.input(ms(5000), r);
+  out::Judged j;
+  j.step = "TAXI";
+  j.tx = 1;
+  j.outcome = Outcome::Incorrect;
+  v.output(ms(5000), j);
+  EXPECT_TRUE(c.notice().contains("Not counted as an attempt")) << c.notice().toStdString();
+  for (const QVariant& s : c.steps()) EXPECT_FALSE(s.toMap()["note"].toString().contains("attempts"));
+}
+
+TEST_F(View, CallingFirstIsNoErrorInTheResult) {  // D-322, with the real engine
+  v.started(false, QDateTime(QDate(2026, 11, 25), QTime(10, 41, 0)));
+  log.seen = [this](const EngineEvent& e) {
+    if (const auto* i = std::get_if<EngineInput>(&e.body)) v.input(e.t, *i);
+    else v.output(e.t, std::get<EngineOutput>(e.body));
+  };
+  sim = std::make_unique<Simulator>(SequenceEngine(ex, seed), log);
+  sim->start();
+  auto wrong = right("TAXI");
+  wrong.fields["runway"].value = otherRunway().toStdString();
+  sim->transmit(wrong);
+  sim->wait(ms(8000));
+  say(right("TAXI"));
+  EXPECT_EQ(c.progressText(), "1 of 3 done");
+  sim->stop();
+  finish();
+  const QVariantMap taxi = c.result()["steps"].toList()[0].toMap();
+  EXPECT_EQ(taxi["attempts"].toInt(), 1);
+  EXPECT_EQ(taxi["errors"].toString(), "none");
+  QString before;
+  for (const QVariant& x : c.result()["ptt"].toList())
+    if (x.toMap()["name"].toString() == "Called before the pilot") before = x.toMap()["value"].toString();
+  EXPECT_EQ(before, "1");
+  int rows = 0;
+  for (int i = 0; i < c.timeline()->rowCount(); ++i) rows += cell(c.timeline(), i, 3).toString() == "ATC CALLED BEFORE PILOT";
+  EXPECT_EQ(rows, 1);
+}
+
+TEST_F(View, AssessedHidesTheVerdictOfACallBeforeThePilot) {
+  v.started(true, QDateTime(QDate(2026, 11, 25), QTime(10, 41, 0)));
+  v.input(ms(0), in::Started{});
+  v.output(ms(0), out::StepEntered{"TAXI"});
+  v.output(ms(3000), out::AtcBeforePilot{1});
+  EXPECT_TRUE(c.notice().contains("Wait for the call"));  // procedure, not a verdict
+  out::Judged j;
+  j.step = "TAXI";
+  j.tx = 1;
+  j.outcome = Outcome::Incorrect;
+  v.output(ms(5000), j);
+  EXPECT_TRUE(c.notice().isEmpty());
 }
 
 // ---- LiveExercise
