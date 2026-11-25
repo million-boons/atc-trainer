@@ -41,7 +41,7 @@ Press before the first call (B7), a correct "hold short" (B8), the other callsig
 Four exercises, all Practice, three stopped by the instructor, the last one (23:30) with no `ended` entry (finding 4 again). Steps done: 0. Release to text, 12 transmissions: median 2.89 s (2.69 to 3.31); other programs may have been open.
 
 - **Values:** in two exercises (23:23 EAGLE-421, 23:28 FALCON-732) the user said "alpha three ... runway zero niner" throughout; the engine had B2, 27 (recomputed from the seed). Queried, not advanced. "Hold short" with A3, 09 was understood and judged as a wrong value. Line up and takeoff in step Taxi: refused (UNEXPECTED), as designed.
-- **All nine logged exercises had B2, 27.** Recomputing 40 000 random seeds gives an equal share of the four combinations, so the draw is not biased by its formula; nine in a row has a chance of about 1 in 500. To be checked with the compiled program. Not explained.
+- **All nine logged exercises had B2, 27.** Recomputing 40 000 random seeds gives an equal share of the four combinations, so the draw is not biased by its formula; nine in a row has a chance of about 1 in 500. Checked with the compiled program on 2026-11-26: equal shares over 40 000 random seeds. Not biased; chance is not proven for those nine.
 - Not proven where A3, 09 comes from: the screen, or the example sentences of the checklist and of ui (EAGLE-421, A3, 09).
 - "how you read me?" (radio check): UNINTELLIGIBLE (D-324, O-5).
 

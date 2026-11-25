@@ -58,7 +58,7 @@ This closes the gap found in 3c: the log alone did not say which values an exerc
 - **PB-4, Run again:** Random draws new values after the exercise and shows them (D-321); Fixed keeps them.
 - The draw is uniform over the allowed combinations (`std::random_device` seed, as today).
 
-Observed, not explained: all nine exercises of 2026-11-25 had runway 27. The formula gives equal shares over 40 000 seeds (recomputed); a test of the compiled program belongs to this package.
+Observed: all nine exercises of 2026-11-25 had runway 27. The compiled draw gives equal shares over 40 000 random seeds, so it is not biased; that agrees with chance (about 1 in 500) and does not prove it for those nine. A test of the shares belongs to this package.
 
 ## 6. From choosing to the result
 
@@ -84,7 +84,8 @@ sequenceDiagram
 
 - Without a plan everything is as today (the scenario of `ui.json`, values by seed), and the header still has its values.
 - **PB-5:** the choice is kept in memory only: after a restart no plan is chosen.
-- **PB-6:** while a plan is chosen for a person and somebody else logs in: the plan stays chosen; Start applies the rule (Assessed refused, Practice warns). At log-out of the person it stays.
+- **PB-6:** while a plan is chosen for a person and somebody else logs in: the plan stays chosen; Start applies the rule (Assessed refused, Practice warns). At log-out of the person it stays. **Consequence (found by ui):** a guest or S02 may not choose a plan of S01, but at a Dashboard where it is still chosen they can start it in Practice after a warning, and the card keeps the ID S01 and the briefing after the log-out. Alternative: a plan of one person is put away at their log-out.
+- **Run number and previous run belong to the person at Start**, not at `choose()` (ui): opening the Start dialog takes the person again, shows that person's run number, and for Random draws again if the values are exactly that person's previous combination; the dialog and the card show the new values before Start. The person cannot change while the dialog is open (login is closed there).
 - Nothing can be chosen during an exercise, in its Start dialog or in "Complete".
 
 ## 7. Rules that are kept in the backend
@@ -99,8 +100,8 @@ sequenceDiagram
 | Point of ui | Answer |
 |---|---|
 | `load` for everybody; `revision` over plans and presets | yes |
-| `choose(plan, person)` draws, sets the scenario of `StatusFeed`, starts the check | yes; `person` is **not** trusted: the backend asks `AccessController` itself, the parameter is dropped |
-| `PlanScenario::combinations` | yes. Today 4; an airfield with many values can give thousands: at most 2000 are given, `tooMany` is set, and the screen asks `fits(values)` (new function) instead of filtering a list |
+| `choose(plan, person)` draws, sets the scenario of `StatusFeed`, starts the check | yes; `person` is **not** trusted: the backend asks `AccessController` itself, on the GUI thread **in the call of `choose()`**, never later on the worker; the parameter is dropped |
+| `PlanScenario::combinations` | yes. Today 4; an airfield with many values can give thousands: at most 2000 are given, `tooMany` is set, and the screen asks `fits(values)` (new function, answered by a callback with yes/no and the reason, "B2 does not serve 09") instead of filtering a list |
 | `PlanScenario::hash` | scenario and airfield file (PB-2) |
 | `PlanCoverage` | clips needed, missing; words that differ count as missing (ST-4); `Failed` has a text: add `error` |
 | `ExerciseContext::plan` | set by `ExerciseView` from the options that really ran |
@@ -128,7 +129,7 @@ Resource use (estimate, **to be measured on the panel**): two small files, one t
 | PB-3 | "Previous run" is the person's latest run of any plan with the same airfield | yes |
 | PB-4 | Run again of a Random plan: new values, shown first; of a Fixed plan: the same | yes |
 | PB-5 | The chosen plan is forgotten at program end | yes |
-| PB-6 | A chosen plan stays chosen at log-in and log-out; Start applies the person rule | yes |
+| PB-6 | A chosen plan stays chosen at log-in and log-out; Start applies the person rule. Consequence: somebody else, also a guest, can start S01's plan in Practice after a warning, and the card shows S01 and the briefing after log-out | your choice; b2 recommends to put a **personal** plan away at that person's log-out, and to keep Anyone plans |
 | PB-7 | Header version 2 with exact values in **every** exercise, also without a plan | yes |
 | PB-8 | b2 makes the changes in engine's files (section 4) before engine resumes, minimal, listed for engine's review (as 3c) | yes |
 | PB-9 | Results and history by plan (5e) come with 5e, not here; until then only the count and last date are shown | yes |
