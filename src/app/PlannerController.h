@@ -48,8 +48,8 @@ class PlannerController : public QObject {
   Q_PROPERTY(int messageLevel READ messageLevel NOTIFY messageChanged)  // LabController.Level
   Q_PROPERTY(QString message READ message NOTIFY messageChanged)
  public:
-  static constexpr int kBriefing = 200, kName = 40;        // characters (D-143; name: assumed)
-  static constexpr int kDelayMin = 300, kDelayMax = 5000;  // ms, assumed
+  static constexpr int kBriefing = 200, kName = 40;        // characters (D-143, D-147)
+  static constexpr int kDelayMin = 300, kDelayMax = 5000;  // ms (D-147)
 
   explicit PlannerController(AccessController* access = nullptr, QObject* parent = nullptr);
   void setAccess(AccessController* a);

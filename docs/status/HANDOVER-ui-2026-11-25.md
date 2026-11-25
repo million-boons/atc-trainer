@@ -47,5 +47,6 @@ Branch and worktree `ui`, everything committed. Next free decision number: D-141
 - Mock cases: planoff, plan, plannew, planmis, planchg, planold, dashplan.
 - Waits for the design of the Planner backend and the user's approval: plan in `ExerciseView` and `LiveExercise`.
 - D-147: the user's review of D-145 and D-146; "Use new preset values" added. D-145 is confirmed finally by the user on the screenshots.
-- Next free ui decision number: D-148.
+- D-148: the rest of D-146 accepted.
+- Next free ui decision number: D-149.
 - **User's order:** when the Studio and Planner screenshots are taken, copy them to `~/atc-screens/<date-time>/` and tell the user that folder path. Only from runtime's build, after its word; both sizes.
