@@ -171,6 +171,72 @@ TEST_F(Studio, ValidatedNeedsSopReferenceAndARealFile) {
   EXPECT_TRUE(s->message().contains("PLACEHOLDER"));
 }
 
+TEST_F(Studio, AChangedTextIsSavedBeforeItIsValidated) {
+  StudioBackend x = b;
+  x.load = [inner = b.load](auto done) {  // the mock's files are PLACEHOLDER: here they are not
+    inner([done](StudioContent c, const std::string& why) {
+      for (StudioEntry& e : c.entries) e.placeholderFile = false;
+      done(c, why);
+    });
+  };
+  std::vector<bool> sent;
+  x.save = [&sent, inner = b.save](StudioEntry e, const std::string& revision, StudioBackend::Done done) {
+    sent.push_back(e.validated);
+    e.placeholderFile = false;
+    inner(e, revision, done);
+  };
+  s->setBackend(x);
+  login();
+  openTaxi();
+  s->setSopRef("SOP 1");
+  s->setText(s->text() + " now");
+  drain();
+  s->setValidated(true);
+  EXPECT_FALSE(s->validated());
+  EXPECT_TRUE(s->message().contains("Save the changed text first"));
+  ASSERT_TRUE(s->canSave());
+  s->save();
+  drain();
+  ASSERT_EQ(sent, std::vector<bool>{false});
+  EXPECT_FALSE(s->dirty());
+  s->setValidated(true);  // the text is saved: now it can be Validated
+  EXPECT_TRUE(s->validated());
+  s->save();
+  drain();
+  EXPECT_EQ(sent, (std::vector<bool>{false, true}));
+  EXPECT_FALSE(s->dirty());
+  EXPECT_TRUE(s->validated());
+  s->setText(s->text() + " please");  // and editing is Draft again (D-25)
+  EXPECT_FALSE(s->validated());
+}
+
+TEST_F(Studio, TheMockSavesAChangedTextAsDraftLikeTheLiveBackend) {
+  StudioEntry e;
+  std::string revision;
+  const auto read = [&] {
+    b.load([&](StudioContent c, const std::string&) {
+      revision = c.revision;
+      for (const StudioEntry& x : c.entries)
+        if (x.reply && (e.id.empty() || x.id == e.id)) {
+          e = x;
+          break;
+        }
+    });
+    drain();
+  };
+  read();
+  ASSERT_FALSE(e.id.empty());
+  e.texts = {"changed"};
+  e.sopRef = "SOP 1";
+  e.validated = true;
+  e.placeholderFile = false;
+  b.save(e, revision, [](const std::string& why) { EXPECT_EQ(why, ""); });
+  drain();
+  read();
+  EXPECT_EQ(e.texts, std::vector<std::string>{"changed"});
+  EXPECT_FALSE(e.validated);
+}
+
 TEST_F(Studio, ARefusedSaveKeepsTheEdit) {
   login();
   openTaxi();

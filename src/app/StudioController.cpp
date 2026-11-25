@@ -437,6 +437,9 @@ void StudioController::setSopRef(const QString& t) {
 void StudioController::setValidated(bool on) {
   if (on == draft_.validated || !allowed()) return;
   if (on && draft_.placeholderFile) return void(say(L::Caution, tr("The file is marked PLACEHOLDER. Its texts cannot be Validated.")));
+  const StudioEntry* saved = savedEntry();
+  if (on && saved && saved->texts != draft_.texts)  // a changed text is always saved as Draft (D-332)
+    return void(say(L::Caution, tr("Save the changed text first. Then set it to Validated.")));
   if (on && sopRef().trimmed().isEmpty()) return void(say(L::Caution, tr("Enter the SOP reference first.")));
   clearMessage();
   draft_.validated = on;

@@ -258,7 +258,10 @@ StudioBackend mockStudio() {
     if (revision != b->content.revision) return done("the file changed on disk: undo and edit again");
     if (e.validated && e.placeholderFile) return done("the file is marked PLACEHOLDER");
     for (StudioEntry& x : b->content.entries)
-      if (x.id == e.id && x.reply == e.reply) x = e;
+      if (x.id == e.id && x.reply == e.reply) {
+        if (x.texts != e.texts) e.validated = false;  // as the live backend (D-332)
+        x = e;
+      }
     b->content.changedHere = true;
     b->content.revision += "1";
     collect(*b);
