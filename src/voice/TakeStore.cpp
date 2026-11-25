@@ -279,7 +279,7 @@ std::string TakeStore::add(NewTake n, Take& out) {
     if (x.clipId == n.clipId) t.number = std::max(t.number, x.number);
   do {
     ++t.number;
-    char b[8];
+    char b[16];
     std::snprintf(b, sizeof b, "__%03d", t.number);
     t.id = n.clipId + b;
   } while (fs::exists(path(t.id, ".wav"), ec) || fs::exists(path(t.id, ".json"), ec));  // never overwrite a recording

@@ -48,6 +48,7 @@ const Person* PeopleStore::find(std::string_view id) const {
 std::string PeopleStore::load() {
   loaded_ = false;
   people_.clear();
+  versions_ = given_;
   std::error_code ec;
   if (!std::filesystem::exists(file_, ec) && !ec) {
     loaded_ = true;
@@ -76,8 +77,13 @@ std::string PeopleStore::load() {
       if (std::any_of(next.begin(), next.end(), [&](const Person& q) { return sameId(q.id, p.id); })) throw std::runtime_error("duplicate");
       next.push_back(std::move(p));
     }
+    if (j.contains("wider")) {
+      j["wider"].value("recording", json::object()).get_to(versions_.recordingWider);
+      j["wider"].value("pilot_voice", json::object()).get_to(versions_.pilotVoiceWider);
+    }
     people_ = std::move(next);
   } catch (const std::exception&) {
+    versions_ = given_;
     return "the trainee records cannot be read";
   }
   loaded_ = true;
@@ -98,7 +104,9 @@ std::string PeopleStore::save(const std::vector<Person>& next) {
     }
     list.push_back(std::move(x));
   }
-  const json j{{"format", 1}, {"people", list}};
+  json j{{"format", 1}, {"people", list}};
+  if (!versions_.recordingWider.empty() || !versions_.pilotVoiceWider.empty())
+    j["wider"] = json{{"recording", versions_.recordingWider}, {"pilot_voice", versions_.pilotVoiceWider}};
   if (!writePrivateFile(file_, j.dump(1, ' ', false, json::error_handler_t::replace) + "\n")) return "the trainee records cannot be written";
   people_ = next;
   return "";
@@ -145,6 +153,19 @@ std::string PeopleStore::setPilotVoice(std::string_view id, bool consent, const 
       p.pilotVoiceVersion = versions_.pilotVoice;
     }
   return save(next);
+}
+
+std::string PeopleStore::setWider(bool pilotVoice, bool wider) {
+  if (!loaded_) return "the trainee records cannot be read";
+  const std::string& now = pilotVoice ? versions_.pilotVoice : versions_.recording;
+  if (isDraftConsent(now) || (pilotVoice ? versions_.pilotVoiceOld : versions_.recordingOld).empty()) return "this text has replaced no approved one";
+  auto& marks = pilotVoice ? versions_.pilotVoiceWider : versions_.recordingWider;
+  const auto before = marks;
+  if (const auto m = marks.find(now); m != marks.end() && m->second && !wider) return "it is marked as wider use already";
+  marks[now] = wider;
+  auto why = save(people_);
+  if (!why.empty()) marks = before;
+  return why;
 }
 
 }  // namespace atc

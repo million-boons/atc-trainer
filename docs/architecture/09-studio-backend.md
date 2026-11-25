@@ -1,6 +1,6 @@
 # 09 Phraseology Studio: backend (approved 2026-11-25, D-331)
 
-By b2, 2026-11-25. Approved with conditions on ST-1 (D-331). Screen: 04 §5 (ui, approved). Interface: ui's `src/app/StudioBackend.h` (0ccbab1) and 07 §5; my answers are in section 8. Binding: D-21, D-25, D-31, D-44, D-117 to D-137, D-312, D-318, D-319. "Exists" was read in the code of 00b307f, not run. Points that need the user are **ST-1 to ST-8** (section 10). No figure here is measured.
+By b2, 2026-11-25. Approved with conditions on ST-1 (D-331). **Built: D-332**, which also says where the code differs (one folder for all takes, section 5). Screen: 04 §5 (ui, approved). Interface: ui's `src/app/StudioBackend.h` (0ccbab1) and 07 §5; my answers are in section 8. Binding: D-21, D-25, D-31, D-44, D-117 to D-137, D-312, D-318, D-319. "Exists" was read in the code of 00b307f, not run. Points that need the user are **ST-1 to ST-8** (section 10). No figure here is measured.
 
 ## 1. Parts
 

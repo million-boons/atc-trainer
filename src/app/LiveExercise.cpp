@@ -58,7 +58,7 @@ void LiveExercise::connectRadio(ExerciseRadio radio, ExerciseStatus status, Stat
   connect(feed, &StatusFeed::stopExerciseRequested, &c_, &ExerciseController::stop);
   if (access_) connect(access_.data(), &AccessController::confirmed, &c_, &ExerciseController::endConfirmed);
   connect(&c_, &ExerciseController::phaseChanged, this, [this] {
-    if (recheck_) recheck();
+    if (recheck_) ui([this] { if (recheck_) recheck(); });  // later: while an exercise begins the phase is idle for a moment
   });
   if (cfg_.check) return checked(cfg_.check(cfg_.scenarioFile));
   check_ = std::make_unique<ExerciseCheck>(cfg_.data, cfg_.voices, [this](const CheckResult& r) { ui([this, r] { checked(r); }); }, cfg_.mayUse, cfg_.phraseology);

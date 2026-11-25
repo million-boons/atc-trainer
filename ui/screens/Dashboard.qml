@@ -6,11 +6,21 @@ Item {
     id: s
     property DashboardController dash
     property bool askStop: false
+    property bool scenarios: false             // Scenario Selection is there
+    property bool results: false               // Assessment is there
+    signal scenariosAsked()
+    signal resultsAsked()
+    property PlannerController planner: null   // null: no plans in this build
     property bool showClips: false
+    property string dialog_                    // "", plans, briefing
     signal settingsAsked()
     readonly property int gap: Theme.s12
     readonly property int fullW: width - 2 * gap
     readonly property var scn: dash.scenario
+
+    readonly property bool planned: scn.plan !== undefined && scn.plan !== ""
+    Component.onCompleted: if (planner) planner.enter()
+    Connections { target: s.planner; function onChosen() { if (s.dialog_ === "plans") s.dialog_ = "" } }
 
     // ---- readiness
     Card {
@@ -51,7 +61,7 @@ Item {
         Label { x: Theme.s12; y: Theme.s8; width: parent.width - 2 * x; height: Theme.px(26)
                 text: s.scn.name || qsTr("No scenario"); font { pixelSize: Theme.h2; weight: Font.DemiBold } }
         Label { x: Theme.s12; y: Theme.px(34); width: parent.width - 2 * x; height: Theme.px(22)
-                text: s.scn.summary || ""; color: Theme.textSecondary }
+                text: s.planned ? qsTr("%1: %2").arg(s.scn.planNote).arg(s.scn.summary || "") : s.scn.summary || ""; color: Theme.textSecondary }
         Row {
             x: Theme.s12; y: Theme.px(64)
             spacing: Theme.s24
@@ -65,11 +75,24 @@ Item {
             }
         }
         Label { x: Theme.s12; y: Theme.px(126); width: parent.width - 2 * x; height: Theme.px(22); font.pixelSize: Theme.small
-                text: qsTr("Half-duplex: %1").arg(s.scn.rule || "-") }
-        Label { x: Theme.s12; y: Theme.px(148); width: parent.width - 2 * x; height: Theme.px(22); font.pixelSize: Theme.small
+                objectName: "planLine"
+                text: s.planned ? s.scn.planLine : qsTr("Half-duplex: %1").arg(s.scn.rule || "-") }
+        // The instructor's note, plain guidance (D-143); the whole of it in the dialog.
+        Label { x: Theme.s12; y: Theme.px(150); width: parent.width - 2 * x; height: Theme.px(40); visible: s.planned
+                font.pixelSize: Theme.small; wrapMode: Text.WordWrap; maximumLineCount: 2; verticalAlignment: Text.AlignTop; text: s.scn.briefing || "" }
+        Label { visible: !s.planned; x: Theme.s12; y: Theme.px(148); width: parent.width - 2 * x; height: Theme.px(22); font.pixelSize: Theme.small
                 text: qsTr("Steps %1   SOP reference: %2").arg(s.scn.steps || 0).arg(s.scn.sop || qsTr("none")) }
-        SecondaryButton { x: Theme.s12; anchors { bottom: parent.bottom; bottomMargin: Theme.s12 }
-                          enabled: false; text: qsTr("Choose scenario (not built)") }
+        Row {
+            x: Theme.s12
+            anchors { bottom: parent.bottom; bottomMargin: Theme.s12 }
+            spacing: Theme.s8
+            SecondaryButton { visible: s.planner !== null; text: qsTr("Choose plan"); focusPolicy: Qt.NoFocus; font.pixelSize: Theme.small
+                              enabled: !s.dash.running; onClicked: { s.planner.clearMessage(); s.dialog_ = "plans" } }
+            SecondaryButton { enabled: s.scenarios && !s.dash.running; text: s.scenarios ? qsTr("Choose scenario") : qsTr("Choose scenario (not built)"); focusPolicy: Qt.NoFocus
+                              font.pixelSize: Theme.small; onClicked: s.scenariosAsked() }
+            SecondaryButton { visible: s.planned && (s.scn.briefing || "") !== ""; text: qsTr("Briefing"); focusPolicy: Qt.NoFocus; font.pixelSize: Theme.small
+                              onClicked: s.dialog_ = "briefing" }
+        }
     }
 
     // ---- exercise
@@ -120,14 +143,46 @@ Item {
                        focusPolicy: Qt.NoFocus; onClicked: s.askStop = true }
         SecondaryButton { width: start.small; height: parent.height; text: qsTr("Settings"); focusPolicy: Qt.NoFocus; onClicked: s.settingsAsked()
                           font.pixelSize: Theme.small }
-        SecondaryButton { width: start.small; height: parent.height; text: qsTr("Last result (not built)"); enabled: false
-                          font.pixelSize: Theme.small }
+        SecondaryButton { width: start.small; height: parent.height; text: s.results ? qsTr("Results") : qsTr("Last result (not built)"); enabled: s.results && !s.dash.running
+                          focusPolicy: Qt.NoFocus; onClicked: s.resultsAsked(); font.pixelSize: Theme.small }
     }
 
     Loader {
         anchors.fill: parent
-        active: s.askStop || s.showClips
-        sourceComponent: s.askStop ? stopDialog : clipDialog
+        active: s.askStop || s.showClips || s.dialog_ !== ""
+        sourceComponent: s.askStop ? stopDialog : s.showClips ? clipDialog : s.dialog_ === "plans" ? planDialog : briefingDialog
+    }
+    Component {
+        id: planDialog
+        ModalPanel {
+            title: qsTr("Choose a plan")
+            Label { width: parent.width; visible: s.planner.choices.length === 0; color: Theme.textSecondary; text: qsTr("No plan for you. Plans for anyone need no login.") }
+            ListView {
+                width: parent.width; height: Math.min(contentHeight, Theme.px(320))
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                spacing: Theme.s8
+                model: s.planner.choices
+                delegate: OptionButton { width: ListView.view.width; title: modelData.text; sub: modelData.note; enabled: !modelData.off
+                                         selected: modelData.id === s.scn.plan; onClicked: s.planner.choose(modelData.id) }
+            }
+            Row {
+                width: parent.width; height: Theme.px(22)
+                spacing: Theme.s8
+                StateIcon { level: s.planner.messageLevel; anchors.verticalCenter: parent.verticalCenter }
+                Label { height: parent.height; text: s.planner.message; font.pixelSize: Theme.small }
+            }
+            SecondaryButton { text: qsTr("Close"); focusPolicy: Qt.NoFocus; onClicked: s.dialog_ = "" }
+        }
+    }
+    Component {
+        id: briefingDialog
+        ConfirmDialog {
+            title: qsTr("Briefing")
+            text: s.scn.briefing || ""
+            closeText: qsTr("Close")
+            onClosed: s.dialog_ = ""
+        }
     }
     Component {
         id: stopDialog

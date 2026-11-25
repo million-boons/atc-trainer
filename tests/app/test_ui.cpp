@@ -7,14 +7,18 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QTest>
+#include <algorithm>
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <tuple>
 
 #include "app/AccessBackends.h"
 #include "app/MockBackend.h"
+#include "app/PlannerMock.h"
 #include "app/SettingsController.h"
+#include "app/StudioMock.h"
 using C = ExerciseController;
 
 namespace {
@@ -30,6 +34,15 @@ void walk(QQuickItem* i, const std::function<void(QQuickItem*)>& f) {
   for (QQuickItem* c : i->childItems()) walk(c, f);
 }
 bool isButton(const QQuickItem* i) { return i->inherits("QQuickButton"); }
+// Outside the visible part of a list or pane that scrolls.
+bool scrolledOut(QQuickItem* i) {
+  for (QQuickItem* f = i->parentItem(); f; f = f->parentItem()) {
+    if (!f->inherits("QQuickFlickable")) continue;
+    const QRectF r = i->mapRectToItem(f, {0, 0, i->width(), i->height()});
+    if (r.top() < -0.5 || r.bottom() > f->height() + 0.5) return true;
+  }
+  return false;
+}
 bool isText(const QQuickItem* i) { return i->inherits("QQuickText"); }
 
 struct Ui : testing::Test {
@@ -66,9 +79,10 @@ struct Ui : testing::Test {
                                   {"themeMode", theme},
                                   {"reduceMotion", true}});
     engine->load(QUrl("qrc:/Atc/Main.qml"));
-    ASSERT_FALSE(engine->rootObjects().isEmpty());
+    // Thrown, not asserted: an ASSERT would only leave load(), and the test would go on without a window.
+    if (engine->rootObjects().isEmpty()) throw std::runtime_error("Main.qml does not load: " + g_warnings.join('\n').toStdString());
     win = qobject_cast<QQuickWindow*>(engine->rootObjects().first());
-    ASSERT_TRUE(win);
+    if (!win) throw std::runtime_error("the root of Main.qml is not a window");
     win->resize(size);
     win->show();
     win->requestActivate();
@@ -108,6 +122,15 @@ struct Ui : testing::Test {
     settle();
   }
   void clickButton(const QString& t) { click(find(t, true), t); }
+  void scrollTo(QQuickItem* i) {  // to the end of the pane it is in
+    ASSERT_TRUE(i);
+    for (QQuickItem* f = i->parentItem(); f; f = f->parentItem())
+      if (f->inherits("QQuickFlickable")) {
+        f->setProperty("contentY", std::max(0.0, f->property("contentHeight").toReal() - f->height()));
+        break;
+      }
+    settle();
+  }
   void clickText(const QString& t) { click(find(t, false), t); }
   void pinWithKeypad(const QString& pin) {
     for (QChar ch : pin) clickButton(QString(ch));
@@ -141,6 +164,7 @@ TEST_P(UiAll, EveryCaseLoadsWithoutWarningsAndNoButtonIsCutOff) {
           EXPECT_FALSE(isText(x) && x->property("truncated").toBool()) << id.toStdString() << ": " << s.toStdString();
         }
       });
+      if (scrolledOut(i)) return;
       const QPointF a = i->mapToScene({0, 0}), b = i->mapToScene({i->width(), i->height()});
       EXPECT_GE(a.x(), -0.5) << id.toStdString();
       EXPECT_LE(b.x(), win->width() + 0.5) << id.toStdString() << ": " << i->property("text").toString().toStdString();
@@ -175,9 +199,9 @@ TEST_F(Ui, DashboardIsReachableAndDisabledEntriesSayWhy) {
   load();
   clickText("Dashboard");
   EXPECT_EQ(screen(), "dash");
-  clickText("Scenarios");
+  clickText("Exercise");
   EXPECT_EQ(screen(), "dash");
-  EXPECT_TRUE(allText().contains("No package is planned"));
+  EXPECT_TRUE(allText().contains("No exercise is running."));
 }
 
 TEST_F(Ui, NoNavigationNameIsCutOff) {
@@ -274,7 +298,7 @@ TEST_F(Ui, SettingsAreLockedForTrainees) {
   load();
   run("setoff");
   EXPECT_EQ(screen(), "set");
-  EXPECT_TRUE(allText().contains("Only the instructor may change these."));
+  EXPECT_TRUE(allText().contains("Only the instructor may change these, except General."));
   EXPECT_FALSE(allText().contains("Mock Name"));
   clickButton("On");  // the save switch, disabled
   EXPECT_TRUE(settings.saveRecordings());
@@ -290,8 +314,10 @@ TEST_F(Ui, InstructorSettingsAndRecords) {
   walk(win->contentItem(), [&](QQuickItem* x) {
     if (x->objectName() == "consentTexts") { EXPECT_FALSE(x->property("truncated").toBool()); }
   });
+  clickButton("Recordings");
   clickButton("On");
   EXPECT_FALSE(settings.saveRecordings());
+  clickButton("Trainee records");
   clickButton("Add");
   EXPECT_TRUE(allText().contains("Consent covers copies to project machines on the local network (offline, never cloud)."));
   clickButton("Add");  // disabled: no ID, no answer
@@ -534,6 +560,615 @@ TEST_F(Ui, ResultHasNoPassMarkAndNoPlaybackWithoutConsent) {
   EXPECT_EQ(plays, 0);
   clickButton("Run again");
   EXPECT_EQ(mock->exercise()->phase(), C::Starting);
+}
+
+// ---- Phraseology Studio (04 section 5)
+
+TEST_F(Ui, TheStudioIsForTheInstructorOnly) {
+  load();
+  run("phroff");
+  EXPECT_EQ(screen(), "train");
+  EXPECT_TRUE(allText().contains("Instructor only. Log in to see or change phrases."));
+  EXPECT_FALSE(allText().contains("READBACK_TAXI"));
+}
+
+TEST_F(Ui, TheStudioShowsTheReplyItsStripAndItsCoverage) {
+  load();
+  run("phr");
+  waitLogin();
+  settle(200);
+  const QString t = allText();
+  for (const char* w : {"READBACK_TAXI", "Used by: DEPARTURE-01  Taxi: CORRECT", "taxi via", "{taxiway}", "RUNWAY_09@medial", "Say this:", "PLACEHOLDER VOICE", "pending"})
+    EXPECT_TRUE(t.contains(w)) << w;
+  walk(win->contentItem(), [&](QQuickItem* x) {
+    for (const char* n : {"phraseId", "sayThis", "coverage", "takeState"})
+      if (x->objectName() == n) { EXPECT_FALSE(x->property("truncated").toBool()) << n << ": " << x->property("text").toString().toStdString(); }
+  });
+  EXPECT_TRUE(t.contains("The clip says \"zero nine\""));
+}
+
+TEST_F(Ui, SpaceRecordsInTheStudioAndNeverTransmits) {
+  load();
+  run("phr");
+  waitLogin();
+  settle(200);
+  QTest::keyClick(win, Qt::Key_Space);  // no session
+  settle();
+  EXPECT_FALSE(mock->studio()->recording());
+  EXPECT_TRUE(allText().contains("Start a recording session first."));
+  clickButton("Start session...");
+  EXPECT_TRUE(allText().contains("no consent to be recorded"));  // S02
+  clickButton("S01");
+  settle();
+  EXPECT_TRUE(mock->studio()->session());
+  QTest::keyPress(win, Qt::Key_Space);
+  settle(150);
+  EXPECT_TRUE(mock->studio()->recording());
+  EXPECT_TRUE(allText().contains("RECORDING"));
+  EXPECT_EQ(lab.txTone(), LabController::Neutral);
+  QTest::keyRelease(win, Qt::Key_Space);
+  QTest::keyClick(win, Qt::Key_Space);
+  settle();
+  EXPECT_FALSE(mock->studio()->recording());
+  EXPECT_FALSE(allText().contains("RECORDING"));
+  QTest::keyClick(win, Qt::Key_Return);  // accept
+  settle();
+  EXPECT_TRUE(allText().contains("Primary take."));
+  clickText("Dashboard");  // leaving ends the session
+  EXPECT_FALSE(mock->studio()->session());
+}
+
+TEST_F(Ui, ChangedWordingIsListedBeforeSaving) {
+  load();
+  run("phr");
+  waitLogin();
+  settle(200);
+  mock->studio()->setText("taxi along {taxiway} runway {runway}, {callsign}");
+  settle();
+  clickButton("Save");
+  EXPECT_TRUE(allText().contains("Save changed wording?"));
+  EXPECT_TRUE(allText().contains("PH_TAXI_ALONG@initial"));
+  clickButton("Cancel");
+  EXPECT_TRUE(mock->studio()->dirty());
+  clickButton("Save");
+  clickButton("Save wording");
+  settle();
+  EXPECT_FALSE(mock->studio()->dirty());
+  EXPECT_TRUE(allText().contains("changed on this machine"));
+}
+
+TEST_F(Ui, EnterInATextFieldNeverAcceptsATake) {
+  load();
+  run("phrtake");
+  waitLogin();
+  settle(200);
+  QQuickItem* label = find("SOP reference (required for Validated)", false);
+  ASSERT_TRUE(label);
+  QTest::mouseClick(win, Qt::LeftButton, {}, label->mapToScene({20, label->height() + 24}).toPoint());
+  for (char ch : std::string("x r p ")) QTest::keyClick(win, ch);  // the shortcut keys are text here
+  QTest::keyClick(win, Qt::Key_Return);
+  settle();
+  EXPECT_EQ(mock->studio()->sopRef(), "x r p ");
+  EXPECT_EQ(mock->studio()->takes()[0].toMap()["state"].toString(), "pending");
+}
+
+TEST_F(Ui, AWithdrawnTakeCanOnlyBeDeleted) {  // D-133
+  load();
+  run("phrwd");
+  waitLogin();
+  settle(200);
+  EXPECT_TRUE(allText().contains("Consent withdrawn – delete or replace"));
+  clickButton("Primary");  // disabled
+  EXPECT_FALSE(allText().contains("Primary take."));
+  clickButton("Delete...");
+  EXPECT_TRUE(allText().contains("Delete this take?"));
+  clickButton("Delete take");
+  settle();
+  EXPECT_TRUE(mock->studio()->takes().isEmpty());
+}
+
+TEST_F(Ui, RecordingIsShownForThePedalToo) {  // ST-1: from the backend's state
+  load();
+  StudioEvents e;
+  StudioBackend b = mockStudio();
+  b.setEvents = [&e](StudioEvents v) { e = std::move(v); };
+  mock->studio()->setBackend(b);
+  run("phr");
+  waitLogin();
+  settle(200);
+  EXPECT_FALSE(allText().contains("RECORDING"));
+  e.recording(true);
+  settle();
+  QQuickItem* sign = nullptr;  // walk() sees visible items only
+  walk(win->contentItem(), [&](QQuickItem* i) {
+    if (i->objectName() == "recordingSign") sign = i;
+  });
+  ASSERT_TRUE(sign);
+  EXPECT_GE(sign->height(), 24);
+  EXPECT_TRUE(find("STOP", true));
+  e.recording(false);
+  settle();
+  EXPECT_FALSE(sign->isVisible());
+}
+
+TEST_F(Ui, TheRoomToneIsAnnouncedAndCanBeCancelled) {  // D-331
+  load();
+  StudioBackend b = mockStudio();
+  StudioBackend::Done late;
+  int ended = 0;
+  b.startSession = [&late](const std::string&, StudioBackend::Done done) { late = std::move(done); };
+  b.endSession = [&ended] { ++ended; };
+  mock->studio()->setBackend(b);
+  run("phr");
+  waitLogin();
+  settle(200);
+  clickButton("Start session...");
+  clickButton("S01");
+  EXPECT_TRUE(allText().contains("Measuring the room tone: please be quiet"));
+  clickButton("Cancel start");
+  EXPECT_EQ(ended, 1);
+  late("cancelled");
+  settle();
+  EXPECT_FALSE(mock->studio()->session());
+  EXPECT_TRUE(find("Start session...", true));
+}
+
+TEST_F(Ui, ClipsWithOtherWordsAreListedInADialog) {  // ST-4
+  load();
+  run("phr");
+  waitLogin();
+  settle(200);
+  clickButton("Words differ 1");
+  EXPECT_TRUE(allText().contains("They block Start until they are recorded again."));
+  EXPECT_TRUE(allText().contains("RUNWAY_09@medial: \"zero nine\", text \"zero niner\""));
+  clickButton("Close");
+}
+
+TEST_F(Ui, ExamplesSayThatTheyDoNotChangeRecognition) {
+  load();
+  run("phrint");
+  waitLogin();
+  settle(200);
+  EXPECT_TRUE(allText().contains("Examples do not change recognition on this machine"));
+  EXPECT_TRUE(allText().contains("ATC examples are not recorded."));
+}
+
+TEST_F(Ui, ChangingTheTabEndsTheRecordingSession) {  // ST-1 (c), the screen's part
+  load();
+  run("phr");
+  waitLogin();
+  settle(200);
+  mock->studio()->startSession("S01");
+  settle();
+  ASSERT_TRUE(mock->studio()->session());
+  clickButton("Exercises");
+  EXPECT_FALSE(mock->studio()->session());
+}
+
+// Every button can be touched (48 px at 1.0), in both sizes.
+struct UiTouch : Ui, testing::WithParamInterface<QSize> {};
+TEST_P(UiTouch, TrainingButtonsAreLargeEnough) {
+  load(GetParam());
+  const double scale = std::max(1.0, std::min(win->height() / 800.0, win->width() / 1280.0)), least = 48 * scale - 1;
+  for (const char* id : {"phr", "phrtake", "phrint", "plan", "planmis", "plannew"}) {
+    run(id);
+    waitLogin();
+    settle(200);
+    walk(win->contentItem(), [&](QQuickItem* i) {
+      if (!isButton(i) || i->mapToScene({0, 0}).y() < 48 * scale) return;  // not the status bar
+      EXPECT_GE(i->height(), least) << id << ": " << i->property("text").toString().toStdString();
+      EXPECT_GE(i->width(), least) << id << ": " << i->property("text").toString().toStdString();
+    });
+  }
+}
+INSTANTIATE_TEST_SUITE_P(Sizes, UiTouch, testing::Values(QSize(1280, 800), QSize(1920, 1080)));
+
+// ---- Exercise Planner (04 section 5g)
+
+TEST_F(Ui, NothingMovesWhenAValueNoLongerFits) {
+  load();
+  run("plan");
+  waitLogin();
+  settle(200);
+  const auto places = [this] {
+    QMap<QString, QPointF> m;
+    for (const char* t : {"Save", "Undo", "Delete", "Put on the Dashboard", "Presets...", "Random"})
+      if (QQuickItem* i = find(t, true)) m[t] = i->mapToScene({0, 0});
+    return m;
+  };
+  const auto before = places();
+  ASSERT_EQ(before.size(), 6);
+  mock->planner()->setRunway("09");
+  settle();
+  EXPECT_TRUE(allText().contains("does not fit"));
+  EXPECT_EQ(places(), before);
+}
+
+TEST_F(Ui, TheBriefingStopsAt200CharactersAndSpaceIsText) {
+  load();
+  run("plannew");
+  waitLogin();
+  settle(200);
+  QQuickItem* label = find("Briefing note (optional): guidance, not phraseology", false);
+  ASSERT_TRUE(label);
+  QTest::mouseClick(win, Qt::LeftButton, {}, label->mapToScene({20, label->height() + 24}).toPoint());
+  for (int i = 0; i < 105; ++i) {
+    QTest::keyClick(win, 'a');
+    QTest::keyClick(win, Qt::Key_Space);
+  }
+  settle();
+  EXPECT_EQ(mock->planner()->plan()["briefing"].toString().size(), 200);
+  EXPECT_TRUE(allText().contains("200 of 200"));
+  EXPECT_EQ(lab.txTone(), LabController::Neutral);
+}
+
+TEST_F(Ui, PlansAreDeletedOnlyAfterAQuestion) {
+  load();
+  run("plan");
+  waitLogin();
+  settle(200);
+  clickButton("Delete");
+  EXPECT_TRUE(allText().contains("Delete this plan?"));
+  clickButton("Cancel");
+  EXPECT_EQ(mock->planner()->planCount(), 4);
+  clickButton("Delete");
+  clickButton("Delete plan");
+  settle();
+  EXPECT_EQ(mock->planner()->planCount(), 3);
+}
+
+TEST_F(Ui, ADialogIsClosedWhenTheInstructorLogsOut) {
+  load();
+  run("plan");
+  waitLogin();
+  settle(200);
+  clickButton("Delete");
+  access.logout();
+  settle();
+  EXPECT_FALSE(allText().contains("Delete this plan?"));
+  EXPECT_TRUE(allText().contains("Instructor only. Log in to plan exercises."));
+}
+
+TEST_F(Ui, SomebodyElseIsWarnedInTheStartDialog) {  // D-142
+  load();
+  run("dashready");
+  ExerciseContext x;
+  x.scenario = "Departure 01";
+  x.trainee = "S01";
+  x.plan = ExercisePlan{"Departure S02", "S02", false, 2};
+  mock->exercise()->begin(x, false, false);
+  mock->exercise()->setPhase(C::Starting);
+  emit mock->exercise()->screenRequested("ex");
+  settle();
+  EXPECT_TRUE(allText().contains("This plan is for S02. The result belongs to S01."));
+  ASSERT_TRUE(find("Start exercise", true));
+  EXPECT_TRUE(find("Start exercise", true)->isEnabled());
+}
+
+TEST_F(Ui, NoPlanCanBeChosenWhileAnExerciseRuns) {
+  load();
+  run("dashrun");
+  QQuickItem* b = find("Choose plan", true);
+  ASSERT_TRUE(b);
+  EXPECT_FALSE(b->isEnabled());
+}
+
+TEST_F(Ui, PresetsAreEditedInTheirDialog) {
+  load();
+  run("plan");
+  waitLogin();
+  settle(200);
+  scrollTo(find("Presets...", true));
+  clickButton("Presets...");
+  for (const char* w : {"Easy", "Normal", "Hard", "0.6 s", "Restore starting values"}) EXPECT_TRUE(allText().contains(w)) << w;
+  clickButton("Cancel");
+  EXPECT_FALSE(find("Save presets", true));
+}
+
+
+TEST_F(Ui, ThePlannerIsForTheInstructorOnly) {
+  load();
+  run("planoff");
+  EXPECT_EQ(screen(), "train");
+  EXPECT_TRUE(allText().contains("Instructor only. Log in to plan exercises."));
+  EXPECT_FALSE(allText().contains("Departure, runway 27"));
+}
+
+TEST_F(Ui, ThePlannerShowsPlanPreviewAndChecks) {
+  load();
+  run("plan");
+  waitLogin();
+  settle(200);
+  const QString t = allText();
+  for (const char* w : {"Departure, runway 27", "3 runs, 25 Nov 16:20", "Ready", "Scenario changed", "Warns: preset changed", "FALCON-732  AN-32", "43 of 200",
+                        "Values: fixed   Trainee S01   Practice   Normal", "Voice bank: 22 clips", "Text is PLACEHOLDER", "Trainee record S01", "Assessed: scenario not Validated"})
+    EXPECT_TRUE(t.contains(w)) << w;
+  walk(win->contentItem(), [&](QQuickItem* x) {
+    for (const char* n : {"planState", "planCheck", "planMessage", "assessedNote"})
+      if (x->objectName() == n) { EXPECT_FALSE(x->property("truncated").toBool()) << n << ": " << x->property("text").toString().toStdString(); }
+  });
+}
+
+TEST_F(Ui, TheTrainingTabsChangeBetweenPhrasesAndExercises) {
+  load();
+  run("plan");
+  waitLogin();
+  settle(200);
+  clickButton("Phrases");
+  EXPECT_TRUE(allText().contains("READBACK_TAXI"));
+  clickButton("Exercises");
+  EXPECT_TRUE(allText().contains("ON THE DASHBOARD"));
+}
+
+TEST_F(Ui, AMisfitIsMarkedInWords) {
+  load();
+  run("planmis");
+  waitLogin();
+  settle(200);
+  QQuickItem* note = find("does not fit", false);
+  ASSERT_TRUE(note);
+  EXPECT_FALSE(scrolledOut(note));  // seen without scrolling, in the smaller size
+  EXPECT_TRUE(allText().contains("The values do not fit together."));
+  ASSERT_TRUE(find("Save", true));
+  EXPECT_FALSE(find("Save", true)->isEnabled());
+}
+
+TEST_F(Ui, NewPresetValuesAreOfferedOnlyIfThePresetChanged) {  // D-147
+  load();
+  run("plan");
+  waitLogin();
+  settle(200);
+  EXPECT_FALSE(find("Use new preset values", true));
+  run("planold");
+  waitLogin();
+  settle(200);
+  QQuickItem* b = find("Use new preset values", true);
+  ASSERT_TRUE(b);
+  scrollTo(b);
+  clickButton("Use new preset values");
+  EXPECT_FALSE(mock->planner()->plan()["presetChanged"].toBool());
+}
+
+TEST_F(Ui, TheNameFieldIsTakenOverAndEdited) {
+  load();
+  run("plannew");
+  waitLogin();
+  settle(200);
+  EXPECT_TRUE(allText().contains("NEW PLAN"));
+  QQuickItem* label = find("Name", false);
+  ASSERT_TRUE(label);
+  QTest::mouseClick(win, Qt::LeftButton, {}, label->mapToScene({20, label->height() + 24}).toPoint());
+  for (char ch : std::string("M 1")) QTest::keyClick(win, ch);  // Space is text here, never PTT
+  settle();
+  EXPECT_EQ(mock->planner()->plan()["name"].toString(), "M 1");
+  EXPECT_EQ(lab.txTone(), LabController::Neutral);
+  clickButton("Save");
+  settle();
+  EXPECT_EQ(mock->planner()->planCount(), 5);
+}
+
+TEST_F(Ui, TheCardShowsThePlanAndTheStartDialogTheSameValues) {  // D-321
+  load();
+  run("dashplan");
+  settle(200);
+  const QString t = allText();
+  for (const char* w : {"Departure, runway 27", "plan, Departure 01: Taxi, line up, takeoff", "FALCON-732", "AN-32", "27", "B2",
+                        "Values: fixed   Trainee S01   Practice   Normal", "Listen for the runway. Read the card first."})
+    EXPECT_TRUE(t.contains(w)) << w;
+  clickButton("Briefing");
+  clickButton("Close");
+  clickButton("START EXERCISE");
+  settle();
+  EXPECT_TRUE(allText().contains("FALCON-732   AN-32   RWY 27   TWY B2"));
+  EXPECT_TRUE(allText().contains("Plan: Departure, runway 27   run 4"));
+}
+
+TEST_F(Ui, AGuestChoosesAPlanForAnyone) {
+  load();
+  run("planoff");
+  run("dashready");
+  clickButton("Choose plan");
+  EXPECT_FALSE(allText().contains("Departure S02"));
+  EXPECT_FALSE(allText().contains("Departure, runway 27"));
+  clickButton("Departure, random");
+  settle();
+  EXPECT_FALSE(allText().contains("Choose a plan"));
+  EXPECT_TRUE(allText().contains("Values: random   Anyone   Practice   Normal"));
+}
+
+// ---- Scenario Selection (04 section 5d)
+
+TEST_F(Ui, ScenariosAreListedFilteredAndSelected) {
+  load();
+  run("scen");
+  EXPECT_EQ(screen(), "scen");
+  settle(100);
+  const QString t = allText();
+  for (const char* w : {"9 of 9", "Departure 01", "TAXI_INSTRUCTION", "30 s, 2 calls", "Clips complete", "Assessed: not available, text is PLACEHOLDER", "Fixed values: in an exercise plan"})
+    EXPECT_TRUE(t.contains(w)) << w;
+  EXPECT_FALSE(t.contains("EAGLE"));  // never the expected values
+  walk(win->contentItem(), [&](QQuickItem* x) {
+    for (const char* n : {"scenarioState", "scenarioInfo", "scenarioBank"})
+      if (x->objectName() == n) { EXPECT_FALSE(x->property("truncated").toBool()) << n << ": " << x->property("text").toString().toStdString(); }
+  });
+  clickButton("Gnd");
+  EXPECT_TRUE(allText().contains("2 of 9"));
+  clickText("Ground 01");
+  clickButton("Select scenario");
+  settle(100);
+  EXPECT_EQ(screen(), "dash");
+  EXPECT_TRUE(allText().contains("Ground 01"));
+}
+
+TEST_F(Ui, AScenarioWithErrorsShowsThemAndCannotBeSelected) {
+  load();
+  run("scenerr");
+  settle(100);
+  ASSERT_TRUE(find("Select scenario", true));
+  EXPECT_FALSE(find("Select scenario", true)->isEnabled());
+  clickButton("List");
+  EXPECT_TRUE(allText().contains("unknown intent"));
+  clickButton("Close");
+}
+
+TEST_F(Ui, TheDashboardLeadsToTheScenariosAndBack) {
+  load();
+  run("dashready");
+  clickButton("Choose scenario");
+  EXPECT_EQ(screen(), "scen");
+  clickButton("Back to Dashboard");
+  EXPECT_EQ(screen(), "dash");
+}
+
+// ---- Assessment and Debrief (04 section 5e)
+
+TEST_F(Ui, ResultsNeedALoginAndGuestsAreNowhere) {
+  load();
+  run("histoff");
+  EXPECT_EQ(screen(), "ass");
+  EXPECT_TRUE(allText().contains("Log in to see results. Guest results are in no history."));
+  run("histall");
+  waitLogin();
+  settle(150);
+  EXPECT_TRUE(allText().contains("5 exercises"));
+}
+
+TEST_F(Ui, ATraineeSeesOnlyTheirOwnResults) {
+  load();
+  run("hist");
+  settle(150);
+  EXPECT_TRUE(allText().contains("My results"));
+  EXPECT_FALSE(allText().contains("S02"));
+  EXPECT_FALSE(find("Delete result", true));
+  walk(win->contentItem(), [&](QQuickItem* x) {
+    if (x->objectName() == "historyHead") { EXPECT_FALSE(x->property("truncated").toBool()) << x->property("text").toString().toStdString(); }
+  });
+}
+
+TEST_F(Ui, DebriefIsFactsWithoutAScore) {
+  load();
+  run("histopen");
+  waitLogin();
+  settle(200);
+  const QString t = allText();
+  for (const char* w : {"SCORECARDS (facts)", "COMPLETED", "1 incorrect", "not counted as trainee errors", "TIMELINE", "INCORRECT runway", "AMBIGUOUS, not counted"}) EXPECT_TRUE(t.contains(w)) << w;
+  EXPECT_FALSE(t.contains("pass mark:"));
+  clickButton("Errors");
+  EXPECT_FALSE(allText().contains("say again, EAGLE-421"));
+  clickButton("All");
+  clickText("eagle four two one line up runway two seven");
+  clickButton("Reclassify...");
+  EXPECT_TRUE(allText().contains("Original: INCORRECT runway. It is kept; both are shown."));
+  clickButton("Not an error");
+  clickButton("Store");
+  settle();
+  EXPECT_TRUE(allText().contains("INCORRECT runway (reclassified)"));
+  clickButton("< History");
+  EXPECT_TRUE(find("Open debrief", true));
+}
+
+// ---- Settings, full (04 section 5f)
+
+TEST_F(Ui, EverySettingsPageFitsWithoutScrolling) {
+  load();
+  for (const char* id : {"setgeneral", "setaudio", "setptt", "setspeech", "setvoice", "setrecordings", "setinstructor", "setabout", "setinstr", "setmark"}) {
+    run(id);
+    waitLogin();
+    settle(120);
+    QQuickItem* foot = nullptr;
+    walk(win->contentItem(), [&](QQuickItem* x) {
+      if (x->objectName() == "setupMessage") foot = x;
+    });
+    const double limit = foot ? foot->mapToScene({0, 0}).y() : win->height();
+    walk(win->contentItem(), [&](QQuickItem* x) {
+      if (x->objectName() == "setupValue") { EXPECT_LE(x->mapToScene({0, x->height()}).y(), limit) << id << ": " << x->property("text").toString().toStdString(); }
+    });
+  }
+}
+
+TEST_F(Ui, TheThemeIsForEverybodyAndTheRestForTheInstructor) {  // E-1
+  load();
+  run("setoff");
+  clickButton("General");
+  clickButton("Dark");
+  clickButton("Night");
+  settle();
+  EXPECT_EQ(mock->setup()->theme(), "night");
+  clickButton("Voice bank");
+  QQuickItem* radio = find("Light", true);
+  ASSERT_TRUE(radio);
+  EXPECT_FALSE(radio->isEnabled());
+}
+
+TEST_F(Ui, GuestResultsAreDeletedWithTheirCount) {  // D-131
+  load();
+  run("setrecordings");
+  waitLogin();
+  settle(100);
+  EXPECT_TRUE(allText().contains("Guest results: 3"));
+  clickButton("Delete guest results");
+  EXPECT_TRUE(allText().contains("Delete 3 guest results?"));
+  clickButton("Delete 3 results");
+  settle();
+  EXPECT_TRUE(allText().contains("Guest results: 0"));
+}
+
+TEST_F(Ui, LearningAPedalNeverTransmitsAndRefusesAKeyboard) {
+  load();
+  run("setptt");
+  waitLogin();
+  settle(100);
+  clickButton("Learn pedal...");
+  settle();
+  EXPECT_TRUE(allText().contains("a keyboard needs an exact VID:PID"));
+  EXPECT_EQ(lab.txTone(), LabController::Neutral);
+  clickButton("Cancel");
+  EXPECT_FALSE(mock->setup()->learning());
+}
+
+// ---- re-consent at login (D-139)
+
+TEST_F(Ui, ANewConsentTextIsAskedAtLoginAndStoredOnlyWithThePin) {
+  load();
+  run("reask");
+  settle();
+  EXPECT_TRUE(allText().contains("Consent: please answer again"));
+  EXPECT_TRUE(allText().contains("it counts as no until you have answered"));
+  clickButton("Yes");
+  ASSERT_TRUE(find("Store answer", true));
+  EXPECT_FALSE(find("Store answer", true)->isEnabled());
+  pinWithKeypad("123456");
+  clickButton("Store answer");
+  waitLogin();
+  settle();
+  EXPECT_TRUE(allText().contains("Use as the pilot voice"));  // the next question
+  EXPECT_TRUE(access.consent());
+  EXPECT_TRUE(access.trainee());
+  clickButton("Later");
+  EXPECT_FALSE(allText().contains("Consent: please answer again"));
+}
+
+TEST_F(Ui, LaterKeepsTheOldAnswerIfOnlyTheWordingChanged) {
+  load();
+  run("reword");
+  settle();
+  EXPECT_TRUE(allText().contains("your old answer stays valid"));
+  clickButton("Later");
+  EXPECT_TRUE(access.consent());
+  EXPECT_FALSE(allText().contains("Consent: please answer again"));
+}
+
+TEST_F(Ui, TheMarkIsInTheRecordsOnlyOnceATextWasReplaced) {  // D-137
+  load();
+  run("setinstr");
+  waitLogin();
+  settle();
+  EXPECT_FALSE(allText().contains("Wider use"));
+  run("setmark");
+  waitLogin();
+  settle();
+  EXPECT_TRUE(allText().contains("text \"unit-2\" has replaced \"unit-1\""));
+  EXPECT_TRUE(allText().contains("Wording only: old answers stay valid"));
 }
 
 int main(int argc, char** argv) {

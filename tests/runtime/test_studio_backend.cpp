@@ -623,7 +623,9 @@ TEST(StudioService, LoadsWordingUseAndClips) {
   }
   const auto r = x.clip("RUNWAY_09@medial");
   EXPECT_EQ(r.words, "zero niner");
-  EXPECT_NE(r.sayBefore.find("alpha three"), std::string::npos) << r.sayBefore;  // values that fit together
+  const auto way = x.clip("TAXIWAY_A3@medial");
+  EXPECT_EQ(way.sayTarget, "alpha three");
+  EXPECT_NE(way.sayAfter.find("zero niner"), std::string::npos) << way.sayAfter;  // values that fit together
   EXPECT_GT(r.replies.size(), 1u);
   EXPECT_EQ(files(x.t.path), 0);  // reading writes nothing
 }

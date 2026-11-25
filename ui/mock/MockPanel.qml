@@ -6,7 +6,7 @@ Rectangle {
     id: mp
     property MockBackend mock
     property bool exercise: false   // Exercise cases instead of the Lab and Dashboard cases
-    width: Theme.px(820); height: col.height + 2 * Theme.s12
+    width: Theme.px(1080); height: col.height + 2 * Theme.s12
     color: Theme.raised
     border { color: Theme.caution; width: 2 * Theme.line }
     radius: Theme.radius

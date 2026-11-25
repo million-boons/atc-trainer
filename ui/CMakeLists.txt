@@ -20,7 +20,12 @@ set(ATC_QML
     components/TextEntry.qml components/KeyPad.qml components/ChoiceButton.qml components/SwitchRow.qml components/LoginDialog.qml
     components/PersonDialog.qml components/RecordingsCard.qml
     components/TranscriptEntry.qml components/StepRow.qml components/SectionHeader.qml
+    components/ClipDot.qml components/SegmentChip.qml components/SegmentStrip.qml components/PhraseEdit.qml
+    components/TrimWaveform.qml components/TakeList.qml components/RecorderPanel.qml components/CoverageBar.qml
+    components/TrainingTabs.qml components/PickDialog.qml components/NoteEdit.qml components/DelayStep.qml
+    components/SetupNumberRow.qml components/SetupChoiceRow.qml components/ReconsentDialog.qml
     screens/SpeechLab.qml screens/Dashboard.qml screens/Exercise.qml screens/Result.qml screens/Settings.qml
+    screens/Studio.qml screens/Planner.qml screens/Scenarios.qml screens/Assessment.qml
     mock/MockPanel.qml)
 set(ATC_QML_SOURCES
     ${APP}/RowModel.h ${APP}/LabController.h ${APP}/LabController.cpp
@@ -30,6 +35,11 @@ set(ATC_QML_SOURCES
     ${APP}/AccessController.h ${APP}/AccessController.cpp ${APP}/SettingsController.h ${APP}/SettingsController.cpp
     ${APP}/RecordingsController.h ${APP}/RecordingsController.cpp ${APP}/AccessBackends.h ${APP}/AccessBackends.cpp
     ${APP}/LabChecks.h ${APP}/LabChecks.cpp
+    ${APP}/StudioBackend.h ${APP}/StudioController.h ${APP}/StudioController.cpp ${APP}/StudioMock.h ${APP}/StudioMock.cpp
+    ${APP}/PlannerBackend.h ${APP}/PlannerController.h ${APP}/PlannerController.cpp ${APP}/PlannerMock.h ${APP}/PlannerMock.cpp
+    ${APP}/ScenarioBackend.h ${APP}/ScenarioController.h ${APP}/ScenarioController.cpp ${APP}/ScenarioMock.h ${APP}/ScenarioMock.cpp
+    ${APP}/HistoryBackend.h ${APP}/HistoryController.h ${APP}/HistoryController.cpp ${APP}/HistoryMock.h ${APP}/HistoryMock.cpp
+    ${APP}/SetupBackend.h ${APP}/SetupController.h ${APP}/SetupController.cpp ${APP}/SetupMock.h ${APP}/SetupMock.cpp
     ${APP}/Painted.h ${APP}/Painted.cpp ${APP}/MockBackend.h ${APP}/MockBackend.cpp)
 set(ATC_FONTS
   fonts/Inter-Regular.otf fonts/Inter-SemiBold.otf fonts/Inter-Bold.otf

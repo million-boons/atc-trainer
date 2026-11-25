@@ -19,6 +19,7 @@
 #include "app/AccessBackends.h"
 #include "app/EngineHeaders.h"
 #include "app/LiveBackend.h"
+#include "app/StudioService.h"
 #include "audio/PulsePlayer.h"
 #include "audio/WavFile.h"
 #include "core/PathResolver.h"
@@ -444,4 +445,115 @@ int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   QCoreApplication app(argc, argv);
   return RUN_ALL_TESTS();
+}
+
+// ---- The Studio on the real radio (D-331). The "speech" is a tone; no person's voice.
+
+namespace {
+struct LiveStudio : Live {
+  std::shared_ptr<ConsentView> consent = std::make_shared<ConsentView>();
+  std::unique_ptr<StudioService> studio;
+  StudioBackend b;
+  std::atomic<int> takes{0}, sessionEnds{0};
+  std::atomic<bool> recording{false};
+  StudioTake last;
+  std::mutex lm;
+  void configure(LiveConfig& c) override {
+    Person p;
+    p.id = "S01";
+    p.consent = p.pilotVoice = true;
+    p.consentDate = p.pilotVoiceDate = "2026-11-25";
+    p.consentVersion = p.pilotVoiceVersion = "draft-1";
+    consent->set({p}, {});
+    Paths paths;
+    std::string error;
+    ASSERT_TRUE(resolvePaths(systemPathInputs(), paths, error)) << error;
+    StudioService::Config s;
+    s.data = paths.data;
+    s.phraseology = paths.data + "/phraseology";
+    s.writable = (home / "w").string();
+    s.bank = (home / "w/voices/own").string();
+    s.pending = (home / "w/pending/own").string();
+    s.voice = "own";
+    s.minFreeMb = 0;
+    studio = std::make_unique<StudioService>(s, consent, std::make_shared<DataCopy>(s.phraseology, s.writable),
+                                             StudioService::Rules{[] { return true; }, [] { return false; }, [] { return std::string("2026-11-26"); }, [] { return std::int64_t(1); }, [] {}});
+    c.studio = studio.get();
+    b = studio->backend();
+    StudioEvents e;
+    e.recording = [this](bool on) { recording = on; };
+    e.takeReady = [this](StudioTake t) {
+      std::lock_guard l(lm);
+      last = std::move(t);
+      ++takes;
+    };
+    e.sessionEnded = [this](const std::string&) { ++sessionEnds; };
+    b.setEvents(std::move(e));
+  }
+  void TearDown() override {
+    Live::TearDown();
+    studio.reset();
+  }
+  bool open() {
+    std::atomic<int> got{0};
+    b.startSession("S01", [&](const std::string& w) { got = w.empty() ? 1 : 2; });
+    EXPECT_TRUE(within(6000, [&] { return got != 0; }));
+    return got == 1;
+  }
+};
+}  // namespace
+
+TEST_F(LiveStudio, RecordsATakeAndNeverTransmitsOrRecognises) {
+  begins = samples = 0;
+  ASSERT_TRUE(open());
+  emit lab.pressRequested("SCREEN");  // no transmission in the Studio
+  spin(400);
+  emit lab.releaseRequested("SCREEN");
+  std::string why = "(none)";
+  b.record("PH_SAY_AGAIN@initial", [&](const std::string& w) { why = w; });
+  EXPECT_EQ(why, "");
+  ASSERT_TRUE(within(2000, [this] { return recording.load(); }));
+  spin(1000);
+  emit lab.pressRequested("SPACE");
+  spin(300);
+  emit lab.releaseRequested("SPACE");
+  b.stopRecord();
+  ASSERT_TRUE(within(5000, [this] { return takes == 1; }));
+  EXPECT_FALSE(recording);
+  EXPECT_GT(last.seconds, 0.8);
+  EXPECT_EQ(last.state, StudioTake::State::Pending);
+  EXPECT_EQ(lab.recordings()->rowCount(), 0);
+  EXPECT_EQ(begins, 0);
+  EXPECT_EQ(samples, 0);
+  b.endSession();
+  spin(300);
+  transmit();  // control: the radio works again
+  EXPECT_EQ(begins, 1);
+  EXPECT_EQ(lab.recordings()->rowCount(), 1);
+}
+
+TEST_F(LiveStudio, ClosingTheProgramKeepsTheTakeThatIsBeingRecorded) {
+  ASSERT_TRUE(open());
+  b.record("PH_SAY_AGAIN@initial", [](const std::string&) {});
+  ASSERT_TRUE(within(2000, [this] { return recording.load(); }));
+  spin(600);
+  live.reset();
+  studio.reset();
+  int n = 0;
+  for (const auto& f : fs::directory_iterator(home / "w/pending/own")) n += f.is_regular_file();
+  EXPECT_EQ(n, 2);
+}
+
+TEST_F(LiveStudio, AWithdrawnAnswerEndsTheSessionAndKeepsNothing) {
+  ASSERT_TRUE(open());
+  b.record("PH_SAY_AGAIN@initial", [](const std::string&) {});
+  ASSERT_TRUE(within(2000, [this] { return recording.load(); }));
+  spin(400);
+  consent->set({}, {});
+  studio->consentChanged();
+  EXPECT_TRUE(within(2000, [this] { return sessionEnds == 1; }));
+  studio->wait();
+  EXPECT_EQ(takes, 0);
+  EXPECT_FALSE(fs::exists(home / "w"));
+  EXPECT_FALSE(open());
 }

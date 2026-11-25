@@ -199,7 +199,7 @@ Item {
             }
             Row {
                 spacing: Theme.s8
-                height: Theme.px(22)
+                width: parent.width; height: Theme.px(22)
                 StateIcon { level: s.access.message ? LabController.Caution : 0; anchors.verticalCenter: parent.verticalCenter }
                 Label { height: parent.height; text: s.access.busy ? qsTr("Checking the PIN") : s.access.message; font.pixelSize: Theme.small }
             }
@@ -230,15 +230,22 @@ Item {
         id: startDialog
         ModalPanel {
             id: sd
-            property bool assessed: false
+            property bool assessed: s.ex.planAssessed
             title: qsTr("Start %1").arg(s.ex.context.scenario)
             // The same values as on the Dashboard's card (D-321).
             Label { objectName: "startValues"; width: parent.width; mono: true; font.weight: Font.DemiBold
                     text: qsTr("%1   %2   RWY %3   TWY %4").arg(s.ex.context.callsign || "-").arg(s.ex.context.type || "-").arg(s.ex.context.runway || "-").arg(s.ex.context.taxiway || "-") }
+            Label { width: parent.width; visible: s.ex.planText !== ""; text: s.ex.planText; font.pixelSize: Theme.small }
+            Row {
+                visible: s.ex.planWarning !== ""
+                spacing: Theme.s8
+                StateIcon { level: LabController.Caution; anchors.verticalCenter: parent.verticalCenter }
+                Label { width: Theme.px(480); wrapMode: Text.WordWrap; text: s.ex.planWarning; font.pixelSize: Theme.small }
+            }
             Label { text: qsTr("Mode (cannot change during the exercise)"); color: Theme.textSecondary }
-            OptionButton { width: parent.width; selected: !sd.assessed
-                           title: selected ? qsTr("Practice, selected") : qsTr("Practice")
-                           sub: qsTr("The verdict is shown during the exercise."); onClicked: sd.assessed = false }
+            OptionButton { width: parent.width; enabled: s.ex.practiceAvailable; selected: !sd.assessed
+                           title: !enabled ? qsTr("Practice, not available") : selected ? qsTr("Practice, selected") : qsTr("Practice")
+                           sub: s.ex.practiceNote; onClicked: sd.assessed = false }
             OptionButton { width: parent.width; enabled: s.ex.assessedAvailable; selected: sd.assessed
                            title: !enabled ? qsTr("Assessed, not available") : selected ? qsTr("Assessed, selected") : qsTr("Assessed")
                            sub: s.ex.assessedNote; onClicked: sd.assessed = true }
@@ -257,7 +264,7 @@ Item {
             }
             Row {
                 spacing: Theme.s12
-                PrimaryButton { text: qsTr("Start exercise"); focusPolicy: Qt.NoFocus; enabled: s.canStart; onClicked: s.ex.start(sd.assessed) }
+                PrimaryButton { text: qsTr("Start exercise"); focusPolicy: Qt.NoFocus; enabled: s.canStart && (sd.assessed ? s.ex.assessedAvailable : s.ex.practiceAvailable); onClicked: s.ex.start(sd.assessed) }
                 SecondaryButton { text: qsTr("Cancel"); focusPolicy: Qt.NoFocus; onClicked: s.ex.cancelStart() }
             }
         }

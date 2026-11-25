@@ -239,6 +239,156 @@ TEST_F(Login, ADraftAnswerIsNoOnceTheTextIsApproved) {  // D-135
   EXPECT_FALSE(c.people()[0].toMap()["again"].toBool());
 }
 
+// D-139: the answer is stored only with the PIN; "Later" depends on the mark.
+struct Reconsent : Login {
+  ConsentVersions v{"u2", "u2"};
+  int stored = 0;
+  std::unique_ptr<AccessController> c;
+  void make(bool wider) {
+    v.recordingOld = v.pilotVoiceOld = {"u1"};
+    v.recordingWider = v.pilotVoiceWider = {{"u2", wider}};
+    for (Person& p : people) p.consentVersion = "u1";
+    AccessBackend b;
+    b.people = [this] { return people; };
+    b.versions = {"u2", "u2"};
+    b.marked = [this] { return v; };
+    b.setConsent = [this](const std::string& id, bool yes, const std::string& date, const std::string&) {
+      ++stored;
+      for (Person& p : people)
+        if (p.id == id) {
+          p.consent = yes;
+          p.consentDate = date;
+          p.consentVersion = "u2";
+        }
+      return std::string();
+    };
+    b.setPilotVoice = [this](const std::string& id, bool yes, const std::string& date, const std::string&) {
+      ++stored;
+      for (Person& p : people)
+        if (p.id == id) {
+          p.pilotVoice = yes;
+          p.pilotVoiceDate = date;
+          p.pilotVoiceVersion = "u2";
+        }
+      return std::string();
+    };
+    b.setWider = [this](bool pilot, bool w) {
+      (pilot ? v.pilotVoiceWider : v.recordingWider)["u2"] = w;
+      return std::string();
+    };
+    b.pinSet = [] { return true; };
+    b.checkPin = [](const std::string& p) { return p == "482913"; };
+    c = std::make_unique<AccessController>(b, [this] { return now; });
+  }
+  void answer(const char* kind, bool yes, const char* pin) {
+    c->answerReconsent(kind, yes, pin);
+    QElapsedTimer t;
+    t.start();
+    do QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+    while (c->busy() && t.elapsed() < 5000);
+    QCoreApplication::processEvents();
+  }
+};
+
+TEST_F(Reconsent, WordingOnlyAsksAndLaterKeepsTheOldAnswer) {
+  make(false);
+  ASSERT_TRUE(c->loginTrainee("S01"));
+  ASSERT_EQ(c->reconsent().size(), 1);  // the pilot voice was never asked
+  EXPECT_TRUE(c->reconsent()[0].toMap()["later"].toString().contains("stays valid"));
+  EXPECT_TRUE(c->consent());
+  c->reconsentLater();
+  EXPECT_TRUE(c->reconsent().isEmpty());
+  EXPECT_TRUE(c->consent());
+  EXPECT_EQ(stored, 0);
+  ASSERT_TRUE(c->loginTrainee("S01"));  // the next login
+  EXPECT_EQ(c->reconsent().size(), 1);
+}
+
+TEST_F(Reconsent, WiderUseCountsAsNoUntilItIsAnswered) {
+  make(true);
+  ASSERT_TRUE(c->loginTrainee("S01"));
+  EXPECT_FALSE(c->consent());
+  EXPECT_TRUE(c->reconsent()[0].toMap()["later"].toString().contains("counts as no"));
+  c->reconsentLater();
+  EXPECT_FALSE(c->consent());
+  ASSERT_TRUE(c->loginTrainee("S01"));
+  answer("recording", true, "482913");
+  EXPECT_EQ(stored, 1);
+  EXPECT_TRUE(c->consent());
+  EXPECT_TRUE(c->reconsent().isEmpty());
+  EXPECT_TRUE(c->trainee());  // the PIN logs nobody in
+  EXPECT_EQ(people[0].consentDate, c->today().toStdString());
+}
+
+TEST_F(Reconsent, WithoutTheRightPinNothingIsStored) {
+  make(true);
+  int confirmed = 0;
+  ASSERT_TRUE(c->loginTrainee("S01"));
+  QObject::connect(c.get(), &AccessController::confirmed, [&confirmed] { ++confirmed; });
+  answer("recording", true, "111111");
+  EXPECT_EQ(stored, 0);
+  EXPECT_FALSE(c->consent());
+  EXPECT_TRUE(c->message().contains("4 tries left"));
+  for (int i = 0; i < 4; ++i) answer("recording", true, "111111");
+  answer("recording", true, "482913");  // the same guard as the login
+  EXPECT_EQ(stored, 0);
+  EXPECT_TRUE(c->message().contains("Wait"));
+  now += ms(60'000);
+  answer("recording", false, "482913");
+  EXPECT_EQ(stored, 1);
+  EXPECT_FALSE(c->consent());  // answered: no
+  EXPECT_TRUE(c->reconsent().isEmpty());
+  EXPECT_EQ(confirmed, 0);  // it ends no exercise
+}
+
+TEST_F(Reconsent, EachAnswerOnItsOwn) {
+  make(true);
+  people[0].pilotVoice = true;
+  people[0].pilotVoiceDate = "2026-11-24";
+  people[0].pilotVoiceVersion = "u1";
+  ASSERT_TRUE(c->loginTrainee("S01"));
+  ASSERT_EQ(c->reconsent().size(), 2);
+  answer("recording", true, "482913");
+  ASSERT_EQ(c->reconsent().size(), 1);
+  EXPECT_EQ(c->reconsent()[0].toMap()["kind"].toString(), "pilot");
+  EXPECT_FALSE(mayUsePilotVoice(people[0], v));
+  answer("pilot", true, "482913");
+  EXPECT_TRUE(mayUsePilotVoice(people[0], v));
+  answer("pilot", false, "482913");  // no question is open
+  EXPECT_EQ(stored, 2);
+}
+
+TEST_F(Reconsent, NobodyIsAskedWhileTheTextIsADraftOrWithoutALogin) {
+  make(true);
+  EXPECT_TRUE(c->reconsent().isEmpty());
+  answer("recording", true, "482913");
+  EXPECT_EQ(stored, 0);
+  v = {};
+  ASSERT_TRUE(c->loginTrainee("S01"));
+  EXPECT_TRUE(c->reconsent().isEmpty());
+}
+
+TEST_F(Reconsent, TheInstructorMarksTheText) {  // D-137
+  make(true);
+  v.recordingWider.clear();
+  ASSERT_TRUE(c->loginTrainee("S01"));
+  EXPECT_TRUE(c->consentMarks().isEmpty());
+  EXPECT_FALSE(c->markWider("recording", false));
+  EXPECT_TRUE(v.recordingWider.empty());
+  c->loginInstructor("482913");
+  QElapsedTimer t;
+  t.start();
+  while (!c->instructor() && t.elapsed() < 5000) QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+  ASSERT_EQ(c->consentMarks().size(), 2);
+  EXPECT_EQ(c->consentMarks()[0].toMap()["mark"].toInt(), -1);
+  EXPECT_TRUE(c->consentMarks()[0].toMap()["note"].toString().contains("Not marked"));
+  EXPECT_TRUE(c->people()[0].toMap()["again"].toBool());
+  EXPECT_TRUE(c->markWider("recording", false));
+  EXPECT_EQ(c->consentMarks()[0].toMap()["mark"].toInt(), 0);
+  EXPECT_FALSE(c->people()[0].toMap()["again"].toBool());
+  EXPECT_TRUE(c->people()[0].toMap()["ask"].toBool());
+}
+
 TEST_F(Login, TextAndVersionBelongTogether) {  // D-135: a changed text needs a new version in core/Consent.h
   EXPECT_EQ(ConsentVersions{}.recording, "draft-1");
   EXPECT_EQ(ConsentVersions{}.pilotVoice, "draft-1");

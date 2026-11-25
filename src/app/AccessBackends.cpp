@@ -23,6 +23,8 @@ AccessBackend realAccess([[maybe_unused]] const std::string& writable) {
   b.setPilotVoice = [store](const std::string& id, bool consent, const std::string& date, const std::string& today) {
     return store->setPilotVoice(id, consent, date, today);
   };
+  b.marked = [store] { return store->versions(); };
+  b.setWider = [store](bool pilotVoice, bool wider) { return store->setWider(pilotVoice, wider); };
 #else
   b.load = [] { return std::string("built without the recording store"); };
   b.people = [] { return std::vector<Person>{}; };
@@ -38,8 +40,38 @@ AccessBackend realAccess([[maybe_unused]] const std::string& writable) {
   return b;
 }
 
+namespace {
+struct MockPeople {
+  std::vector<Person> people;
+  ConsentVersions versions;
+};
+std::weak_ptr<MockPeople> g_mock;
+}  // namespace
+
+void setMockConsent(MockConsent c) {
+  const auto m = g_mock.lock();
+  if (!m) return;
+  m->versions = {};
+  const std::string answered = c == MockConsent::Wording ? "unit-1" : "draft-1";
+  if (c != MockConsent::Draft) m->versions.recording = m->versions.pilotVoice = c == MockConsent::Approved ? "unit-1" : "unit-2";
+  if (c == MockConsent::Wording) {
+    m->versions.recordingOld = m->versions.pilotVoiceOld = {"unit-1"};
+    m->versions.recordingWider = m->versions.pilotVoiceWider = {{"unit-2", false}};
+  }
+  for (Person& p : m->people) {
+    p.consentVersion = answered;
+    if (!p.pilotVoiceDate.empty()) p.pilotVoiceVersion = answered;
+  }
+}
+
 AccessBackend mockAccess() {
-  auto all = std::make_shared<std::vector<Person>>(std::vector<Person>{{"S01", "Mock Name", "Mock Rank", true, "2026-11-24"}, {"S02", "", "", false, "2026-11-24"}});
+  auto mock = std::make_shared<MockPeople>();
+  g_mock = mock;
+  const std::shared_ptr<std::vector<Person>> all(mock, &mock->people);
+  *all = std::vector<Person>{{"S01", "Mock Name", "Mock Rank", true, "2026-11-24"}, {"S02", "", "", false, "2026-11-24"}};
+  all->front().pilotVoice = true;  // S01 may record in the Studio
+  all->front().pilotVoiceDate = "2026-11-24";
+  all->front().pilotVoiceVersion = ConsentVersions{}.pilotVoice;
   AccessBackend b;
   b.load = [] { return std::string(); };
   b.people = [all] { return *all; };
@@ -49,21 +81,27 @@ AccessBackend mockAccess() {
     all->push_back(std::move(p));
     return std::string();
   };
-  b.setConsent = [all](const std::string& id, bool consent, const std::string& date, const std::string&) {
+  b.marked = [mock] { return mock->versions; };
+  b.setWider = [mock](bool pilotVoice, bool wider) {
+    ConsentVersions& v = mock->versions;
+    (pilotVoice ? v.pilotVoiceWider : v.recordingWider)[pilotVoice ? v.pilotVoice : v.recording] = wider;
+    return std::string();
+  };
+  b.setConsent = [all, mock](const std::string& id, bool consent, const std::string& date, const std::string&) {
     for (Person& p : *all)
       if (p.id == id) {
         p.consent = consent;
         p.consentDate = date;
-        p.consentVersion = ConsentVersions{}.recording;
+        p.consentVersion = mock->versions.recording;
       }
     return std::string();
   };
-  b.setPilotVoice = [all](const std::string& id, bool consent, const std::string& date, const std::string&) {
+  b.setPilotVoice = [all, mock](const std::string& id, bool consent, const std::string& date, const std::string&) {
     for (Person& p : *all)
       if (p.id == id) {
         p.pilotVoice = consent;
         p.pilotVoiceDate = date;
-        p.pilotVoiceVersion = ConsentVersions{}.pilotVoice;
+        p.pilotVoiceVersion = mock->versions.pilotVoice;
       }
     return std::string();
   };

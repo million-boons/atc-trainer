@@ -175,7 +175,9 @@ int main(int argc, char** argv) {
       setup.callbacks = exercise->callbacks();
       lc.exercise = std::move(setup);
     }
-    const auto answers = [&accessBackend, consent] { return consent->set(accessBackend.people ? accessBackend.people() : std::vector<atc::Person>{}, accessBackend.versions); };
+    const auto answers = [&accessBackend, consent] {  // with the marks of D-137
+      return consent->set(accessBackend.people ? accessBackend.people() : std::vector<atc::Person>{}, accessBackend.marked ? accessBackend.marked() : accessBackend.versions);
+    };
     answers();
     if (exercise) {  // the Studio (09, D-331)
       atc::StudioService::Config sc;

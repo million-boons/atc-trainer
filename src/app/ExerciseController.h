@@ -4,13 +4,22 @@
 #include <QVariantList>
 #include <QVariantMap>
 #include <QtQml/qqmlregistration.h>
+#include <optional>
 
 #include "app/RowModel.h"
+
+// The plan an exercise was started from (04 section 5g).
+struct ExercisePlan {
+  QString name{}, trainee{};  // trainee empty: anyone
+  bool assessed = false;
+  int run = 0;                // of this person; 0: unnumbered (guest)
+};
 
 struct ExerciseContext {
   QString scenario, callsign, runway, taxiway, type, rule, model;
   QString trainee;  // ID; empty: guest, without history and audio (D-127)
   bool placeholder = true;  // some text is unvalidated: no Assessed mode (P-11)
+  std::optional<ExercisePlan> plan{};
 };
 
 struct ExerciseStep {
@@ -34,6 +43,12 @@ class ExerciseController : public QObject {
   Q_PROPERTY(QString preview READ preview NOTIFY changed)  // mock: why this is only a preview
   Q_PROPERTY(bool assessedAvailable READ assessedAvailable NOTIFY changed)
   Q_PROPERTY(QString assessedNote READ assessedNote NOTIFY changed)
+  Q_PROPERTY(bool practiceAvailable READ practiceAvailable NOTIFY changed)  // a plan fixes the mode
+  Q_PROPERTY(QString practiceNote READ practiceNote NOTIFY changed)
+  Q_PROPERTY(bool planAssessed READ planAssessed NOTIFY changed)
+  Q_PROPERTY(QString planText READ planText NOTIFY changed)        // empty: no plan
+  Q_PROPERTY(QString planWarning READ planWarning NOTIFY changed)  // somebody else is logged in (D-142)
+  Q_PROPERTY(QString runText READ runText NOTIFY changed)
   Q_PROPERTY(bool audioSaved READ audioSaved NOTIFY changed)
   Q_PROPERTY(QString audioText READ audioText NOTIFY changed)
   Q_PROPERTY(QStringList clearances READ clearances NOTIFY changed)
@@ -93,7 +108,13 @@ class ExerciseController : public QObject {
   bool assessed() const { return assessed_; }
   QString modeText() const { return assessed_ ? tr("ASSESSED") : tr("PRACTICE"); }
   QString preview() const { return preview_; }
-  bool assessedAvailable() const { return !ctx_.placeholder; }
+  bool assessedAvailable() const { return !ctx_.placeholder && (!ctx_.plan || (ctx_.plan->assessed && planned())); }
+  bool practiceAvailable() const { return !planAssessed(); }
+  QString practiceNote() const { return practiceAvailable() ? tr("The verdict is shown during the exercise.") : tr("The plan is for Assessed."); }
+  bool planAssessed() const { return ctx_.plan && ctx_.plan->assessed; }
+  QString runText() const { return !ctx_.plan ? QString() : ctx_.plan->run > 0 ? tr("plan, run %1").arg(ctx_.plan->run) : tr("plan, run not numbered"); }
+  QString planText() const { return ctx_.plan ? tr("Plan: %1   %2").arg(ctx_.plan->name, ctx_.plan->run > 0 ? tr("run %1").arg(ctx_.plan->run) : tr("run not numbered")) : QString(); }
+  QString planWarning() const { return !ctx_.plan || planned() || planAssessed() ? QString() : tr("This plan is for %1. The result belongs to %2.").arg(ctx_.plan->trainee, who()); }
   QString assessedNote() const;
   QString who() const { return ctx_.trainee.isEmpty() ? tr("Guest") : ctx_.trainee; }
   bool audioSaved() const { return consent_ && audioConnected_ && !ctx_.trainee.isEmpty(); }
@@ -153,6 +174,7 @@ class ExerciseController : public QObject {
     QString text;
     bool verdict = false;
   };
+  bool planned() const { return ctx_.plan->trainee.isEmpty() || ctx_.plan->trainee == ctx_.trainee; }  // only with a plan
   bool hide() const { return assessed_ && phase_ != Result; }
 
   Phase phase_ = Idle;

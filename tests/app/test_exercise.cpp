@@ -174,6 +174,48 @@ TEST(Exercise, AGuestHasNoAudio) {  // D-127
   EXPECT_EQ(c.who(), "S01");
 }
 
+TEST(Exercise, APlanFixesTheModeAndNamesItsTrainee) {  // D-142
+  C c;
+  int practice = 0, assessed = 0;
+  QObject::connect(&c, &C::startRequested, [&](bool a) { ++(a ? assessed : practice); });
+  ExerciseContext x;
+  x.placeholder = false;
+  x.trainee = "S02";
+  x.plan = ExercisePlan{"P", "S01", false, 3};
+  c.begin(x, false, false);
+  c.setPhase(C::Starting);
+  EXPECT_TRUE(c.planWarning().contains("This plan is for S01. The result belongs to S02."));
+  EXPECT_FALSE(c.assessedAvailable());
+  c.start(true);
+  c.start(false);
+  EXPECT_EQ(practice, 1);
+  EXPECT_EQ(assessed, 0);
+  EXPECT_EQ(c.runText(), "plan, run 3");
+
+  x.plan->assessed = true;  // somebody else: refused
+  c.begin(x, false, false);
+  c.setPhase(C::Starting);
+  EXPECT_FALSE(c.assessedAvailable());
+  EXPECT_EQ(c.assessedNote(), "This plan is for S01.");
+  c.start(true);
+  c.start(false);
+  EXPECT_EQ(practice, 1);
+  EXPECT_EQ(assessed, 0);
+
+  x.trainee = "S01";
+  c.begin(x, false, false);
+  c.setPhase(C::Starting);
+  EXPECT_TRUE(c.planWarning().isEmpty());
+  c.start(false);
+  c.start(true);
+  EXPECT_EQ(practice, 1);
+  EXPECT_EQ(assessed, 1);
+
+  x.plan.reset();  // no plan: as before
+  c.begin(x, false, false);
+  EXPECT_TRUE(c.practiceAvailable() && c.assessedAvailable() && c.planText().isEmpty() && c.runText().isEmpty());
+}
+
 TEST(Exercise, UncertainValueIsShownAsHeard) {
   C c;
   exercise_mock::show(c, "examb", false, false);

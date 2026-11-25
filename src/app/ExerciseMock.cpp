@@ -97,11 +97,19 @@ QVariantList cases() {
   return l;
 }
 
-void show(ExerciseController& c, const QString& id, bool assessed, bool consent) {
+void show(ExerciseController& c, const QString& id, bool assessed, bool consent, const PlanChoice* plan) {
   using C = ExerciseController;
-  c.begin({.scenario = t("Departure 01"), .callsign = "EAGLE-421", .runway = "09", .taxiway = "A3", .type = "C295",
-           .rule = t("interrupt"), .model = "Whisper tiny + generated prompt", .trainee = "S01", .placeholder = true},
-          assessed, consent, assessed ? t("PREVIEW: Assessed is off in the slice (placeholder text)") : QString());
+  ExerciseContext x{.scenario = t("Departure 01"), .callsign = "EAGLE-421", .runway = "09", .taxiway = "A3", .type = "C295",
+                    .rule = t("interrupt"), .model = "Whisper tiny + generated prompt", .trainee = "S01", .placeholder = true};
+  if (plan && id == "exstart") {
+    const auto q = [](const std::string& v) { return QString::fromStdString(v); };
+    x.callsign = q(plan->values.callsign);
+    x.type = q(plan->values.type);
+    x.runway = q(plan->values.runway);
+    x.taxiway = q(plan->values.taxiway);
+    x.plan = ExercisePlan{q(plan->plan.name), q(plan->plan.trainee), plan->plan.assessed, plan->run};
+  }
+  c.begin(std::move(x), assessed, consent, assessed ? t("PREVIEW: Assessed is off in the slice (placeholder text)") : QString());
   const auto steps = [&c](int done, int a, int b, int d) { c.setSteps({{t("Taxi"), a}, {t("Line up"), b}, {t("Takeoff"), d}}, done); };
   const QString cTaxi = t("Taxi via A3, runway 09"), cLine = t("Line up runway 09"), cGo = t("Cleared for takeoff 09");
   C::Phase phase = C::Running;

@@ -32,7 +32,7 @@ ModalPanel {
     }
     Row {
         spacing: Theme.s8
-        height: Theme.px(22)
+        width: parent.width; height: Theme.px(22)
         StateIcon { level: d.access.message ? LabController.Caution : 0; anchors.verticalCenter: parent.verticalCenter }
         Label { height: parent.height; text: d.access.message; font.pixelSize: Theme.small }
     }

@@ -2,6 +2,7 @@
 
 #include <QPainter>
 #include <QPainterPath>
+#include <QRegularExpression>
 #include <algorithm>
 
 WaveformItem::WaveformItem(QQuickItem* parent) : QQuickPaintedItem(parent) {
@@ -68,4 +69,56 @@ void IconItem::paint(QPainter* p) {
     }
   }
   p->strokePath(path, QPen(color_, stroke_, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+}
+
+PeaksItem::PeaksItem(QQuickItem* parent) : QQuickPaintedItem(parent) {
+  connect(this, &PeaksItem::changed, this, [this] { update(); });
+}
+
+void PeaksItem::paint(QPainter* p) {
+  const int n = int(peaks_.size() / 2), w = int(width()), mid = int(height() / 2);
+  if (n == 0) return;
+  p->setPen(QPen(color_, 1));
+  for (int x = 0; x < w; ++x) {
+    const int b = int(qint64(x) * n / w), e = std::max(b + 1, int(qint64(x + 1) * n / w));
+    double lo = 1, hi = -1;
+    for (int i = b; i < std::min(e, n); ++i) {
+      lo = std::min(lo, peaks_[2 * i].toDouble());
+      hi = std::max(hi, peaks_[2 * i + 1].toDouble());
+    }
+    p->drawLine(x, int(mid - hi * mid * 0.92), x, int(mid - lo * mid * 0.92));
+  }
+}
+
+SlotHighlighter::SlotHighlighter(QObject* parent) : QSyntaxHighlighter(parent) {
+  connect(this, &SlotHighlighter::changed, this, [this] { rehighlight(); });
+}
+
+void SlotHighlighter::setTarget(QQuickTextDocument* t) {
+  if (target_ == t) return;
+  target_ = t;
+  setDocument(t ? t->textDocument() : nullptr);
+  emit changed();
+}
+
+void SlotHighlighter::highlightBlock(const QString& text) {
+  static const QRegularExpression slot(QStringLiteral("\\{[^}]*\\}?"));
+  QTextCharFormat f;
+  f.setForeground(color_);
+  f.setFontFamilies({family_});
+  for (auto it = slot.globalMatch(text); it.hasNext();) {
+    const auto m = it.next();
+    setFormat(int(m.capturedStart()), int(m.capturedLength()), f);
+  }
+}
+
+DashFrame::DashFrame(QQuickItem* parent) : QQuickPaintedItem(parent) {
+  connect(this, &DashFrame::changed, this, [this] { update(); });
+}
+
+void DashFrame::paint(QPainter* p) {
+  p->setRenderHint(QPainter::Antialiasing);
+  p->setPen(QPen(color_, line_, Qt::DashLine));
+  const qreal m = line_ / 2;
+  p->drawRoundedRect(QRectF(m, m, width() - line_, height() - line_), radius_, radius_);
 }

@@ -472,6 +472,38 @@ TEST_F(Live, StartGoesThroughTheDialogAndRunsWithTheShownValues) {
   EXPECT_FALSE(c()->audioSaved());
 }
 
+// Wording, clips or a consent changed (D-331): checked again, but never under a running exercise or its Start dialog.
+TEST_F(Live, ChangedContentIsCheckedAgainWhenNoExerciseIsActive) {
+  make();
+  state = CheckResult::State::MissingClips;  // e.g. a speaker withdrew
+  live->recheck();
+  EXPECT_EQ(bank, BankReady::MissingClips);
+  emit feed.startExerciseRequested();
+  EXPECT_EQ(c()->phase(), C::Idle);  // Start is blocked at once
+  state = CheckResult::State::Covered;
+  live->recheck();
+  EXPECT_EQ(bank, BankReady::CoverageOk);
+  emit feed.startExerciseRequested();
+  EXPECT_TRUE(live->active());
+  const QVariantMap shown = scenario;
+  state = CheckResult::State::MissingClips;
+  live->recheck();
+  EXPECT_EQ(bank, BankReady::CoverageOk);  // the dialog is open: later
+  EXPECT_EQ(scenario, shown);
+  c()->start(false);
+  cb.started(true, {});
+  queued();
+  EXPECT_TRUE(live->active());
+  EXPECT_EQ(bank, BankReady::CoverageOk);
+  ExerciseResult r;
+  cb.ended(r);
+  queued();
+  if (c()->phase() == C::Complete) c()->setPhase(C::Result);
+  queued();
+  EXPECT_FALSE(live->active());
+  EXPECT_EQ(bank, BankReady::MissingClips);  // now
+}
+
 TEST_F(Live, ARefusalSaysWhyAndCanBeTriedAgain) {
   make();
   refusal = "the PTT is missing";
