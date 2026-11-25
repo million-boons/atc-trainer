@@ -47,7 +47,7 @@ Item {
 
     // ---- pages
     Card {
-        id: left
+        id: menu
         x: s.gap; y: s.gap; width: Theme.px(212); height: s.height - 2 * s.gap
         title: qsTr("SETTINGS")
         Column {
@@ -57,7 +57,7 @@ Item {
                 T.Button {
                     id: pb
                     readonly property bool on: modelData[0] === s.page
-                    width: left.width - 2 * Theme.line; height: Theme.touch
+                    width: menu.width - 2 * Theme.line; height: Theme.touch
                     focusPolicy: Qt.NoFocus
                     text: modelData[1]
                     onClicked: s.page = modelData[0]
@@ -78,7 +78,7 @@ Item {
             Row {
                 spacing: Theme.s4
                 StateIcon { level: LabController.Caution; anchors.verticalCenter: parent.verticalCenter }
-                Label { width: left.width - Theme.px(48); text: qsTr("Only the instructor may change these, except General."); wrapMode: Text.WordWrap; font.pixelSize: Theme.caption }
+                Label { width: menu.width - Theme.px(48); text: qsTr("Only the instructor may change these, except General."); wrapMode: Text.WordWrap; font.pixelSize: Theme.caption }
             }
             SecondaryButton { width: parent.width; text: qsTr("Log in"); focusPolicy: Qt.NoFocus; onClicked: s.loginAsked() }
         }
@@ -86,7 +86,7 @@ Item {
 
     Card {
         id: body
-        x: left.x + left.width + s.gap; y: s.gap; width: s.width - x - s.gap; height: left.height
+        x: menu.x + menu.width + s.gap; y: s.gap; width: s.width - x - s.gap; height: menu.height
         title: s.name.toUpperCase()
         headerItems: Label { anchors.right: parent.right; height: parent.height; color: Theme.textSecondary; font.pixelSize: Theme.caption
                              text: s.page === "records" && s.instructor ? qsTr("%1 records").arg(s.access.people.length) : s.page === "general" || s.page === "about" ? "" : qsTr("instructor") }

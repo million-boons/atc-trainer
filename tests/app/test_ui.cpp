@@ -841,6 +841,7 @@ TEST_F(Ui, SomebodyElseIsWarnedInTheStartDialog) {  // D-142
   emit mock->exercise()->screenRequested("ex");
   settle();
   EXPECT_TRUE(allText().contains("This plan is for S02. The result belongs to S01."));
+  ASSERT_TRUE(find("Start exercise", true));
   EXPECT_TRUE(find("Start exercise", true)->isEnabled());
 }
 
@@ -906,6 +907,7 @@ TEST_F(Ui, AMisfitIsMarkedInWords) {
   settle(200);
   EXPECT_TRUE(allText().contains("does not fit"));
   EXPECT_TRUE(allText().contains("The values do not fit together."));
+  ASSERT_TRUE(find("Save", true));
   EXPECT_FALSE(find("Save", true)->isEnabled());
 }
 
@@ -1000,6 +1002,7 @@ TEST_F(Ui, AScenarioWithErrorsShowsThemAndCannotBeSelected) {
   load();
   run("scenerr");
   settle(100);
+  ASSERT_TRUE(find("Select scenario", true));
   EXPECT_FALSE(find("Select scenario", true)->isEnabled());
   clickButton("List");
   EXPECT_TRUE(allText().contains("unknown intent"));
@@ -1049,7 +1052,7 @@ TEST_F(Ui, DebriefIsFactsWithoutAScore) {
   for (const char* w : {"SCORECARDS (facts)", "COMPLETED", "1 incorrect", "not counted as trainee errors", "TIMELINE", "INCORRECT runway", "AMBIGUOUS, not counted"}) EXPECT_TRUE(t.contains(w)) << w;
   EXPECT_FALSE(t.contains("pass mark:"));
   clickButton("Errors");
-  EXPECT_FALSE(allText().contains("request taxi, EAGLE-421"));
+  EXPECT_FALSE(allText().contains("say again, EAGLE-421"));
   clickButton("All");
   clickText("eagle four two one line up runway two seven");
   clickButton("Reclassify...");
@@ -1090,7 +1093,9 @@ TEST_F(Ui, TheThemeIsForEverybodyAndTheRestForTheInstructor) {  // E-1
   settle();
   EXPECT_EQ(mock->setup()->theme(), "night");
   clickButton("Voice bank");
-  EXPECT_FALSE(find("Light", true)->isEnabled());
+  QQuickItem* radio = find("Light", true);
+  ASSERT_TRUE(radio);
+  EXPECT_FALSE(radio->isEnabled());
 }
 
 TEST_F(Ui, GuestResultsAreDeletedWithTheirCount) {  // D-131
@@ -1128,6 +1133,7 @@ TEST_F(Ui, ANewConsentTextIsAskedAtLoginAndStoredOnlyWithThePin) {
   EXPECT_TRUE(allText().contains("Consent: please answer again"));
   EXPECT_TRUE(allText().contains("it counts as no until you have answered"));
   clickButton("Yes");
+  ASSERT_TRUE(find("Store answer", true));
   EXPECT_FALSE(find("Store answer", true)->isEnabled());
   pinWithKeypad("123456");
   clickButton("Store answer");
