@@ -7,11 +7,11 @@ ModalPanel {
     id: d
     property AccessController access
     readonly property var item: access.reconsent[0] || ({})
+    readonly property string kind: item.kind || ""   // the item itself is new after every change of the controller
     property int answer: -1       // neither answer is preselected
     property string pin
     title: qsTr("Consent: please answer again")
-    onItemChanged: { answer = -1; pin = "" }
-    Component.onCompleted: access.clearMessage()
+    onKindChanged: { answer = -1; pin = "" }
     Label { width: parent.width; text: qsTr("%1   %2").arg(d.access.personId).arg(d.item.title || ""); font.weight: Font.DemiBold }
     Label { objectName: "reconsentText"; width: parent.width; text: d.item.text || ""; wrapMode: Text.WordWrap; font.pixelSize: Theme.small }
     Row {

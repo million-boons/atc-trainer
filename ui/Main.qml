@@ -52,6 +52,7 @@ Window {
     Binding { target: root.plans; property: "trainerBusy"; value: root.exActive; when: root.plans !== null }
 
     Binding { target: root.scens; property: "trainerBusy"; value: root.exActive; when: root.scens !== null }
+    Binding { target: root.scens; property: "instructor"; value: root.access.instructor; when: root.scens !== null }
     Binding { target: root.setups; property: "trainerBusy"; value: root.exActive; when: root.setups !== null }
     Connections {
         target: root.setups

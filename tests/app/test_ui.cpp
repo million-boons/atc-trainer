@@ -884,7 +884,7 @@ TEST_F(Ui, ThePlannerShowsPlanPreviewAndChecks) {
                         "Values: fixed   Trainee S01   Practice   Normal", "Voice bank: 22 clips", "Text is PLACEHOLDER", "Trainee record S01", "Assessed: scenario not Validated"})
     EXPECT_TRUE(t.contains(w)) << w;
   walk(win->contentItem(), [&](QQuickItem* x) {
-    for (const char* n : {"planState", "planCheck", "planMessage"})
+    for (const char* n : {"planState", "planCheck", "planMessage", "assessedNote"})
       if (x->objectName() == n) { EXPECT_FALSE(x->property("truncated").toBool()) << n << ": " << x->property("text").toString().toStdString(); }
   });
 }
@@ -905,7 +905,9 @@ TEST_F(Ui, AMisfitIsMarkedInWords) {
   run("planmis");
   waitLogin();
   settle(200);
-  EXPECT_TRUE(allText().contains("does not fit"));
+  QQuickItem* note = find("does not fit", false);
+  ASSERT_TRUE(note);
+  EXPECT_FALSE(scrolledOut(note));  // seen without scrolling, in the smaller size
   EXPECT_TRUE(allText().contains("The values do not fit together."));
   ASSERT_TRUE(find("Save", true));
   EXPECT_FALSE(find("Save", true)->isEnabled());

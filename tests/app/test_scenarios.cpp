@@ -111,6 +111,16 @@ TEST_F(Scenarios, StepsShowTheIntentAndNeverTheValues) {
   for (const QVariant& v : s->steps()) EXPECT_EQ(v.toMap().size(), 4);
 }
 
+TEST_F(Scenarios, StepsOfAScenarioThatMayBeAssessedAreTheInstructors) {  // C-1, D-122
+  enter();
+  EXPECT_FALSE(s->stepsHidden());
+  s->open("GROUND-01");  // Validated
+  EXPECT_TRUE(s->stepsHidden());
+  EXPECT_TRUE(s->steps().isEmpty());
+  s->setProperty("instructor", true);
+  EXPECT_EQ(s->steps().size(), 2);
+}
+
 TEST_F(Scenarios, PlaceholderAndValidatedAreWords) {
   enter();
   EXPECT_EQ(row("DEPARTURE-01")["tag"].toString(), "PLACEHOLDER");
@@ -118,6 +128,8 @@ TEST_F(Scenarios, PlaceholderAndValidatedAreWords) {
   EXPECT_TRUE(s->detail()["assessed"].toString().contains("not available"));
   s->open("GROUND-01");
   EXPECT_TRUE(s->detail()["assessed"].toString().contains("needs a trainee"));
+  s->open("GROUND-02");
+  EXPECT_TRUE(s->detail()["assessed"].toString().contains("cannot be loaded"));
 }
 
 TEST_F(Scenarios, SelectPutsItOnTheDashboard) {

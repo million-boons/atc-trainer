@@ -120,12 +120,19 @@ QVariantMap ScenarioController::detail() const {
           {"stepsTitle", tr("STEPS   %1").arg(s->steps.size())}, {"rule", tr("Half-duplex: %1").arg(s->rule.empty() ? QStringLiteral("-") : q(s->rule))},
           {"values", tr("Callsign %1   Type %2   Runway %3   Taxiway %4").arg(s->callsigns).arg(s->types).arg(s->runways).arg(s->taxiways)},
           {"bankLevel", level}, {"bank", bank}, {"hasMissing", !missing().isEmpty()}, {"hasErrors", !s->errors.empty()},
-          {"assessedLevel", int(s->placeholder ? L::Fault : L::Ok)},
-          {"assessed", s->placeholder ? tr("Assessed: not available, text is PLACEHOLDER") : tr("Assessed: available, instructor only, needs a trainee")}};
+          {"assessedLevel", int(s->placeholder || !s->errors.empty() ? L::Fault : L::Ok)},
+          {"assessed", !s->errors.empty() ? tr("Assessed: not available, the scenario cannot be loaded") : s->placeholder ? tr("Assessed: not available, text is PLACEHOLDER") : tr("Assessed: available, needs a trainee")}};
+}
+
+// Practice shows all steps to everybody; those of a scenario that may be Assessed only to the instructor (C-1).
+bool ScenarioController::stepsHidden() const {
+  const ScenarioInfo* s = find(open_);
+  return s && !s->placeholder && !instructor_;
 }
 
 QVariantList ScenarioController::steps() const {
   QVariantList l;
+  if (stepsHidden()) return l;
   if (const ScenarioInfo* s = find(open_))
     for (const ScenarioStepInfo& x : s->steps)
       l.append(QVariantMap{{"no", l.size() + 1}, {"name", q(x.name)}, {"intent", q(x.intent)},

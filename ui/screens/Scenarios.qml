@@ -110,6 +110,7 @@ Item {
                     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: Theme.line; color: Theme.divider }
                 }
             }
+            Label { visible: s.scenarios.stepsHidden; anchors { top: stH.bottom; topMargin: Theme.s8 } text: qsTr("Steps: instructor only. This scenario may be used Assessed."); color: Theme.textSecondary; font.pixelSize: Theme.small }
             SectionHeader { id: vaH; anchors.bottom: va.top; x: -Theme.s12; width: parent.width + 2 * Theme.s12; text: qsTr("VALUES (drawn from the pools)") }
             Column {
                 id: va

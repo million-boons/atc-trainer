@@ -143,25 +143,20 @@ Item {
                     id: form
                     width: pane.width - Theme.s8
                     spacing: Theme.s8
-                    TextEntry { id: name; width: parent.width; label: qsTr("Name"); maximumLength: 40
-                                onTextChanged: if (text !== (s.p.name || "")) s.planner.setName(text)
-                                onAccepted: s.keyboardFree() }
                     Row {
                         width: parent.width
                         spacing: Theme.s8
-                        Pick { width: Math.round(parent.width * 0.5); label: qsTr("Scenario"); value: s.p.scenario || ""; onAsked: s.ask("scenario") }
-                        Column {
-                            y: Theme.px(22)
-                            spacing: Theme.s4
-                            Tag { visible: s.p.placeholder === true; text: qsTr("PLACEHOLDER") }
-                            Label { text: s.p.scenarioNote || ""; color: Theme.textSecondary; font.pixelSize: Theme.caption }
-                        }
+                        TextEntry { id: name; width: (parent.width - Theme.s8) / 2; label: qsTr("Name"); maximumLength: 40
+                                    onTextChanged: if (text !== (s.p.name || "")) s.planner.setName(text)
+                                    onAccepted: s.keyboardFree() }
+                        Pick { width: (parent.width - Theme.s8) / 2; label: qsTr("Scenario"); value: s.p.scenario || ""; onAsked: s.ask("scenario") }
                     }
                     Row {
                         width: parent.width
                         spacing: Theme.s8
-                        Pick { width: Math.round(parent.width * 0.3); label: qsTr("Trainee"); value: s.p.trainee || ""; onAsked: s.ask("trainee") }
+                        Pick { width: Math.round(parent.width * 0.28); label: qsTr("Trainee"); value: s.p.trainee || ""; onAsked: s.ask("trainee") }
                         Column {
+                            width: Theme.px(228)
                             Label { height: Theme.px(22); text: qsTr("Mode"); color: Theme.textSecondary; font.pixelSize: Theme.caption }
                             Row {
                                 spacing: Theme.s8
@@ -169,11 +164,17 @@ Item {
                                 Choice { text: qsTr("Assessed"); selected: s.p.assessed === true; enabled: s.p.assessedOn === true; onClicked: { s.free(); s.planner.setAssessed(true) } }
                             }
                             Row {
-                                width: Theme.px(300); height: Theme.px(18)
+                                width: parent.width; height: Theme.px(18)
                                 spacing: Theme.s4
                                 StateIcon { level: s.p.assessedNote ? LabController.Caution : 0; anchors.verticalCenter: parent.verticalCenter }
-                                Label { height: parent.height; text: s.p.assessedNote || ""; font.pixelSize: Theme.caption; color: Theme.textSecondary }
+                                Label { objectName: "assessedNote"; width: parent.width - Theme.px(18); height: parent.height; text: s.p.assessedNote || ""; font.pixelSize: Theme.caption; color: Theme.textSecondary }
                             }
+                        }
+                        Column {
+                            y: Theme.px(22)
+                            spacing: Theme.s4
+                            Tag { visible: s.p.placeholder === true; text: qsTr("PLACEHOLDER") }
+                            Label { text: s.p.scenarioNote || ""; color: Theme.textSecondary; font.pixelSize: Theme.caption }
                         }
                     }
                     Item {
@@ -282,7 +283,7 @@ Item {
                 Label { width: parent.width; height: Theme.px(26); text: side.v.name || qsTr("No name"); font { pixelSize: Theme.h2; weight: Font.DemiBold } }
                 Label { width: parent.width; text: side.v.planNote || ""; color: Theme.textSecondary; font.pixelSize: Theme.caption }
                 Label { width: parent.width; height: Theme.px(32); mono: true; font { pixelSize: Theme.h1; weight: Font.Bold }
-                        text: side.v.drawn ? qsTr("drawn then") : side.v.callsign || "-" }
+                        text: side.v.drawn ? qsTr("random") : side.v.callsign || "-" }
                 Label { width: parent.width; height: Theme.px(24); mono: true; font { pixelSize: Theme.body; weight: Font.Bold }
                         text: side.v.drawn ? "" : qsTr("%1   RWY %2   TWY %3").arg(side.v.type || "-").arg(side.v.runway || "-").arg(side.v.taxiway || "-") }
                 Label { width: parent.width; text: side.v.planLine || ""; font.pixelSize: Theme.caption; wrapMode: Text.WordWrap }

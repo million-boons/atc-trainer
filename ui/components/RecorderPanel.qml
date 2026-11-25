@@ -82,21 +82,21 @@ Card {
             id: wave
             anchors { top: meter.bottom; topMargin: Theme.s4 }
             width: parent.width; height: Theme.px(64)
-            visible: r.studio.hasTake
+            visible: r.studio.hasTake && !r.studio.recording   // the old take is not what is being recorded
             peaks: r.take_.peaks || []
             from: r.take_.start || 0
             to: r.take_.end === undefined ? 1 : r.take_.end
             editable: (r.take_.trimmable || false) && r.free
             onTrimmed: (a, b) => r.studio.setTrim(a, b)
         }
-        Label { anchors.fill: wave; visible: !r.studio.hasTake; text: qsTr("No take"); color: Theme.textMuted; font.pixelSize: Theme.small; horizontalAlignment: Text.AlignHCenter }
+        Label { anchors.fill: wave; visible: !wave.visible; text: r.studio.recording ? qsTr("The take appears after Stop") : qsTr("No take"); color: Theme.textMuted; font.pixelSize: Theme.small; horizontalAlignment: Text.AlignHCenter }
         Row {
             id: warn
             anchors.top: wave.bottom
             height: Theme.px(22)
             spacing: Theme.s4
-            StateIcon { level: r.take_.warnings ? LabController.Caution : 0; anchors.verticalCenter: parent.verticalCenter }
-            Label { height: parent.height; text: r.take_.warnings || ""; font.pixelSize: Theme.caption }
+            StateIcon { level: r.take_.warnings && !r.studio.recording ? LabController.Caution : 0; anchors.verticalCenter: parent.verticalCenter }
+            Label { height: parent.height; text: r.studio.recording ? "" : r.take_.warnings || ""; font.pixelSize: Theme.caption }
         }
         Row {
             id: plays

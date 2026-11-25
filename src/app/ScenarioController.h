@@ -30,6 +30,8 @@ class ScenarioController : public QObject {
   Q_PROPERTY(QStringList errors READ errors NOTIFY detailChanged)
   Q_PROPERTY(QStringList missing READ missing NOTIFY detailChanged)
   Q_PROPERTY(bool canSelect READ canSelect NOTIFY detailChanged)
+  Q_PROPERTY(bool instructor MEMBER instructor_ NOTIFY detailChanged)  // set by the shell
+  Q_PROPERTY(bool stepsHidden READ stepsHidden NOTIFY detailChanged)   // of a scenario that may be Assessed (C-1)
   Q_PROPERTY(bool trainerBusy MEMBER trainerBusy_ WRITE setTrainerBusy NOTIFY detailChanged)
   Q_PROPERTY(int messageLevel READ messageLevel NOTIFY messageChanged)
   Q_PROPERTY(QString message READ message NOTIFY messageChanged)
@@ -48,6 +50,7 @@ class ScenarioController : public QObject {
   QStringList objectives() const;
   QStringList errors() const;
   QStringList missing() const;
+  bool stepsHidden() const;
   bool canSelect() const;
   void setTrainerBusy(bool on);
   int messageLevel() const { return messageLevel_; }
@@ -77,7 +80,7 @@ class ScenarioController : public QObject {
   std::map<std::string, ScenarioCoverage> coverage_;   // of the scenarios that were opened since the files were read
   std::string open_;
   QString category_ = QStringLiteral("all"), difficulty_ = QStringLiteral("all"), search_, message_;
-  bool loaded_ = false, trainerBusy_ = false, selecting_ = false;
+  bool loaded_ = false, trainerBusy_ = false, instructor_ = false, selecting_ = false;
   int messageLevel_ = 0;
   unsigned loadNo_ = 0;
   ScenarioBackend b_;  // last
