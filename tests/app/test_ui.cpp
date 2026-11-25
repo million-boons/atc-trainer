@@ -7,6 +7,7 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QTest>
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <string>
@@ -14,7 +15,9 @@
 
 #include "app/AccessBackends.h"
 #include "app/MockBackend.h"
+#include "app/PlannerMock.h"
 #include "app/SettingsController.h"
+#include "app/StudioMock.h"
 using C = ExerciseController;
 
 namespace {
@@ -117,6 +120,15 @@ struct Ui : testing::Test {
     settle();
   }
   void clickButton(const QString& t) { click(find(t, true), t); }
+  void scrollTo(QQuickItem* i) {  // to the end of the pane it is in
+    ASSERT_TRUE(i);
+    for (QQuickItem* f = i->parentItem(); f; f = f->parentItem())
+      if (f->inherits("QQuickFlickable")) {
+        f->setProperty("contentY", std::max(0.0, f->property("contentHeight").toReal() - f->height()));
+        break;
+      }
+    settle();
+  }
   void clickText(const QString& t) { click(find(t, false), t); }
   void pinWithKeypad(const QString& pin) {
     for (QChar ch : pin) clickButton(QString(ch));
@@ -651,7 +663,199 @@ TEST_F(Ui, AWithdrawnTakeCanOnlyBeDeleted) {  // D-133
   EXPECT_TRUE(mock->studio()->takes().isEmpty());
 }
 
+TEST_F(Ui, RecordingIsShownForThePedalToo) {  // ST-1: from the backend's state
+  load();
+  StudioEvents e;
+  StudioBackend b = mockStudio();
+  b.setEvents = [&e](StudioEvents v) { e = std::move(v); };
+  mock->studio()->setBackend(b);
+  run("phr");
+  waitLogin();
+  settle(200);
+  EXPECT_FALSE(allText().contains("RECORDING"));
+  e.recording(true);
+  settle();
+  QQuickItem* sign = nullptr;  // walk() sees visible items only
+  walk(win->contentItem(), [&](QQuickItem* i) {
+    if (i->objectName() == "recordingSign") sign = i;
+  });
+  ASSERT_TRUE(sign);
+  EXPECT_GE(sign->height(), 24);
+  EXPECT_TRUE(find("STOP", true));
+  e.recording(false);
+  settle();
+  EXPECT_FALSE(sign->isVisible());
+}
+
+TEST_F(Ui, TheRoomToneIsAnnouncedAndCanBeCancelled) {  // D-331
+  load();
+  StudioBackend b = mockStudio();
+  StudioBackend::Done late;
+  int ended = 0;
+  b.startSession = [&late](const std::string&, StudioBackend::Done done) { late = std::move(done); };
+  b.endSession = [&ended] { ++ended; };
+  mock->studio()->setBackend(b);
+  run("phr");
+  waitLogin();
+  settle(200);
+  clickButton("Start session...");
+  clickButton("S01");
+  EXPECT_TRUE(allText().contains("Measuring the room tone: please be quiet"));
+  clickButton("Cancel start");
+  EXPECT_EQ(ended, 1);
+  late("cancelled");
+  settle();
+  EXPECT_FALSE(mock->studio()->session());
+  EXPECT_TRUE(find("Start session...", true));
+}
+
+TEST_F(Ui, ClipsWithOtherWordsAreListedInADialog) {  // ST-4
+  load();
+  run("phr");
+  waitLogin();
+  settle(200);
+  clickButton("Words differ 1");
+  EXPECT_TRUE(allText().contains("They block Start until they are recorded again."));
+  EXPECT_TRUE(allText().contains("RUNWAY_09@medial: \"zero nine\", text \"zero niner\""));
+  clickButton("Close");
+}
+
+TEST_F(Ui, ExamplesSayThatTheyDoNotChangeRecognition) {
+  load();
+  run("phrint");
+  waitLogin();
+  settle(200);
+  EXPECT_TRUE(allText().contains("Examples do not change recognition on this machine"));
+  EXPECT_TRUE(allText().contains("ATC examples are not recorded."));
+}
+
+TEST_F(Ui, ChangingTheTabEndsTheRecordingSession) {  // ST-1 (c), the screen's part
+  load();
+  run("phr");
+  waitLogin();
+  settle(200);
+  mock->studio()->startSession("S01");
+  settle();
+  ASSERT_TRUE(mock->studio()->session());
+  clickButton("Exercises");
+  EXPECT_FALSE(mock->studio()->session());
+}
+
+// Every button can be touched (48 px at 1.0), in both sizes.
+struct UiTouch : Ui, testing::WithParamInterface<QSize> {};
+TEST_P(UiTouch, TrainingButtonsAreLargeEnough) {
+  load(GetParam());
+  const double scale = std::max(1.0, std::min(win->height() / 800.0, win->width() / 1280.0)), least = 48 * scale - 1;
+  for (const char* id : {"phr", "phrtake", "phrint", "plan", "planmis", "plannew"}) {
+    run(id);
+    waitLogin();
+    settle(200);
+    walk(win->contentItem(), [&](QQuickItem* i) {
+      if (!isButton(i) || i->mapToScene({0, 0}).y() < 48 * scale) return;  // not the status bar
+      EXPECT_GE(i->height(), least) << id << ": " << i->property("text").toString().toStdString();
+      EXPECT_GE(i->width(), least) << id << ": " << i->property("text").toString().toStdString();
+    });
+  }
+}
+INSTANTIATE_TEST_SUITE_P(Sizes, UiTouch, testing::Values(QSize(1280, 800), QSize(1920, 1080)));
+
 // ---- Exercise Planner (04 section 5g)
+
+TEST_F(Ui, NothingMovesWhenAValueNoLongerFits) {
+  load();
+  run("plan");
+  waitLogin();
+  settle(200);
+  const auto places = [this] {
+    QMap<QString, QPointF> m;
+    for (const char* t : {"Save", "Undo", "Delete", "Put on the Dashboard", "Presets...", "Random"})
+      if (QQuickItem* i = find(t, true)) m[t] = i->mapToScene({0, 0});
+    return m;
+  };
+  const auto before = places();
+  ASSERT_EQ(before.size(), 6);
+  mock->planner()->setRunway("09");
+  settle();
+  EXPECT_TRUE(allText().contains("does not fit"));
+  EXPECT_EQ(places(), before);
+}
+
+TEST_F(Ui, TheBriefingStopsAt200CharactersAndSpaceIsText) {
+  load();
+  run("plannew");
+  waitLogin();
+  settle(200);
+  QQuickItem* label = find("Briefing note (optional): guidance, not phraseology", false);
+  ASSERT_TRUE(label);
+  QTest::mouseClick(win, Qt::LeftButton, {}, label->mapToScene({20, label->height() + 24}).toPoint());
+  for (int i = 0; i < 105; ++i) {
+    QTest::keyClick(win, 'a');
+    QTest::keyClick(win, Qt::Key_Space);
+  }
+  settle();
+  EXPECT_EQ(mock->planner()->plan()["briefing"].toString().size(), 200);
+  EXPECT_TRUE(allText().contains("200 of 200"));
+  EXPECT_EQ(lab.txTone(), LabController::Neutral);
+}
+
+TEST_F(Ui, PlansAreDeletedOnlyAfterAQuestion) {
+  load();
+  run("plan");
+  waitLogin();
+  settle(200);
+  clickButton("Delete");
+  EXPECT_TRUE(allText().contains("Delete this plan?"));
+  clickButton("Cancel");
+  EXPECT_EQ(mock->planner()->planCount(), 4);
+  clickButton("Delete");
+  clickButton("Delete plan");
+  settle();
+  EXPECT_EQ(mock->planner()->planCount(), 3);
+}
+
+TEST_F(Ui, ADialogIsClosedWhenTheInstructorLogsOut) {
+  load();
+  run("plan");
+  waitLogin();
+  settle(200);
+  clickButton("Delete");
+  access.logout();
+  settle();
+  EXPECT_FALSE(allText().contains("Delete this plan?"));
+  EXPECT_TRUE(allText().contains("Instructor only. Log in to plan exercises."));
+}
+
+TEST_F(Ui, SomebodyElseIsWarnedInTheStartDialog) {  // D-142
+  load();
+  run("dashready");
+  mock->exercise()->begin({.scenario = "Departure 01", .trainee = "S01", .plan = ExercisePlan{"Departure S02", "S02", false, 2}}, false, false);
+  mock->exercise()->setPhase(C::Starting);
+  emit mock->exercise()->screenRequested("ex");
+  settle();
+  EXPECT_TRUE(allText().contains("This plan is for S02. The result belongs to S01."));
+  EXPECT_TRUE(find("Start exercise", true)->isEnabled());
+}
+
+TEST_F(Ui, NoPlanCanBeChosenWhileAnExerciseRuns) {
+  load();
+  run("dashrun");
+  QQuickItem* b = find("Choose plan", true);
+  ASSERT_TRUE(b);
+  EXPECT_FALSE(b->isEnabled());
+}
+
+TEST_F(Ui, PresetsAreEditedInTheirDialog) {
+  load();
+  run("plan");
+  waitLogin();
+  settle(200);
+  scrollTo(find("Presets...", true));
+  clickButton("Presets...");
+  for (const char* w : {"Easy", "Normal", "Hard", "0.6 s", "Restore starting values"}) EXPECT_TRUE(allText().contains(w)) << w;
+  clickButton("Cancel");
+  EXPECT_FALSE(find("Save presets", true));
+}
+
 
 TEST_F(Ui, ThePlannerIsForTheInstructorOnly) {
   load();
@@ -708,12 +912,7 @@ TEST_F(Ui, NewPresetValuesAreOfferedOnlyIfThePresetChanged) {  // D-147
   settle(200);
   QQuickItem* b = find("Use new preset values", true);
   ASSERT_TRUE(b);
-  for (QQuickItem* f = b->parentItem(); f; f = f->parentItem())  // the pane scrolls
-    if (f->inherits("QQuickFlickable")) {
-      f->setProperty("contentY", f->property("contentHeight").toReal() - f->height());
-      break;
-    }
-  settle();
+  scrollTo(b);
   clickButton("Use new preset values");
   EXPECT_FALSE(mock->planner()->plan()["presetChanged"].toBool());
 }

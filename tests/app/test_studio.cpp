@@ -549,6 +549,151 @@ TEST_F(Studio, ASessionThatAnEventEndsIsNotEndedTwice) {
   EXPECT_EQ(s->message(), "microphone lost");
 }
 
+TEST_F(Studio, ThePedalIsForASessionOnlyAndEndsWithIt) {
+  login();
+  std::vector<bool> pedal;
+  StudioBackend x = b;
+  x.setPedal = [&pedal](bool on) { pedal.push_back(on); };
+  s->setBackend(x);
+  s->setPedal(true);
+  EXPECT_TRUE(pedal.empty());
+  startS01();
+  s->setPedal(true);
+  EXPECT_TRUE(s->pedal());
+  s->endSession();
+  EXPECT_FALSE(s->pedal());
+  EXPECT_EQ(pedal, std::vector<bool>{true});
+}
+
+TEST_F(Studio, ASecondRequestWaitsForTheFirst) {
+  login();
+  openTaxi();
+  s->selectSegment(3);
+  s->selectClip("RUNWAY_09@medial");
+  drain();
+  StudioBackend::Done late;
+  StudioBackend x = b;
+  x.accept = [&late](const std::string&, bool, StudioBackend::Done done) { late = std::move(done); };
+  int rejected = 0;
+  x.reject = [&rejected](const std::string&, StudioBackend::Done done) {
+    ++rejected;
+    done("");
+  };
+  s->setBackend(x);
+  s->accept(true);
+  EXPECT_TRUE(s->busy());
+  s->reject();
+  EXPECT_EQ(rejected, 0);
+  late("manifest changed on disk");  // 09 section 8, 5
+  drain();
+  EXPECT_FALSE(s->busy());
+  EXPECT_EQ(s->message(), "manifest changed on disk");
+  EXPECT_EQ(takeState(0), "pending");
+}
+
+TEST_F(Studio, AnswersToOlderQuestionsAreIgnored) {  // 09 section 8, 10
+  login();
+  std::vector<std::function<void(std::vector<StudioClip>, const std::string&)>> late;
+  StudioBackend x = b;
+  x.clips = [&late](const std::string&, auto done) { late.push_back(done); };
+  s->setBackend(x);
+  StudioEvents e;
+  x.setEvents = [&e](StudioEvents v) { e = std::move(v); };
+  s->setBackend(x);
+  e.clipsChanged();
+  e.clipsChanged();
+  drain();
+  ASSERT_EQ(late.size(), 2u);
+  StudioClip c;
+  c.id = "NEW";
+  c.words = "new";
+  late[1]({c}, "");
+  late[0]({}, "");
+  drain();
+  EXPECT_EQ(s->missingCount(), 1);
+}
+
+TEST_F(Studio, AnUnreadableCopyIsSaidAndNothingIsShown) {  // 09 section 3: never a silent return to the installed data
+  StudioBackend x = b;
+  x.load = [](auto done) { done(StudioContent{}, "the copy is damaged: replies/placeholder.json"); };
+  s->setBackend(x);
+  a->loginInstructor("482913");
+  ASSERT_TRUE(wait([&] { return a->instructor() && s->message().contains("damaged"); }));
+  EXPECT_FALSE(s->ready());
+  EXPECT_TRUE(s->entries().isEmpty());
+  EXPECT_EQ(s->messageLevel(), int(LabController::Fault));
+}
+
+TEST_F(Studio, ATakeOfAnotherClipIsNotSelected) {
+  login();
+  openTaxi();
+  s->selectSegment(3);
+  s->selectClip("RUNWAY_09@medial");
+  StudioEvents e;
+  StudioBackend x = b;
+  x.setEvents = [&e](StudioEvents v) { e = std::move(v); };
+  s->setBackend(x);
+  const int n = s->takes().size();
+  StudioTake t;
+  t.id = "other";
+  t.clipId = "RUNWAY_27@medial";
+  e.takeReady(t);
+  drain();
+  EXPECT_EQ(s->takes().size(), n);
+  s->selectClip("RUNWAY_27@medial");
+  EXPECT_EQ(s->takes().size(), 2);
+}
+
+TEST_F(Studio, ANewExampleIsDraftAndIsNotSavedEmpty) {
+  login();
+  s->showReplies(false);
+  drain();
+  s->select("TAXI_INSTRUCTION");
+  drain();
+  s->addExample();
+  drain();
+  EXPECT_EQ(s->exampleCount(), 3);
+  EXPECT_FALSE(s->canSave());
+  s->setText("{callsign} taxi");
+  drain();
+  EXPECT_TRUE(s->canSave());
+  EXPECT_FALSE(s->validated());
+}
+
+TEST_F(Studio, ExportNeedsAFileAndShowsTheRefusal) {
+  login();
+  s->exportChanges("  ");
+  EXPECT_TRUE(s->message().contains("file name"));
+  s->exportChanges("/tmp/x.json");
+  drain();
+  EXPECT_TRUE(s->message().contains("nothing is written"));
+}
+
+TEST_F(Studio, NothingIsPlayedWhileItRecordsAndPlaybackStopsFirst) {
+  login();
+  openTaxi();
+  s->selectSegment(3);
+  s->selectClip("RUNWAY_09@medial");
+  drain();
+  int played = 0, stopped = 0;
+  StudioBackend x = b;
+  x.play = [&played](const std::string&, const std::string&, StudioBackend::Done done) {
+    ++played;
+    done("");
+  };
+  x.stopPlay = [&stopped] { ++stopped; };
+  s->setBackend(x);
+  startS01();
+  stopped = 0;
+  s->toggleRecord();
+  drain();
+  EXPECT_EQ(stopped, 1);
+  ASSERT_TRUE(s->recording());
+  s->play("raw");
+  drain();
+  EXPECT_EQ(played, 0);
+}
+
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   QCoreApplication app(argc, argv);

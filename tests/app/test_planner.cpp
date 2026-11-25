@@ -450,6 +450,194 @@ TEST_F(Planner, AnAnswerAfterLogoutChangesNothing) {
   EXPECT_TRUE(p->plans().isEmpty());
 }
 
+TEST_F(Planner, AFileThatCannotBeReadIsSaid) {
+  b.load = [](auto done) { done(PlannerContent{}, "plans.json is damaged"); };
+  p->setBackend(b);
+  a->loginInstructor("482913");
+  QElapsedTimer t;
+  t.start();
+  while (p->message().isEmpty() && t.elapsed() < 3000) QCoreApplication::processEvents(QEventLoop::AllEvents, 20);
+  EXPECT_EQ(p->message(), "plans.json is damaged");
+  EXPECT_EQ(p->messageLevel(), int(L::Fault));
+  EXPECT_FALSE(p->ready());
+  EXPECT_TRUE(p->choices().isEmpty());
+}
+
+TEST_F(Planner, ABuildWithoutABackendSaysSo) {
+  login();
+  p->setBackend({});
+  p->newPlan();
+  EXPECT_TRUE(p->message().contains("no Planner backend"));
+}
+
+TEST_F(Planner, CoverageIsShownInWordsAndOlderAnswersAreIgnored) {
+  std::vector<std::function<void(PlanCoverage)>> late;
+  b.coverage = [&late](const std::string&, auto done) { late.push_back(done); };
+  p->setBackend(b);
+  login();
+  open("p2");
+  ASSERT_GE(late.size(), 2u);
+  EXPECT_TRUE(hasCheck("Voice bank: checking"));
+  late.front()({PlanCoverage::State::Ok, 9, 0});
+  drain();
+  EXPECT_TRUE(hasCheck("Voice bank: checking"));
+  late.back()({PlanCoverage::State::Missing, 22, 3});
+  drain();
+  EXPECT_TRUE(hasCheck("Voice bank: 3 clips missing"));
+  late.back()({PlanCoverage::State::Failed, 0, 0});  // it may answer again
+  drain();
+  EXPECT_TRUE(hasCheck("Voice bank: check failed"));
+}
+
+TEST_F(Planner, ARecordThatIsGoneStopsThePlan) {
+  login();
+  open("p1");
+  people.erase(people.begin());
+  EXPECT_EQ(stateOf("p1"), "Cannot start: no record S01");
+  EXPECT_TRUE(hasCheck("No record S01"));
+  EXPECT_FALSE(p->canPut());
+  EXPECT_EQ(p->saveNote(), "There is no record S01.");
+}
+
+TEST_F(Planner, AScenarioThatIsGoneStopsThePlan) {
+  change = [](PlannerContent& c) { c.scenarios.erase(c.scenarios.begin()); };
+  login();
+  EXPECT_EQ(stateOf("p1"), "Cannot start: no such scenario");
+  EXPECT_TRUE(hasCheck("No such scenario"));
+  EXPECT_FALSE(p->canPut());
+  EXPECT_FALSE(p->canSave());
+}
+
+TEST_F(Planner, ValuesThatLeftThePoolsStopThePlan) {
+  change = [](PlannerContent& c) { c.scenarios.front().combinations.resize(1); };  // only EAGLE, 09, A3
+  login();
+  EXPECT_EQ(stateOf("p1"), "Cannot start: values do not fit");
+  EXPECT_TRUE(p->plan()["aircraftBad"].toBool());
+  EXPECT_EQ(p->plan()["runway"].toString(), "27");  // not corrected
+}
+
+TEST_F(Planner, OneCombinationIsUsedAndSaid) {  // 04 section 5g
+  change = [](PlannerContent& c) { c.scenarios.front().combinations.resize(1); };
+  login();
+  open("p2");
+  EXPECT_TRUE(hasCheck("Only one combination: no change"));
+  b.choose = [](const std::string&, const std::string&, auto done) {
+    PlanChoice c;
+    c.plan.name = "N";
+    c.onlyCombination = true;
+    done(c, "");
+  };
+  p->setBackend(b);
+  p->put();
+  drain();
+  EXPECT_TRUE(p->message().contains("only one combination"));
+}
+
+TEST_F(Planner, ARefusedChoiceIsShownAndNothingIsSignalled) {
+  int signalled = 0;
+  QObject::connect(p.get(), &PlannerController::chosen, p.get(), [&signalled] { ++signalled; });
+  b.choose = [](const std::string&, const std::string&, auto done) { done(PlanChoice{}, "the scenario changed on disk"); };
+  p->setBackend(b);
+  login();
+  p->put();
+  drain();
+  EXPECT_EQ(p->message(), "the scenario changed on disk");
+  EXPECT_EQ(signalled, 0);
+  EXPECT_TRUE(p->canPut());  // may be tried again
+}
+
+TEST_F(Planner, OneChoiceAtATime) {
+  std::function<void(PlanChoice, const std::string&)> late;
+  int n = 0;
+  b.choose = [&](const std::string&, const std::string&, auto done) {
+    ++n;
+    late = done;
+  };
+  p->setBackend(b);
+  login();
+  p->put();
+  EXPECT_FALSE(p->canPut());
+  p->choose("p2");
+  EXPECT_EQ(n, 1);
+  late(PlanChoice{}, "");
+  drain();
+  EXPECT_TRUE(p->canPut());
+}
+
+TEST_F(Planner, ACountedRunIsReadAgainAndKeepsAnEdit) {
+  std::function<void()> changed;
+  b.setEvents = [&changed](std::function<void()> f) { changed = std::move(f); };
+  p->setBackend(b);
+  login();
+  open("p1");
+  p->setName("Other");
+  change = [](PlannerContent& c) { c.plans.front().runs = 4; };
+  changed();
+  drain();
+  EXPECT_TRUE(p->plans()[0].toMap()["runs"].toString().startsWith("4 runs"));
+  EXPECT_EQ(p->plan()["name"].toString(), "Other");
+}
+
+TEST_F(Planner, AReloadDoesNotGiveAnEditTheNewRevision) {
+  login();
+  open("p1");
+  p->setName("Other");
+  std::string sent;
+  b.save = [&sent](Plan, const std::string& r, auto done) {
+    sent = r;
+    done("", "the plans changed on disk");
+  };
+  p->setBackend(b);
+  change = [](PlannerContent& c) { c.revision = "changed elsewhere"; };
+  p->enter();
+  drain();
+  p->save();
+  drain();
+  EXPECT_EQ(sent, "1");
+  EXPECT_TRUE(p->dirty());
+}
+
+TEST_F(Planner, DeletingANewPlanWritesNothing) {
+  int removed = 0;
+  b.remove = [&removed](const std::string&, const std::string&, PlannerBackend::Done done) {
+    ++removed;
+    done("");
+  };
+  p->setBackend(b);
+  login();
+  p->newPlan();
+  p->deletePlan();
+  drain();
+  EXPECT_EQ(removed, 0);
+  EXPECT_EQ(p->planCount(), 4);
+  EXPECT_FALSE(p->plan()["isNew"].toBool());
+}
+
+TEST_F(Planner, RandomPlansStoreNoValues) {
+  Plan sent;
+  login();
+  open("p1");
+  b.save = [&sent](Plan x, const std::string&, auto done) {
+    sent = x;
+    done(x.id, "");
+  };
+  p->setBackend(b);
+  p->setFixed(false);
+  EXPECT_TRUE(p->canSave());
+  p->save();
+  drain();
+  EXPECT_FALSE(sent.fixed);
+  EXPECT_TRUE(sent.values == PlanValues{});
+}
+
+TEST_F(Planner, TheSearchAndTheFilterNeverHideWhatIsBeingEdited) {
+  login();
+  open("p1");
+  p->search("random");
+  EXPECT_EQ(p->plan()["id"].toString(), "p1");
+  EXPECT_TRUE(p->hasPlan());
+}
+
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   QCoreApplication app(argc, argv);
