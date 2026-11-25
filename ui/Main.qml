@@ -19,6 +19,8 @@ Window {
     onLoginOpenChanged: { lab.releaseRequested("SPACE"); if (!loginOpen) { access.clearMessage(); shell.forceActiveFocus() } }
     property ExerciseController exercise: null   // live; null: this build cannot run an exercise
     readonly property ExerciseController ex: mock ? mock.exercise : exercise
+    property StudioController studio: null   // live; null: no Studio backend in this build
+    readonly property StudioController phrases: mock ? mock.studio : studio
     readonly property bool exActive: ex !== null && ex.active
     readonly property bool exResult: ex !== null && ex.phase === ExerciseController.Result
     width: 1280; height: 800
@@ -31,6 +33,8 @@ Window {
     Binding { target: Theme; property: "windowHeight"; value: root.height }
     Binding { target: Theme; property: "reduceMotion"; value: root.reduceMotion }
     Component.onCompleted: Theme.mode = themeMode
+
+    Binding { target: root.phrases; property: "trainerBusy"; value: root.exActive; when: root.phrases !== null }
 
     // Space is a fallback PTT; losing focus always releases it.
     onActiveChanged: if (!active) lab.releaseRequested("SPACE")
@@ -50,6 +54,7 @@ Window {
         function onCurrentChanged() {
             const c = root.mock.current
             if (c.startsWith("dash")) root.screen_ = "dash"
+            else if (c.startsWith("phr")) root.screen_ = "train"
             else if (c.startsWith("set")) root.screen_ = "set"
             else if (c.startsWith("sav") || c === "login") root.screen_ = "lab"
             root.loginOpen = c === "login"
@@ -67,7 +72,9 @@ Window {
         focus: true
         Rectangle { anchors.fill: parent; color: Theme.bg }
         Keys.onPressed: (e) => {
-            if (e.key === Qt.Key_Space) { if (!e.isAutoRepeat && !root.loginOpen && (root.screen_ === "lab" || dashCtl.pttTesting || (root.screen_ === "ex" && root.ex.pttLive))) root.lab.pressRequested("SPACE"); e.accepted = true }
+            // In the Studio the keys record and play; none of them transmits there.
+            if (root.screen_ === "train" && !root.loginOpen && train.item && train.item.handleKey(e.key, e.isAutoRepeat)) e.accepted = true
+            else if (e.key === Qt.Key_Space) { if (!e.isAutoRepeat && !root.loginOpen && (root.screen_ === "lab" || dashCtl.pttTesting || (root.screen_ === "ex" && root.ex.pttLive))) root.lab.pressRequested("SPACE"); e.accepted = true }
             else if (e.key === Qt.Key_M && root.mock) { panel.active = !panel.active; e.accepted = true }
         }
         Keys.onReleased: (e) => {
@@ -103,6 +110,8 @@ Window {
                 { id: "lab", name: qsTr("Speech Lab"), enabled: !root.exActive, off: true, why: nav.busy, icon: "M 7 3 L 13 3 L 13 11 L 7 11 Z M 4 9 L 4 14 L 16 14 L 16 9 M 10 14 L 10 18" },
                 { id: "ass", name: qsTr("Assessment"), enabled: root.exResult, off: root.ex !== null, why: root.exActive ? nav.busy : root.mock ? qsTr("No result yet. Mock: press M and choose a RESULT case.") : root.ex ? qsTr("No result yet. It opens after an exercise.") : qsTr("This build cannot run an exercise."),
                   icon: "M 4 16 L 4 10 M 10 16 L 10 4 M 16 16 L 16 8" },
+                { id: "train", name: qsTr("Training"), enabled: root.phrases !== null && !root.exActive, off: root.phrases !== null, why: root.exActive ? nav.busy : qsTr("The Studio's backend is not built yet. It opens here when it is."),
+                  icon: "M 4 4 L 12 4 L 12 16 L 4 16 Z M 15 6 L 15 14 M 18 8 L 18 12" },
                 { id: "set", name: qsTr("Settings"), enabled: !root.exActive, off: true, why: nav.busy,
                   icon: "M 3 6 L 17 6 M 13 4 L 13 8 M 3 14 L 17 14 M 7 12 L 7 16" }
             ]
@@ -135,6 +144,12 @@ Window {
                 Settings { access: root.access; settings: root.settings; dash: dashCtl
                            onLoginAsked: root.loginOpen = true; onKeyboardFree: shell.forceActiveFocus() }
             }
+        }
+        Loader {
+            id: train
+            anchors { top: status.bottom; bottom: alert.top; left: nav.right; right: parent.right }
+            active: root.phrases !== null && root.screen_ === "train"
+            sourceComponent: Component { Studio { studio: root.phrases; onLoginAsked: root.loginOpen = true; onKeyboardFree: shell.forceActiveFocus() } }
         }
         Loader {
             anchors { top: status.bottom; bottom: alert.top; left: nav.right; right: parent.right }

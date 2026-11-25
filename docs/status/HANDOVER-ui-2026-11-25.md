@@ -32,3 +32,10 @@ Branch and worktree `ui`, everything committed. Next free decision number: D-141
 - Merged. Texts and tests for D-322 ("The pilot calls first.", "You called before the pilot", "Not counted as an attempt", row "Called before the pilot" in the result, timeline "ATC CALLED BEFORE PILOT") and D-325 (the key-over notice says what the pilot will do: readback repeated after the answer / answers what you say now / short tap repeats). Not compiled.
 - Found while reading: the key-over notice was cleared at once, because the transmission that cuts the pilot opens right after; fixed, with a test.
 - Result: more PTT rows than fit make the rows lower instead of cutting the last one off.
+
+## Screenshots of the new program and the Studio (2026-11-25, 20:10 onward, after 3c)
+- 24 mock screenshots (18 at 1280x800, 6 at 1920x1080) from the program built at 18:43; 16 opened, in pairs. Nothing to fix except the old key-over text, which c4342d0 replaces. The Lab with another model loaded than selected (case `mother`) was seen and is right. Not opened: dash, dashfault, exdone, login, setinstr, lab at 1280x800; exwrong, dashready at 1920x1080.
+- Studio on the mock written (D-145), **nothing compiled or run**; only the QML syntax check.
+- **For b2, `ui/CMakeLists.txt`** (b2's file): QML `components/ClipDot.qml SegmentChip.qml SegmentStrip.qml PhraseEdit.qml TrimWaveform.qml TakeList.qml RecorderPanel.qml CoverageBar.qml`, `screens/Studio.qml`; sources `StudioBackend.h StudioController.h/.cpp StudioMock.h/.cpp`. Without them this commit does not build. `tests/app/CMakeLists.txt` has the new `studio_tests`.
+- `main.cpp` needs nothing: live, `Main.qml`'s `studio` property is null and the entry says why it is off.
+- Mock cases: phroff, phr, phrrec, phrtake, phrwd, phrmiss, phrint.

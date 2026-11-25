@@ -13,6 +13,7 @@
 #include "app/LabController.h"
 #include "app/RecordingsController.h"
 #include "app/StatusFeed.h"
+#include "app/StudioController.h"
 #include "app/SttController.h"
 #include "ptt/PttInputManager.h"
 
@@ -26,6 +27,7 @@ class MockBackend : public QObject {
   Q_PROPERTY(QString current READ current NOTIFY currentChanged)
   Q_PROPERTY(StatusFeed* status READ status CONSTANT)
   Q_PROPERTY(ExerciseController* exercise READ exercise CONSTANT)
+  Q_PROPERTY(StudioController* studio READ studio CONSTANT)
   Q_PROPERTY(QVariantList exerciseScripts READ exerciseScripts CONSTANT)
   Q_PROPERTY(bool assessed MEMBER assessed_ WRITE setAssessed NOTIFY currentChanged)  // Exercise cases only
   Q_PROPERTY(bool consent MEMBER consent_ WRITE setConsent NOTIFY currentChanged)
@@ -35,10 +37,13 @@ class MockBackend : public QObject {
   QString current() const { return current_; }
   StatusFeed* status() { return &status_; }
   ExerciseController* exercise() { return &exercise_; }
+  StudioController* studio() { return &studio_; }
   QVariantList exerciseScripts() const;
   void attach(AccessController* a, RecordingsController* r) {
     access_ = a;
     connect(a, &AccessController::confirmed, &exercise_, &ExerciseController::endConfirmed);
+    studio_.setAccess(a);
+    connect(a, &AccessController::loggedIn, this, [this] { studioCase(); });
     recordings_ = r;
     r->setConnected();
     r->setPlayer([this](std::vector<std::int16_t>, int) { lab_->setNotice(LabController::Caution, tr("Mock backend: no audio playback.")); });
@@ -63,6 +68,7 @@ class MockBackend : public QObject {
   void testEdge(bool down);
   void exerciseEdge(bool down);
   void loginCase(const QString& id);
+  void studioCase();                      // once the instructor is logged in
   void endPttTest(const QString& note);
   struct Speech { double startMs = 320, endBeforeReleaseMs = 350, gain = 0.292  /* about -12 dBFS */; };
   void goLive();
@@ -90,6 +96,7 @@ class MockBackend : public QObject {
   QTimer timer_;
   StatusFeed status_;
   ExerciseController exercise_;
+  StudioController studio_;
   bool assessed_ = false, consent_ = false;
   bool exPressed_ = false;    // a press in an Exercise case
   QTimer statusTimer_;

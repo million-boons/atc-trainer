@@ -1,6 +1,7 @@
 #include "app/MockBackend.h"
 
 #include "app/ExerciseMock.h"
+#include "app/StudioMock.h"
 
 #include <QDateTime>
 #include <QTime>
@@ -44,6 +45,7 @@ std::unique_ptr<ISpeechRecognizer> MockBackend::fakeEngine(const SttModel&, std:
 MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs, QObject* parent)
     : QObject(parent), lab_(lab), stt_(stt), pilotCutMs_(pilotCutMs) {
   exercise_.setAudioConnected();  // the mock shows both consent cases
+  studio_.setBackend(mockStudio());
   connect(lab, &LabController::pressRequested, this, [this](const QString& s) { userEdge(s, true); });
   connect(lab, &LabController::releaseRequested, this, [this](const QString& s) { userEdge(s, false); });
   connect(lab, &LabController::playRequested, this,
@@ -140,7 +142,9 @@ QVariantList MockBackend::scripts() const {
       {"vloaded", "Bank loaded"}, {"vchecking", "Bank checking"}, {"vok", "Bank coverage OK"}, {"vmissing", "Bank missing clips"}, {"vfailed", "Bank failed"},
       {"login", "Login dialog"}, {"savyes", "Trainee, consent"}, {"savno", "Trainee, no consent"}, {"setoff", "Settings: not logged in"}, {"setinstr", "Settings: instructor"},
       {"dash", "Dashboard: not ready"}, {"dashready", "Dashboard: all ready"}, {"dashrun", "Dashboard: running"},
-      {"dashfault", "Dashboard: faults"}};
+      {"dashfault", "Dashboard: faults"},
+      {"phroff", "Studio: not logged in"}, {"phr", "Studio"}, {"phrrec", "Studio: recording"}, {"phrtake", "Studio: pending take"},
+      {"phrwd", "Studio: consent withdrawn"}, {"phrmiss", "Studio: clip missing"}, {"phrint", "Studio: ATC intent"}};
   QVariantList l;
   for (auto [id, name] : all) l.append(QVariantMap{{"id", id}, {"name", name}});
   return l;
@@ -378,10 +382,30 @@ void MockBackend::run(const QString& id) {
 
 void MockBackend::loginCase(const QString& id) {
   if (!access_) return;
-  if (id == "login" || id == "setoff") access_->logout();
+  studio_.leave();
+  if (id == "login" || id == "setoff" || id == "phroff") access_->logout();
   else if (id == "savyes") access_->loginTrainee("S01");
   else if (id == "savno") access_->loginTrainee("S02");
-  else if (id == "setinstr") access_->loginInstructor("123456");  // the mock's PIN
+  else if (id == "setinstr" || id.startsWith("phr")) access_->loginInstructor("123456");  // the mock's PIN
+}
+
+void MockBackend::studioCase() {
+  const QString id = current_;
+  if (!id.startsWith("phr") || !studio_.instructor()) return;
+  // The controller's answers are queued: one step after the other, unless another case was chosen meanwhile.
+  const auto step = [this, id](int ms, std::function<void()> f) {
+    QTimer::singleShot(ms, this, [this, id, f = std::move(f)] { if (current_ == id) f(); });
+  };
+  studio_.undo();
+  studio_.showReplies(id != "phrint");
+  step(40, [this, id] { studio_.select(id == "phrint" ? "TAXI_INSTRUCTION" : id == "phrmiss" ? "READBACK_TAXI_HOLD_SHORT" : "READBACK_TAXI"); });
+  step(60, [this, id] {
+    if (id == "phrmiss") studio_.selectClip("PH_HOLD_SHORT_RUNWAY@medial");
+    else if (id == "phrwd") { studio_.selectSegment(3); studio_.selectClip("RUNWAY_27@medial"); }
+    else if (id != "phrint") { studio_.selectSegment(3); studio_.selectClip("RUNWAY_09@medial"); }
+    if (id == "phrrec") studio_.startSession("S01");
+  });
+  if (id == "phrrec") step(90, [this] { studio_.toggleRecord(); });
 }
 
 void MockBackend::goLive() {

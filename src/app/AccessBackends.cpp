@@ -40,6 +40,9 @@ AccessBackend realAccess([[maybe_unused]] const std::string& writable) {
 
 AccessBackend mockAccess() {
   auto all = std::make_shared<std::vector<Person>>(std::vector<Person>{{"S01", "Mock Name", "Mock Rank", true, "2026-11-24"}, {"S02", "", "", false, "2026-11-24"}});
+  all->front().pilotVoice = true;  // S01 may record in the Studio
+  all->front().pilotVoiceDate = "2026-11-24";
+  all->front().pilotVoiceVersion = ConsentVersions{}.pilotVoice;
   AccessBackend b;
   b.load = [] { return std::string(); };
   b.people = [all] { return *all; };

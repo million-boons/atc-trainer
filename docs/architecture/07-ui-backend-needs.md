@@ -72,7 +72,7 @@ Consent withdrawn (D-133), or "re-consent needed" (D-135): the bank, the coverag
 
 ### Studio interface (proposed, for b2)
 
-As with login and recordings: `StudioController` (ui, GUI thread, state and texts) and `StudioBackend` (b2, a struct of `std::function`), so that the screens and tests run on a mock. Include rule for Qt files: engine, scenario, parser and PhraseTemplate headers only through `src/app/EngineHeaders.h` (Qt's `slots` macro). Every action answers with an empty text or the reason; slow ones through a callback queued to the GUI thread. Names are proposals.
+As with login and recordings: `StudioController` (ui, GUI thread, state and texts) and `StudioBackend` (b2, a struct of `std::function`), so that the screens and tests run on a mock. Include rule for Qt files: engine, scenario, parser and PhraseTemplate headers only through `src/app/EngineHeaders.h` (Qt's `slots` macro). Every action answers with an empty text or the reason; slow ones through a callback queued to the GUI thread. Names are proposals. Written down as code in `src/app/StudioBackend.h` (with `StudioMock` as a working example), still a proposal; only `StudioController` and a backend know it. There `saveReply` and `saveIntent` are one `save(entry, revision)`, and `setPedal` is its own function.
 
 | Function | Does | Refuses |
 |---|---|---|

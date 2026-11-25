@@ -536,6 +536,109 @@ TEST_F(Ui, ResultHasNoPassMarkAndNoPlaybackWithoutConsent) {
   EXPECT_EQ(mock->exercise()->phase(), C::Starting);
 }
 
+// ---- Phraseology Studio (04 section 5)
+
+TEST_F(Ui, TheStudioIsForTheInstructorOnly) {
+  load();
+  run("phroff");
+  EXPECT_EQ(screen(), "train");
+  EXPECT_TRUE(allText().contains("Instructor only. Log in to see or change phrases."));
+  EXPECT_FALSE(allText().contains("READBACK_TAXI"));
+}
+
+TEST_F(Ui, TheStudioShowsTheReplyItsStripAndItsCoverage) {
+  load();
+  run("phr");
+  waitLogin();
+  settle(200);
+  const QString t = allText();
+  for (const char* w : {"READBACK_TAXI", "Used by: DEPARTURE-01  Taxi: CORRECT", "taxi via", "{taxiway}", "RUNWAY_09@medial", "Say this:", "PLACEHOLDER VOICE", "pending"})
+    EXPECT_TRUE(t.contains(w)) << w;
+  walk(win->contentItem(), [&](QQuickItem* x) {
+    for (const char* n : {"phraseId", "sayThis", "coverage", "takeState"})
+      if (x->objectName() == n) { EXPECT_FALSE(x->property("truncated").toBool()) << n << ": " << x->property("text").toString().toStdString(); }
+  });
+  EXPECT_TRUE(t.contains("The clip says \"zero nine\""));
+}
+
+TEST_F(Ui, SpaceRecordsInTheStudioAndNeverTransmits) {
+  load();
+  run("phr");
+  waitLogin();
+  settle(200);
+  QTest::keyClick(win, Qt::Key_Space);  // no session
+  settle();
+  EXPECT_FALSE(mock->studio()->recording());
+  EXPECT_TRUE(allText().contains("Start a recording session first."));
+  clickButton("Start session...");
+  EXPECT_TRUE(allText().contains("no consent to be recorded"));  // S02
+  clickButton("S01");
+  settle();
+  EXPECT_TRUE(mock->studio()->session());
+  QTest::keyPress(win, Qt::Key_Space);
+  settle(150);
+  EXPECT_TRUE(mock->studio()->recording());
+  EXPECT_EQ(lab.txTone(), LabController::Neutral);
+  QTest::keyRelease(win, Qt::Key_Space);
+  QTest::keyClick(win, Qt::Key_Space);
+  settle();
+  EXPECT_FALSE(mock->studio()->recording());
+  QTest::keyClick(win, Qt::Key_Return);  // accept
+  settle();
+  EXPECT_TRUE(allText().contains("Primary take."));
+  clickText("Dashboard");  // leaving ends the session
+  EXPECT_FALSE(mock->studio()->session());
+}
+
+TEST_F(Ui, ChangedWordingIsListedBeforeSaving) {
+  load();
+  run("phr");
+  waitLogin();
+  settle(200);
+  mock->studio()->setText("taxi along {taxiway} runway {runway}, {callsign}");
+  settle();
+  clickButton("Save");
+  EXPECT_TRUE(allText().contains("Save changed wording?"));
+  EXPECT_TRUE(allText().contains("PH_TAXI_ALONG@initial"));
+  clickButton("Cancel");
+  EXPECT_TRUE(mock->studio()->dirty());
+  clickButton("Save");
+  clickButton("Save wording");
+  settle();
+  EXPECT_FALSE(mock->studio()->dirty());
+  EXPECT_TRUE(allText().contains("changed on this machine"));
+}
+
+TEST_F(Ui, EnterInATextFieldNeverAcceptsATake) {
+  load();
+  run("phrtake");
+  waitLogin();
+  settle(200);
+  QQuickItem* label = find("SOP reference (required for Validated)", false);
+  ASSERT_TRUE(label);
+  QTest::mouseClick(win, Qt::LeftButton, {}, label->mapToScene({20, label->height() + 24}).toPoint());
+  for (char ch : std::string("x r p ")) QTest::keyClick(win, ch);  // the shortcut keys are text here
+  QTest::keyClick(win, Qt::Key_Return);
+  settle();
+  EXPECT_EQ(mock->studio()->sopRef(), "x r p ");
+  EXPECT_EQ(mock->studio()->takes()[0].toMap()["state"].toString(), "pending");
+}
+
+TEST_F(Ui, AWithdrawnTakeCanOnlyBeDeleted) {  // D-133
+  load();
+  run("phrwd");
+  waitLogin();
+  settle(200);
+  EXPECT_TRUE(allText().contains("Consent withdrawn – delete or replace"));
+  clickButton("Primary");  // disabled
+  EXPECT_FALSE(allText().contains("Primary take."));
+  clickButton("Delete...");
+  EXPECT_TRUE(allText().contains("Delete this take?"));
+  clickButton("Delete take");
+  settle();
+  EXPECT_TRUE(mock->studio()->takes().isEmpty());
+}
+
 int main(int argc, char** argv) {
   qputenv("QT_QPA_PLATFORM", "offscreen");
   testing::InitGoogleTest(&argc, argv);
