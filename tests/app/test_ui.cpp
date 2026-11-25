@@ -286,6 +286,10 @@ TEST_F(Ui, InstructorSettingsAndRecords) {
   waitLogin();
   EXPECT_TRUE(allText().contains("Mock Name"));
   EXPECT_TRUE(allText().contains("offline, never cloud"));
+  EXPECT_TRUE(allText().contains("to be approved by the unit"));  // D-134
+  walk(win->contentItem(), [&](QQuickItem* x) {
+    if (x->objectName() == "consentTexts") { EXPECT_FALSE(x->property("truncated").toBool()); }
+  });
   clickButton("On");
   EXPECT_FALSE(settings.saveRecordings());
   clickButton("Add");
@@ -301,6 +305,13 @@ TEST_F(Ui, InstructorSettingsAndRecords) {
   clickButton("Change consent");
   clickButton("No");
   clickButton("Change consent");
+  EXPECT_FALSE(access.people()[2].toMap()["consent"].toBool());
+  EXPECT_TRUE(allText().contains("not asked"));
+  clickButton("Pilot voice");  // a separate answer (D-133)
+  EXPECT_TRUE(allText().contains("Pilot voice: consent of S03"));
+  clickButton("Yes");
+  clickButton("Change consent");
+  EXPECT_TRUE(access.people()[2].toMap()["pilot"].toBool());
   EXPECT_FALSE(access.people()[2].toMap()["consent"].toBool());
 }
 
@@ -430,6 +441,25 @@ TEST_F(Ui, EndInAssessedNeedsTheInstructorPin) {  // D-125
   settle(200);
   EXPECT_EQ(mock->exercise()->phase(), C::Result);
   EXPECT_FALSE(access.instructor());
+}
+
+TEST_F(Ui, StopInAssessedNeedsTheInstructorPin) {  // D-129
+  load();
+  mock->setAssessed(true);
+  for (const char* id : {"exwait", "exlost"}) {
+    run(id);
+    const C::Phase before = mock->exercise()->phase();
+    clickButton("Stop exercise");
+    EXPECT_TRUE(allText().contains("instructor PIN")) << id;
+    clickButton("Cancel");
+    EXPECT_EQ(mock->exercise()->phase(), before) << id;
+    clickButton("Stop exercise");
+    pinWithKeypad("123456");
+    clickButton("End exercise");
+    waitLogin();
+    settle(200);
+    EXPECT_EQ(mock->exercise()->phase(), C::Result) << id;
+  }
 }
 
 TEST_F(Ui, DashboardStartOpensTheDialog) {

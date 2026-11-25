@@ -23,6 +23,7 @@ void ExerciseController::begin(ExerciseContext c, bool assessed, bool consent, c
   done_ = 0;
   notice_ = alert_ = {};
   choice_ = false;
+  pin_ = Pin::No;
   result_.clear();
   transcript_.reset();
   timeline_.reset();
@@ -35,6 +36,7 @@ void ExerciseController::begin(ExerciseContext c, bool assessed, bool consent, c
 void ExerciseController::setPhase(Phase p) {
   if (phase_ == p) return;
   phase_ = p;
+  if (p != Running && p != Paused) pin_ = Pin::No;
   emit phaseChanged();
   emit changed();  // Assessed shows more in the result
   emit resultChanged();
@@ -84,6 +86,7 @@ void ExerciseController::setChoice(const QString& title, const QString& text) {
 void ExerciseController::clearChoice() {
   if (!choice_) return;
   choice_ = false;
+  if (pin_ == Pin::Choice) pin_ = Pin::No;
   notice_ = {};
   alert_ = {LabController::Ok, tr("Exercise running")};
   emit changed();
@@ -142,11 +145,24 @@ void ExerciseController::start(bool assessed) {
 }
 
 void ExerciseController::stop() {
-  if (pttLive() && !(choice() && assessed_)) emit stopRequested();
+  if (pttLive() && !assessed_) emit stopRequested();
+}
+
+void ExerciseController::requestEnd() {
+  if (!assessed_ || (phase_ != Running && phase_ != Paused)) return;
+  pin_ = choice() ? Pin::Choice : Pin::Stop;
+  emit changed();
+}
+
+void ExerciseController::cancelEnd() {
+  pin_ = Pin::No;
+  emit changed();
 }
 
 void ExerciseController::endConfirmed() {
-  if (choice()) emit stopRequested();
+  if (!pinAsked()) return;
+  cancelEnd();
+  emit stopRequested();
 }
 
 void ExerciseController::continueExercise() {

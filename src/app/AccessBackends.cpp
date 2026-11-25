@@ -13,12 +13,15 @@ using namespace atc;
 AccessBackend realAccess([[maybe_unused]] const std::string& writable) {
   AccessBackend b;
 #ifdef ATC_HAVE_STORAGE
-  auto store = std::make_shared<PeopleStore>(writable + "/people.json");
+  auto store = std::make_shared<PeopleStore>(writable + "/people.json", b.versions);
   b.load = [store] { return store->load(); };
   b.people = [store] { return store->people(); };
   b.add = [store](Person p, const std::string& today) { return store->add(std::move(p), today); };
   b.setConsent = [store](const std::string& id, bool consent, const std::string& date, const std::string& today) {
     return store->setConsent(id, consent, date, today);
+  };
+  b.setPilotVoice = [store](const std::string& id, bool consent, const std::string& date, const std::string& today) {
+    return store->setPilotVoice(id, consent, date, today);
   };
 #else
   b.load = [] { return std::string("built without the recording store"); };
@@ -51,6 +54,16 @@ AccessBackend mockAccess() {
       if (p.id == id) {
         p.consent = consent;
         p.consentDate = date;
+        p.consentVersion = ConsentVersions{}.recording;
+      }
+    return std::string();
+  };
+  b.setPilotVoice = [all](const std::string& id, bool consent, const std::string& date, const std::string&) {
+    for (Person& p : *all)
+      if (p.id == id) {
+        p.pilotVoice = consent;
+        p.pilotVoiceDate = date;
+        p.pilotVoiceVersion = ConsentVersions{}.pilotVoice;
       }
     return std::string();
   };

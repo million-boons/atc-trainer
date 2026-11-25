@@ -1,15 +1,16 @@
 import QtQuick
 import Atc
 
-// Adds a trainee record, or changes the consent of one (changeId not empty). Instructor only (04 section 5b).
+// Adds a trainee record, or changes the consent of one (changeId not empty). pilot: the answer for the pilot voice (D-133). Instructor only (04 section 5b).
 ModalPanel {
     id: d
     property AccessController access
     property string changeId
+    property bool pilot: false
     readonly property bool adding: changeId === ""
     property int consent: -1      // -1: not answered yet; neither answer is preselected
     signal closed()
-    title: adding ? qsTr("Add a record") : qsTr("Consent of %1").arg(changeId)
+    title: adding ? qsTr("Add a record") : pilot ? qsTr("Pilot voice: consent of %1").arg(changeId) : qsTr("Consent of %1").arg(changeId)
     Component.onCompleted: { access.clearMessage(); date.text = access.today; if (adding) code.take(); else date.take() }
     Row {
         visible: d.adding
@@ -20,8 +21,8 @@ ModalPanel {
         TextEntry { id: name; width: (parent.width - 2 * parent.spacing) * 0.44; label: qsTr("Name (optional)"); maximumLength: 60 }
         TextEntry { id: rank; width: (parent.width - 2 * parent.spacing) * 0.28; label: qsTr("Rank (optional)"); maximumLength: 60 }
     }
-    Label { text: qsTr("Consent to be recorded (required)"); font.weight: Font.DemiBold }
-    Label { width: parent.width; text: d.access.consentText; wrapMode: Text.WordWrap; color: Theme.textSecondary; font.pixelSize: Theme.small }
+    Label { text: d.pilot ? qsTr("Use as the pilot voice") : qsTr("Consent to be recorded (required)"); font.weight: Font.DemiBold }
+    Label { width: parent.width; text: d.pilot ? d.access.pilotVoiceText : d.access.consentText; wrapMode: Text.WordWrap; color: Theme.textSecondary; font.pixelSize: Theme.small }
     Row {
         spacing: Theme.s12
         ChoiceButton { anchors.bottom: parent.bottom; text: qsTr("Yes"); selected: d.consent === 1; onClicked: d.consent = 1 }
@@ -42,7 +43,8 @@ ModalPanel {
             focusPolicy: Qt.NoFocus
             enabled: d.consent >= 0 && date.text.length === 10 && (!d.adding || code.text !== "")
             onClicked: if (d.adding ? d.access.addPerson(code.text, name.text, rank.text, d.consent === 1, date.text)
-                                    : d.access.setConsent(d.changeId, d.consent === 1, date.text)) d.closed()
+                                    : d.pilot ? d.access.setPilotVoice(d.changeId, d.consent === 1, date.text)
+                                              : d.access.setConsent(d.changeId, d.consent === 1, date.text)) d.closed()
         }
         SecondaryButton { text: qsTr("Cancel"); focusPolicy: Qt.NoFocus; onClicked: d.closed() }
     }

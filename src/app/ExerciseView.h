@@ -20,8 +20,8 @@ class ExerciseView {
   struct Setup {
     std::shared_ptr<const atc::Exercise> exercise;
     std::uint64_t seed = 1;
-    QString model;         // shown name
-    QString trainee;       // ID; empty: guest
+    QString model{};       // shown name
+    QString trainee{};     // ID; empty: guest
     bool consent = false;  // of the trainee on record
   };
   explicit ExerciseView(ExerciseController* c) : c_(c) {}

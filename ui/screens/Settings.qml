@@ -8,7 +8,7 @@ Item {
     property SettingsController settings
     property DashboardController dash
     property string selectedId
-    property string dialog            // "", "add" or "change"
+    property string dialog            // "", "add", "change" or "pilot"
     signal loginAsked()
     signal keyboardFree()             // a text field has gone: the shell takes the keyboard back
     readonly property int gap: Theme.s12
@@ -17,6 +17,17 @@ Item {
     onInstructorChanged: { if (!instructor) { dialog = ""; selectedId = "" } }
     onDialogChanged: if (dialog === "") keyboardFree()
 
+    // One answer of a record. again: a draft answer after an approved text is in place; it counts as no (D-135).
+    component Answer: Row {
+        id: a
+        property bool yes
+        property bool again
+        property string date
+        spacing: Theme.s4
+        StateIcon { level: !a.date ? 0 : a.yes && !a.again ? LabController.Ok : LabController.Caution; anchors.verticalCenter: parent.verticalCenter }
+        Label { height: parent.height; font.pixelSize: Theme.small
+                text: !a.date ? qsTr("not asked") : a.again ? qsTr("re-consent needed") : qsTr("%1 %2").arg(a.yes ? qsTr("yes") : qsTr("no")).arg(a.date) }
+    }
     Card {
         id: left
         x: s.gap; y: s.gap; width: s.leftW; height: s.height - 2 * s.gap
@@ -62,20 +73,20 @@ Item {
         title: qsTr("TRAINEE RECORDS")
         headerItems: Label { anchors.right: parent.right; height: parent.height; visible: s.instructor
                              text: qsTr("%1 records").arg(s.access.people.length); color: Theme.textSecondary; font.pixelSize: Theme.caption }
-        readonly property var cols: [0.18, 0.28, 0.2, 0.14, 0.2]
+        readonly property var cols: [0.15, 0.21, 0.14, 0.25, 0.25]
         Label { anchors.centerIn: parent; visible: !s.instructor; text: qsTr("Instructor only. Log in to see or change records."); color: Theme.textSecondary }
         Row {
             visible: s.instructor
             x: Theme.s12; width: parent.width - 2 * x; height: Theme.px(30)
             Repeater {
-                model: [qsTr("ID"), qsTr("Name"), qsTr("Rank"), qsTr("Consent"), qsTr("Date")]
+                model: [qsTr("ID"), qsTr("Name"), qsTr("Rank"), qsTr("Recording consent"), qsTr("Pilot voice")]
                 Label { width: parent.width * records.cols[index]; height: parent.height; text: modelData; color: Theme.textSecondary; font.pixelSize: Theme.caption }
             }
         }
         ListView {
             id: list
             visible: s.instructor
-            y: Theme.px(30); width: parent.width; height: parent.height - y - Theme.px(140)
+            y: Theme.px(30); width: parent.width; height: parent.height - y - Theme.px(180)
             clip: true
             reuseItems: true
             boundsBehavior: Flickable.StopAtBounds
@@ -92,26 +103,22 @@ Item {
                     Label { width: parent.width * records.cols[0]; height: parent.height; mono: true; text: row.d.id; font.weight: Font.DemiBold }
                     Label { width: parent.width * records.cols[1]; height: parent.height; text: row.d.name || "-"; font.pixelSize: Theme.small }
                     Label { width: parent.width * records.cols[2]; height: parent.height; text: row.d.rank || "-"; font.pixelSize: Theme.small }
-                    Row {
-                        width: parent.width * records.cols[3]; height: parent.height
-                        spacing: Theme.s4
-                        StateIcon { level: row.d.consent ? LabController.Ok : LabController.Caution; anchors.verticalCenter: parent.verticalCenter }
-                        Label { height: parent.height; text: row.d.consent ? qsTr("yes") : qsTr("no"); font.pixelSize: Theme.small }
-                    }
-                    Label { width: parent.width * records.cols[4]; height: parent.height; mono: true; text: row.d.date; font.pixelSize: Theme.small }
+                    Answer { width: parent.width * records.cols[3]; height: parent.height; yes: row.d.consent; date: row.d.date; again: row.d.again }
+                    Answer { width: parent.width * records.cols[4]; height: parent.height; yes: row.d.pilot; date: row.d.pilotDate; again: row.d.pilotAgain }
                 }
                 Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: Theme.line; color: Theme.divider }
                 TapHandler { onTapped: s.selectedId = row.d.id }
                 Accessible.role: Accessible.ListItem
-                Accessible.name: qsTr("%1, consent %2").arg(row.d.id).arg(row.d.consent ? qsTr("yes") : qsTr("no"))
+                Accessible.name: qsTr("%1, recording consent %2").arg(row.d.id).arg(row.d.again ? qsTr("needed again") : row.d.consent ? qsTr("yes") : qsTr("no"))
             }
         }
-        Label { visible: s.instructor; x: Theme.s12; y: parent.height - Theme.px(132); width: parent.width - 2 * x; height: Theme.px(60)
-                text: s.access.consentText; wrapMode: Text.WordWrap; color: Theme.textSecondary; font.pixelSize: Theme.small }
+        Label { visible: s.instructor; x: Theme.s12; y: parent.height - Theme.px(172); width: parent.width - 2 * x; height: Theme.px(100)
+                objectName: "consentTexts"; text: s.access.consentText + "\n" + s.access.pilotVoiceText; wrapMode: Text.WordWrap; color: Theme.textSecondary; font.pixelSize: Theme.small }
         Row {
             visible: s.instructor
             anchors { right: parent.right; rightMargin: Theme.s12; bottom: parent.bottom; bottomMargin: Theme.s12 }
             spacing: Theme.s12
+            SecondaryButton { text: qsTr("Pilot voice"); focusPolicy: Qt.NoFocus; enabled: s.selectedId !== ""; onClicked: s.dialog = "pilot" }
             SecondaryButton { text: qsTr("Change consent"); focusPolicy: Qt.NoFocus; enabled: s.selectedId !== ""; onClicked: s.dialog = "change" }
             PrimaryButton { text: qsTr("Add"); width: Theme.px(96); focusPolicy: Qt.NoFocus; onClicked: s.dialog = "add" }
         }
@@ -120,7 +127,7 @@ Item {
         anchors.fill: parent
         active: s.dialog !== ""
         sourceComponent: Component {
-            PersonDialog { access: s.access; changeId: s.dialog === "change" ? s.selectedId : ""; onClosed: s.dialog = "" }
+            PersonDialog { access: s.access; changeId: s.dialog === "add" ? "" : s.selectedId; pilot: s.dialog === "pilot"; onClosed: s.dialog = "" }
         }
     }
 }

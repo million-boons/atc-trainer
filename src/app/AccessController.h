@@ -15,10 +15,12 @@
 
 // What the login needs from outside. Texts: empty, or the reason of a refusal.
 struct AccessBackend {
+  atc::ConsentVersions versions{};  // of the texts shown (D-135)
   std::function<std::string()> load;
   std::function<std::vector<atc::Person>()> people;
   std::function<std::string(atc::Person, const std::string& today)> add;
   std::function<std::string(const std::string& id, bool consent, const std::string& date, const std::string& today)> setConsent;
+  std::function<std::string(const std::string& id, bool consent, const std::string& date, const std::string& today)> setPilotVoice;  // D-133
   std::function<bool()> pinSet;
   std::function<bool(const std::string& pin)> checkPin;  // slow: called on a worker thread
 };
@@ -34,19 +36,20 @@ class AccessController : public QObject {
   Q_PROPERTY(QString personId READ personId NOTIFY changed)
   Q_PROPERTY(QString shortText READ shortText NOTIFY changed)  // status bar
   Q_PROPERTY(QString longText READ longText NOTIFY changed)
-  Q_PROPERTY(QVariantList people READ people NOTIFY changed)   // {id, name, rank, consent, date}; names only for the instructor
+  Q_PROPERTY(QVariantList people READ people NOTIFY changed)   // {id, name, rank, consent, date, again, pilot, pilotDate, pilotAgain}; names only for the instructor
   Q_PROPERTY(bool pinSet READ pinSet NOTIFY changed)
   Q_PROPERTY(bool busy READ busy NOTIFY changed)               // the PIN is being checked
   Q_PROPERTY(QString message READ message NOTIFY changed)      // why the last request was refused
   Q_PROPERTY(QString today READ today NOTIFY changed)
   Q_PROPERTY(QString consentText READ consentText CONSTANT)    // D-114
+  Q_PROPERTY(QString pilotVoiceText READ pilotVoiceText CONSTANT)  // D-133
  public:
   explicit AccessController(AccessBackend b, std::function<atc::Ns()> clock = atc::monotonicNow, QObject* parent = nullptr);
   ~AccessController() override;
   void setLab(LabController* lab) { lab_ = lab; }
 
   atc::Role role() const { return role_; }
-  bool consent() const;  // of the trainee who is logged in
+  bool consent() const;  // of the trainee who is logged in; no if it must be asked again
   bool trainee() const { return role_ == atc::Role::Trainee; }
   bool instructor() const { return role_ == atc::Role::Instructor; }
   QString personId() const { return id_; }
@@ -58,6 +61,7 @@ class AccessController : public QObject {
   QString message() const { return message_; }
   QString today() const;
   QString consentText() const;
+  QString pilotVoiceText() const;
 
   // An instructor without input for this long is logged out (D-120). Input is any key, touch or mouse event of
   // the application (install this object as its event filter) and any transmission.
@@ -74,6 +78,7 @@ class AccessController : public QObject {
   // Instructor only. False: message says why.
   Q_INVOKABLE bool addPerson(const QString& id, const QString& name, const QString& rank, bool consent, const QString& date);
   Q_INVOKABLE bool setConsent(const QString& id, bool consent, const QString& date);
+  Q_INVOKABLE bool setPilotVoice(const QString& id, bool consent, const QString& date);
 
  signals:
   void changed();
@@ -90,6 +95,7 @@ class AccessController : public QObject {
 
   AccessBackend b_;
   std::function<atc::Ns()> clock_;
+  QString draft(const std::string& version) const;  // the mark of D-134, while the version is a draft
   QPointer<LabController> lab_;
   atc::Role role_ = atc::Role::None;
   QString id_, message_, loadError_;

@@ -48,6 +48,7 @@ class ExerciseController : public QObject {
   Q_PROPERTY(bool choice READ choice NOTIFY changed)
   Q_PROPERTY(QString choiceTitle READ choiceTitle NOTIFY changed)
   Q_PROPERTY(QString choiceText READ choiceText NOTIFY changed)
+  Q_PROPERTY(bool pinAsked READ pinAsked NOTIFY changed)  // Assessed: the instructor's PIN is needed to end (D-125, D-129)
   Q_PROPERTY(QVariantMap result READ result NOTIFY resultChanged)
   Q_PROPERTY(QAbstractItemModel* transcript READ transcript CONSTANT)  // newest first
   Q_PROPERTY(QAbstractItemModel* timeline READ timeline CONSTANT)      // oldest first
@@ -77,7 +78,7 @@ class ExerciseController : public QObject {
   void setAlert(int level, const QString& t, bool verdict = false);
   void setChoice(const QString& title, const QString& text);  // text is hidden in Assessed; also the trainee's "Instructor notified"
   void clearChoice();
-  void endConfirmed();  // the instructor's PIN was right (Assessed, D-125)
+  void endConfirmed();  // the instructor's PIN was right; only while it is asked for
   // chips: list of {value, uncertain}. An uncertain value is passed as heard and never corrected.
   void addAtc(const QString& time, const QString& text, const QString& intent, const QVariantList& chips, const QString& cls, bool recognised, const QString& delay);
   void addPilot(const QString& time, const QString& text);
@@ -109,6 +110,7 @@ class ExerciseController : public QObject {
   QString notice() const { return hide() && notice_.verdict ? QString() : notice_.text; }
   int alertLevel() const;  // footer
   QString alert() const;
+  bool pinAsked() const { return pin_ != Pin::No; }
   bool choice() const { return choice_ && phase_ == Running; }
   QString choiceTitle() const { return choiceTitle_; }
   QString choiceText() const { return hide() ? QString() : choiceText_; }
@@ -118,7 +120,9 @@ class ExerciseController : public QObject {
 
   Q_INVOKABLE void start(bool assessed);  // refused if the mode is not available
   Q_INVOKABLE void cancelStart() { emit cancelStartRequested(); }
-  Q_INVOKABLE void stop();  // refused while a choice is open in Assessed: the PIN is needed
+  Q_INVOKABLE void stop();        // Practice; refused in Assessed: the PIN is needed (D-129)
+  Q_INVOKABLE void requestEnd();  // Assessed: ask for the PIN
+  Q_INVOKABLE void cancelEnd();
   Q_INVOKABLE void continueExercise();  // the pilot calls again
   Q_INVOKABLE void showResult();
   Q_INVOKABLE void useScreenPtt();
@@ -160,6 +164,8 @@ class ExerciseController : public QObject {
   int done_ = 0;
   Line notice_, alert_;
   bool choice_ = false;
+  enum class Pin { No, Stop, Choice };  // Choice: asked from the choice dialog, and ends with it
+  Pin pin_ = Pin::No;
   QString choiceTitle_, choiceText_;
   QVariantMap result_;
   RowModel transcript_, timeline_;

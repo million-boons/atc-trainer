@@ -24,22 +24,32 @@ AccessController::~AccessController() {
 bool AccessController::consent() const {
   if (!trainee()) return false;
   for (const Person& p : b_.people())
-    if (QString::fromStdString(p.id) == id_) return p.consent;
+    if (QString::fromStdString(p.id) == id_) return mayRecord(p, b_.versions);
   return false;
 }
 
 QString AccessController::shortText() const { return instructor() ? tr("Instructor") : trainee() ? id_ : tr("Log in"); }
 QString AccessController::longText() const { return instructor() ? tr("Instructor") : trainee() ? tr("%1  trainee").arg(id_) : tr("Not logged in"); }
 QString AccessController::today() const { return QDate::currentDate().toString(Qt::ISODate); }
+QString AccessController::draft(const std::string& version) const {
+  return isDraftConsent(version) ? " [" + tr("draft — to be approved by the unit") + "]" : QString();
+}
+
 QString AccessController::consentText() const {
-  return tr("Voice recordings stay on this machine. Consent covers copies to project machines on the local network (offline, never cloud).");
+  return tr("Voice recordings stay on this machine. Consent covers copies to project machines on the local network (offline, never cloud).") + draft(b_.versions.recording);
+}
+
+QString AccessController::pilotVoiceText() const {
+  return tr("Pilot voice (separate answer): Your recorded phrases may be used as the pilot's voice in training exercises and heard by other trainees. You can withdraw this at any time through the instructor; your phrases are then taken out of use immediately.") + draft(b_.versions.pilotVoice);
 }
 
 QVariantList AccessController::people() const {
   QVariantList l;
   if (!b_.people) return l;
   for (const Person& p : b_.people()) {
-    QVariantMap m{{"id", QString::fromStdString(p.id)}, {"consent", p.consent}, {"date", QString::fromStdString(p.consentDate)}};
+    QVariantMap m{{"id", QString::fromStdString(p.id)}, {"consent", p.consent}, {"date", QString::fromStdString(p.consentDate)},
+                  {"again", recordingAgain(p, b_.versions)}, {"pilot", p.pilotVoice},
+                  {"pilotDate", QString::fromStdString(p.pilotVoiceDate)}, {"pilotAgain", pilotVoiceAgain(p, b_.versions)}};
     if (instructor()) {
       m["name"] = QString::fromStdString(p.name);
       m["rank"] = QString::fromStdString(p.rank);
@@ -173,6 +183,11 @@ bool AccessController::addPerson(const QString& id, const QString& name, const Q
   if (!mayManagePeople(role_) || !b_.add) return refuse(tr("Only the instructor may add a record."));
   return done(b_.add({id.trimmed().toStdString(), name.trimmed().toStdString(), rank.trimmed().toStdString(), consent, date.trimmed().toStdString()},
                      today().toStdString()));
+}
+
+bool AccessController::setPilotVoice(const QString& id, bool consent, const QString& date) {
+  if (!mayManagePeople(role_) || !b_.setPilotVoice) return refuse(tr("Only the instructor may change consent."));
+  return done(b_.setPilotVoice(id.toStdString(), consent, date.trimmed().toStdString(), today().toStdString()));
 }
 
 bool AccessController::setConsent(const QString& id, bool consent, const QString& date) {

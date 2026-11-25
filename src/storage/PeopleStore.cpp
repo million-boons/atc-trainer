@@ -65,6 +65,13 @@ std::string PeopleStore::load() {
       p.rank = x.value("rank", "");
       x.at("consent").get_to(p.consent);
       x.at("consent_date").get_to(p.consentDate);
+      p.consentVersion = x.value("consent_version", "");
+      if (x.contains("pilot_voice") || x.contains("pilot_voice_date")) {
+        x.at("pilot_voice").get_to(p.pilotVoice);
+        x.at("pilot_voice_date").get_to(p.pilotVoiceDate);
+        p.pilotVoiceVersion = x.value("pilot_voice_version", "");
+        if (!validDate(p.pilotVoiceDate)) throw std::runtime_error("record");
+      }
       if (!validPersonId(p.id) || !validDate(p.consentDate)) throw std::runtime_error("record");
       if (std::any_of(next.begin(), next.end(), [&](const Person& q) { return sameId(q.id, p.id); })) throw std::runtime_error("duplicate");
       next.push_back(std::move(p));
@@ -81,8 +88,14 @@ std::string PeopleStore::save(const std::vector<Person>& next) {
   json list = json::array();
   for (const Person& p : next) {
     json x{{"id", p.id}, {"consent", p.consent}, {"consent_date", p.consentDate}};
+    if (!p.consentVersion.empty()) x["consent_version"] = p.consentVersion;
     if (!p.name.empty()) x["name"] = p.name;
     if (!p.rank.empty()) x["rank"] = p.rank;
+    if (!p.pilotVoiceDate.empty()) {
+      x["pilot_voice"] = p.pilotVoice;
+      x["pilot_voice_date"] = p.pilotVoiceDate;
+      if (!p.pilotVoiceVersion.empty()) x["pilot_voice_version"] = p.pilotVoiceVersion;
+    }
     list.push_back(std::move(x));
   }
   const json j{{"format", 1}, {"people", list}};
@@ -97,6 +110,10 @@ std::string PeopleStore::add(Person p, std::string_view today) {
   if (find(p.id)) return "this ID exists already";
   if (p.name.size() > kMaxText || p.rank.size() > kMaxText) return "the name or rank is too long";
   if (auto why = badDate(p.consentDate, today); !why.empty()) return why;
+  p.pilotVoice = false;  // its own question, with setPilotVoice()
+  p.pilotVoiceDate.clear();
+  p.pilotVoiceVersion.clear();
+  p.consentVersion = versions_.recording;
   auto next = people_;
   next.push_back(std::move(p));
   return save(next);
@@ -111,6 +128,21 @@ std::string PeopleStore::setConsent(std::string_view id, bool consent, const std
     if (sameId(p.id, id)) {
       p.consent = consent;
       p.consentDate = date;
+      p.consentVersion = versions_.recording;
+    }
+  return save(next);
+}
+
+std::string PeopleStore::setPilotVoice(std::string_view id, bool consent, const std::string& date, std::string_view today) {
+  if (!loaded_) return "the trainee records cannot be read";
+  if (!find(id)) return "no such ID";
+  if (auto why = badDate(date, today); !why.empty()) return why;
+  auto next = people_;
+  for (Person& p : next)
+    if (sameId(p.id, id)) {
+      p.pilotVoice = consent;
+      p.pilotVoiceDate = date;
+      p.pilotVoiceVersion = versions_.pilotVoice;
     }
   return save(next);
 }
