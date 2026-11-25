@@ -95,10 +95,12 @@ Item {
     component Rows: Column {
         id: rows
         property var model: []
+        property real maxHeight: Infinity   // more rows than fit: lower rows, none is cut off
+        readonly property int rowH: Math.min(Theme.px(27), Math.floor(maxHeight / Math.max(1, model.length)))
         Repeater {
             model: rows.model
             Item {
-                width: rows.width; height: Theme.px(27)
+                width: rows.width; height: rows.rowH
                 Label { height: parent.height; width: parent.width - v.width - Theme.s8; text: modelData.name
                         color: Theme.textSecondary; font.pixelSize: Theme.small }
                 Label { id: v; anchors.right: parent.right; height: parent.height; text: modelData.value
@@ -112,7 +114,7 @@ Item {
         x: s.gap; y: steps.y + steps.height + s.gap
         width: Math.round((s.midW - s.gap) / 2); height: s.midY + s.midH - y
         title: qsTr("PTT DISCIPLINE")
-        Rows { x: Theme.s12; y: Theme.s4; width: parent.width - 2 * x; model: s.r.ptt || [] }
+        Rows { x: Theme.s12; y: Theme.s4; width: parent.width - 2 * x; maxHeight: parent.height - 2 * y; model: s.r.ptt || [] }
     }
     Card {
         x: ptt.x + ptt.width + s.gap; y: ptt.y

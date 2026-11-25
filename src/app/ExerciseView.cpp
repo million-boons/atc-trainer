@@ -122,6 +122,7 @@ void ExerciseView::prepare(Setup s) {
   clearances_.clear();
   pressed_.clear();
   utterances_.clear();
+  firstCall_ = firstNotice_ = keyedOver_ = false;
   row_.clear();
   early_.clear();
   sayAgain_.clear();
@@ -160,20 +161,29 @@ void ExerciseView::output(Ns t, const EngineOutput& o) {
   if (s_.exercise) std::visit([&](const auto& x) { on(t, x); }, o);
 }
 
-void ExerciseView::on(Ns t, const in::Started&) { t0_ = t; }
+void ExerciseView::on(Ns t, const in::Started&) {
+  t0_ = t;
+  const auto* s = s_.exercise->scenario.step(s_.exercise->scenario.initialStep);
+  firstCall_ = s && s->onEnter;
+  firstNotice_ = firstCall_;
+  if (firstCall_) c_->setNotice(L::None, tr("The pilot calls first."));
+}
 
 void ExerciseView::on(Ns, const in::TxOpened& x) {
   pressed_[x.tx] = x.press;
   if (c_->choice()) return;  // the instructor is still asked; the transmission may end it
-  c_->setNotice(L::None, {});
+  if (!keyedOver_) c_->setNotice(L::None, {});  // the key-over notice belongs to this transmission
   c_->setAlert(L::Ok, tr("Text appears after release"));
 }
 
 void ExerciseView::on(Ns, const in::TxCancelled&) {
+  if (std::exchange(keyedOver_, false) && s_.exercise->scenario.repeatInterruptedReply)
+    c_->setNotice(L::Caution, tr("Short tap: nothing was said. The pilot repeats the reply."));
   if (!c_->choice()) c_->setAlert(L::Ok, tr("Exercise running"));
 }
 
 void ExerciseView::on(Ns t, const in::Recognised& x) {
+  keyedOver_ = false;
   c_->clearChoice();
   const ParsedInstruction& p = x.instruction;
   const auto it = pressed_.find(p.tx);
@@ -207,14 +217,21 @@ void ExerciseView::on(Ns t, const in::Recognised& x) {
 void ExerciseView::on(Ns t, const in::PilotStarted& x) {
   const auto it = utterances_.find(x.utterance);
   if (it == utterances_.end()) return;
-  c_->addPilot(time(t), it->second);
-  timeline_.append(QVariantList{time(t), tr("PILOT"), it->second, QString(), 0});
+  if (std::exchange(firstCall_, false) && firstNotice_) c_->setNotice(L::None, {});  // never a verdict
+  c_->addPilot(time(t), it->second.text);
+  timeline_.append(QVariantList{time(t), tr("PILOT"), it->second.text, QString(), 0});
 }
 
 void ExerciseView::on(Ns, const in::PilotEnded& x) {
   if (x.end == in::PilotEnd::Interrupted) {
-    c_->setNotice(L::Caution, s_.exercise->scenario.repeatInterruptedReply ? tr("You keyed over the pilot. The reply will be repeated.")
-                                                                           : tr("You keyed over the pilot. The reply is not repeated."));
+    // D-325: the new instruction is answered first; only a readback is still owed after it.
+    const auto it = utterances_.find(x.utterance);
+    const bool repeats = s_.exercise->scenario.repeatInterruptedReply;
+    keyedOver_ = true;
+    c_->setNotice(L::Caution, !repeats ? tr("You keyed over the pilot. The reply is not repeated.")
+                              : it != utterances_.end() && it->second.owed
+                                  ? tr("You keyed over the pilot. The readback will be repeated after the answer to you.")
+                                  : tr("You keyed over the pilot. The pilot answers what you say now."));
   } else if (x.end == in::PilotEnd::TimedOut) {
     c_->setNotice(L::Fault, tr("Pilot voice stopped: playback did not finish. The reply is shown as text only."));
     c_->setAlert(L::Fault, tr("Fault logged: pilot speech watchdog"));
@@ -257,6 +274,7 @@ void ExerciseView::on(Ns t, const out::Judged& x) {
     return;
   }
   judged_ = x.tx;
+  firstNotice_ = false;
   calls_ = 0;
   if (x.tx && x.tx == faultTx_) {  // the system failed: nothing about the trainee (D-317)
     if (const auto r = row_.find(x.tx); r != row_.end()) {
@@ -266,7 +284,12 @@ void ExerciseView::on(Ns t, const out::Judged& x) {
     return;
   }
   if (early_.erase(x.tx) && x.outcome != Outcome::Correct) {  // before the pilot's call: no attempt (D-322)
-    if (const auto r = row_.find(x.tx); r != row_.end()) timeline_[r->second][3] = tr("%1, not counted").arg(q(toString(x.outcome)).replace('_', ' '));
+    const QString word = q(toString(x.outcome)).replace('_', ' ');
+    if (const auto r = row_.find(x.tx); r != row_.end()) {
+      timeline_[r->second][3] = tr("%1, not counted").arg(word);
+      timeline_[r->second][4] = int(L::Caution);
+    }
+    c_->setNotice(L::Caution, tr("Called before the pilot: %1. Not counted as an attempt.").arg(word), true);
     return;
   }
   const int i = stepIndex(x.step);
@@ -294,12 +317,14 @@ void ExerciseView::on(Ns t, const out::Judged& x) {
 
 void ExerciseView::on(Ns t, const out::AtcBeforePilot& x) {
   early_.insert(x.tx);
-  c_->addNote(L::Caution, tr("ATC called before pilot"));
-  timeline_.append(QVariantList{time(t), tr("ATC"), tr("ATC called before pilot"), QString(), int(L::Caution)});
+  c_->addNote(L::Caution, tr("You called before the pilot"));
+  firstNotice_ = true;
+  c_->setNotice(L::Caution, tr("The pilot calls first. Wait for the call."));
+  timeline_.append(QVariantList{time(t), tr("ATC"), tr("Transmitted before the pilot's first call"), tr("ATC CALLED BEFORE PILOT"), int(L::Caution)});
 }
 
 void ExerciseView::on(Ns, const out::PilotRequested& x) {
-  utterances_[x.utterance.id] = q(x.utterance.text);
+  utterances_[x.utterance.id] = {q(x.utterance.text), x.utterance.owed};
   if (x.utterance.unprompted && x.utterance.cause == Outcome::Timeout) {
     const auto* s = s_.exercise->scenario.step(step_);
     ++calls_;
@@ -380,6 +405,7 @@ void ExerciseView::ended(const ExerciseResult& r, QDateTime at) {
   const QVariantList ptt{row(tr("Transmissions"), n(r.ptt.transmissions)), row(tr("Spoke before keying"), n(r.ptt.spokeBeforeKeying)),
                          row(tr("Released early"), n(r.ptt.releasedEarly)), row(tr("Short taps"), n(r.ptt.shortTaps)),
                          row(tr("No speech"), n(r.ptt.noSpeech)), row(tr("Keyed over the pilot"), n(r.ptt.keyedOverPilot)),
+                         row(tr("Called before the pilot"), n(r.atcBeforePilot)),
                          row(tr("Key to speech, median"), r.ptt.keyToSpeechMs ? tr("%1 s").arg(*r.ptt.keyToSpeechMs / 1000.0, 0, 'f', 2) : QStringLiteral("-")),
                          row(tr("Fallback PTT used"), r.fallbackPttUsed() ? tr("yes, %1").arg(r.ptt.fallback) : tr("no"))};
   const QVariantList speech{row(tr("Speech model"), s_.model), row(tr("Release to text, median"), median(delays_)),

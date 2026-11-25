@@ -27,3 +27,8 @@ Branch and worktree `ui`, everything committed. Next free decision number: D-141
 - b2's screenshots were gone (restart). New ones by ui from b2's finished 10:53 program, mock, off-screen, no build: 11 cases at 1280x800 (10 opened, not exresult), 5 at 1920x1080 (4 opened, on sheets at 3/4 size). Fixed in 44ecc8a, not built: Result titles ran together; selected model name cut off in the Lab; mock result without "Fallback PTT used"; D-321 (Run again drew a second seed, the Start dialog did not show the values).
 - Seen and left: in the Lab's recording list the model name is shortened in the middle at 1280x800 ("Whisper tiny...ompt"), so two models can look the same; the full name is in the stored result.
 - Not seen: the Lab with another model loaded than selected (no mock case).
+
+## After main 53e23ef (2026-11-25, evening; 3c running, so nothing built, run or grabbed)
+- Merged. Texts and tests for D-322 ("The pilot calls first.", "You called before the pilot", "Not counted as an attempt", row "Called before the pilot" in the result, timeline "ATC CALLED BEFORE PILOT") and D-325 (the key-over notice says what the pilot will do: readback repeated after the answer / answers what you say now / short tap repeats). Not compiled.
+- Found while reading: the key-over notice was cleared at once, because the transmission that cuts the pilot opens right after; fixed, with a test.
+- Result: more PTT rows than fit make the rows lower instead of cutting the last one off.

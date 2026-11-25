@@ -78,7 +78,11 @@ class ExerciseView {
   QList<int> attempts_;
   QStringList clearances_;
   std::map<std::uint64_t, atc::Ns> pressed_;
-  std::map<std::uint64_t, QString> utterances_;
+  struct Said { QString text; bool owed = false; };
+  std::map<std::uint64_t, Said> utterances_;
+  bool firstCall_ = false;                       // the pilot's first call has not begun
+  bool firstNotice_ = false;                     // the notice is about that call
+  bool keyedOver_ = false;                       // the open transmission cut the pilot
   std::set<std::uint64_t> early_;                // transmitted before the pilot's first call (D-322)
   std::map<std::uint64_t, int> row_;             // timeline row of a transmission
   std::map<std::string, int> sayAgain_;
