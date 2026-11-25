@@ -10,6 +10,8 @@ Authored by engine from the user's dialogue scripts, in `data/scenarios`, all PL
 
 ## 2. Planner API (P), same form as the Studio interface in 07
 
+**Drafted in full in `10-planner-backend.md` (2026-11-26), which replaces this section and section 3 once the user approves it.**
+
 | Function | Does | Refuses |
 |---|---|---|
 | `scenarios()` | the predefined ones: id, name, status, steps, pools, load errors | – |
