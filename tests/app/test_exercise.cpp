@@ -167,7 +167,9 @@ TEST(Exercise, AGuestHasNoAudio) {  // D-127
   EXPECT_FALSE(c.audioSaved());
   EXPECT_TRUE(c.audioText().contains("guest"));
   EXPECT_EQ(c.who(), "Guest");
-  c.begin({.trainee = "S01"}, false, true);
+  ExerciseContext x;
+  x.trainee = "S01";
+  c.begin(x, false, true);
   EXPECT_TRUE(c.audioSaved());
   EXPECT_EQ(c.who(), "S01");
 }

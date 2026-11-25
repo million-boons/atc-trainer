@@ -19,6 +19,7 @@ struct AccessBackend {
   std::function<std::vector<atc::Person>()> people;
   std::function<std::string(atc::Person, const std::string& today)> add;
   std::function<std::string(const std::string& id, bool consent, const std::string& date, const std::string& today)> setConsent;
+  std::function<std::string(const std::string& id, bool consent, const std::string& date, const std::string& today)> setPilotVoice;  // D-133
   std::function<bool()> pinSet;
   std::function<bool(const std::string& pin)> checkPin;  // slow: called on a worker thread
 };
@@ -34,12 +35,13 @@ class AccessController : public QObject {
   Q_PROPERTY(QString personId READ personId NOTIFY changed)
   Q_PROPERTY(QString shortText READ shortText NOTIFY changed)  // status bar
   Q_PROPERTY(QString longText READ longText NOTIFY changed)
-  Q_PROPERTY(QVariantList people READ people NOTIFY changed)   // {id, name, rank, consent, date}; names only for the instructor
+  Q_PROPERTY(QVariantList people READ people NOTIFY changed)   // {id, name, rank, consent, date, pilot, pilotDate}; names only for the instructor
   Q_PROPERTY(bool pinSet READ pinSet NOTIFY changed)
   Q_PROPERTY(bool busy READ busy NOTIFY changed)               // the PIN is being checked
   Q_PROPERTY(QString message READ message NOTIFY changed)      // why the last request was refused
   Q_PROPERTY(QString today READ today NOTIFY changed)
   Q_PROPERTY(QString consentText READ consentText CONSTANT)    // D-114
+  Q_PROPERTY(QString pilotVoiceText READ pilotVoiceText CONSTANT)  // D-133
  public:
   explicit AccessController(AccessBackend b, std::function<atc::Ns()> clock = atc::monotonicNow, QObject* parent = nullptr);
   ~AccessController() override;
@@ -58,6 +60,7 @@ class AccessController : public QObject {
   QString message() const { return message_; }
   QString today() const;
   QString consentText() const;
+  QString pilotVoiceText() const;
 
   // An instructor without input for this long is logged out (D-120). Input is any key, touch or mouse event of
   // the application (install this object as its event filter) and any transmission.
@@ -74,6 +77,7 @@ class AccessController : public QObject {
   // Instructor only. False: message says why.
   Q_INVOKABLE bool addPerson(const QString& id, const QString& name, const QString& rank, bool consent, const QString& date);
   Q_INVOKABLE bool setConsent(const QString& id, bool consent, const QString& date);
+  Q_INVOKABLE bool setPilotVoice(const QString& id, bool consent, const QString& date);
 
  signals:
   void changed();

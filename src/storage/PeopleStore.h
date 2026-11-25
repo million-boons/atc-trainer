@@ -12,13 +12,20 @@ struct Person {
   std::string name, rank;    // optional; never written into recordings or logs
   bool consent = false;      // to be recorded, on this machine
   std::string consentDate;   // YYYY-MM-DD, the day the answer was given, yes or no
+  bool pilotVoice = false;       // separate answer (D-133): heard by other trainees as the pilot voice
+  std::string pilotVoiceDate{};  // empty: never asked, which counts as no
 };
+
+// May this person be recorded for the pilot voice (D-132, D-133)? Both answers are needed.
+inline bool mayRecordPilot(const Person& p) { return p.consent && p.pilotVoice && !p.pilotVoiceDate.empty(); }
+// May takes of this person be used in an exercise? Withdrawn: at once no.
+inline bool mayUsePilotVoice(const Person& p) { return p.pilotVoice && !p.pilotVoiceDate.empty(); }
 
 bool validPersonId(std::string_view id);
 bool validDate(std::string_view d);  // a real day, YYYY-MM-DD
 
 // people.json in the writable folder, readable by the owner only. Not thread-safe. Who may call
-// add() and setConsent() is checked by the caller (mayManagePeople). A file that cannot be
+// add(), setConsent() and setPilotVoice() is checked by the caller (mayManagePeople). A file that cannot be
 // read is reported and never overwritten. Every call returns an empty text or the reason.
 class PeopleStore {
  public:
@@ -28,6 +35,7 @@ class PeopleStore {
   const Person* find(std::string_view id) const;  // upper and lower case are the same person
   std::string add(Person p, std::string_view today);
   std::string setConsent(std::string_view id, bool consent, const std::string& date, std::string_view today);
+  std::string setPilotVoice(std::string_view id, bool consent, const std::string& date, std::string_view today);
 
  private:
   std::string save(const std::vector<Person>& next);

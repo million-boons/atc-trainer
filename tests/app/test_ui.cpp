@@ -302,6 +302,13 @@ TEST_F(Ui, InstructorSettingsAndRecords) {
   clickButton("No");
   clickButton("Change consent");
   EXPECT_FALSE(access.people()[2].toMap()["consent"].toBool());
+  EXPECT_TRUE(allText().contains("not asked"));
+  clickButton("Pilot voice");  // a separate answer (D-133)
+  EXPECT_TRUE(allText().contains("Pilot voice: consent of S03"));
+  clickButton("Yes");
+  clickButton("Change consent");
+  EXPECT_TRUE(access.people()[2].toMap()["pilot"].toBool());
+  EXPECT_FALSE(access.people()[2].toMap()["consent"].toBool());
 }
 
 TEST_F(Ui, RecordingsCardSaysWhyNothingIsSaved) {

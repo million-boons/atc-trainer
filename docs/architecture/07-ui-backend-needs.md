@@ -31,7 +31,7 @@ Common rules: file work never on the GUI thread or RadioCore's thread; answers a
 | Trend | last 20 of one trainee and one scenario: errors, missed responses, response median, suspected STT; never added together | From the list |
 | Not used | pilot readback errors (H-4), score, pass mark, comparison of trainees (H-5), export | – |
 
-Guest results (D-131): no list on any screen. The store gives the instructor their count, and deletes them all in one action; each file deleted is a line in the deletion log, written first. The confirmation shows the count; if it changed since, the store refuses and the new count is shown (P).
+Guest results (D-131): no list on any screen. The store gives the instructor their count, and deletes them all in one action; each file deleted is a line in the deletion log, written first. The confirmation shows the count; if it changed since, the store refuses and the new count is shown.
 
 ## 5f Settings
 
@@ -66,7 +66,9 @@ Instructor only (D-25). Logic is engine's (`atc-scenario-pilot-engine`); the lis
 | Pending (S-1) | undecided takes in a separate `pending` folder, never read by bank, check or player; Accept moves to the bank as primary or alternate and writes the manifest; Reject keeps the file as rejected | **Missing** |
 | Coverage | per scenario: needed, primary, missing, unused | `checkCoverage` and the above |
 
-Speakers (D-132): only a person with a record and consent "yes"; the instructor starts the session and chooses the speaker; the ID (never name or rank) is stored with each take, also in `pending` and in the manifest. Consent is checked when the session starts and before each take is saved (P). D-31 applies: never in git. **Missing:** a speaker field in the manifest (engine's format). Not ruled: the consent text for this use, and takes of somebody whose consent becomes "no".
+Speakers (D-132): only a person with a record and consent "yes"; the instructor starts the session and chooses the speaker; the ID (never name or rank) is stored with each take, also in `pending` and in the manifest. Consent (recording and pilot voice) is checked when the session starts and before each take is saved. D-31 applies: never in git. **Missing:** speaker ID and pilot-voice consent per take in the manifest (engine's format).
+
+Consent withdrawn (D-133): the bank, the coverage check and the player must leave those takes out **at once**: a clip with no other take is then missing, and Start is blocked. The running program must notice the change (P: LiveExercise asks for a new check when an answer changes; not during an exercise, where no record can be changed). The Studio lists them "Consent withdrawn – delete or replace"; deletion by the instructor is logged first.
 
 ## Order and dependencies
 

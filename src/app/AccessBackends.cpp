@@ -20,6 +20,9 @@ AccessBackend realAccess([[maybe_unused]] const std::string& writable) {
   b.setConsent = [store](const std::string& id, bool consent, const std::string& date, const std::string& today) {
     return store->setConsent(id, consent, date, today);
   };
+  b.setPilotVoice = [store](const std::string& id, bool consent, const std::string& date, const std::string& today) {
+    return store->setPilotVoice(id, consent, date, today);
+  };
 #else
   b.load = [] { return std::string("built without the recording store"); };
   b.people = [] { return std::vector<Person>{}; };
@@ -51,6 +54,14 @@ AccessBackend mockAccess() {
       if (p.id == id) {
         p.consent = consent;
         p.consentDate = date;
+      }
+    return std::string();
+  };
+  b.setPilotVoice = [all](const std::string& id, bool consent, const std::string& date, const std::string&) {
+    for (Person& p : *all)
+      if (p.id == id) {
+        p.pilotVoice = consent;
+        p.pilotVoiceDate = date;
       }
     return std::string();
   };

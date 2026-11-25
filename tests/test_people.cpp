@@ -71,6 +71,40 @@ TEST_F(People, ConsentCanBeWithdrawn) {
   EXPECT_NE(s.setConsent("S01", true, "", kToday), "");
 }
 
+TEST_F(People, PilotVoiceIsASeparateAnswer) {  // D-132, D-133
+  PeopleStore s(file);
+  ASSERT_EQ(s.load(), "");
+  Person p{"S01", "", "", true, "2026-11-01"};
+  p.pilotVoice = true;  // cannot come with the record
+  p.pilotVoiceDate = kToday;
+  ASSERT_EQ(s.add(p, kToday), "");
+  EXPECT_FALSE(mayRecordPilot(*s.find("S01")));
+  EXPECT_EQ(text().find("pilot_voice"), std::string::npos);  // never asked
+  EXPECT_NE(s.setPilotVoice("S01", true, "2026-11-25", kToday), "");  // future
+  EXPECT_NE(s.setPilotVoice("S01", true, "", kToday), "");
+  EXPECT_NE(s.setPilotVoice("S09", true, kToday, kToday), "");
+  EXPECT_EQ(s.setPilotVoice("S01", true, "2026-11-20", kToday), "");
+  PeopleStore again(file);
+  ASSERT_EQ(again.load(), "");
+  EXPECT_TRUE(mayRecordPilot(*again.find("S01")));
+  EXPECT_EQ(again.find("S01")->pilotVoiceDate, "2026-11-20");
+  EXPECT_EQ(again.find("S01")->consentDate, "2026-11-01");  // unchanged
+  EXPECT_EQ(again.setPilotVoice("S01", false, kToday, kToday), "");  // withdrawn
+  EXPECT_FALSE(mayUsePilotVoice(*again.find("S01")));
+  EXPECT_TRUE(again.find("S01")->consent);
+  EXPECT_EQ(again.setPilotVoice("S01", true, kToday, kToday), "");
+  EXPECT_EQ(again.setConsent("S01", false, kToday, kToday), "");
+  EXPECT_FALSE(mayRecordPilot(*again.find("S01")));  // recording needs both
+  EXPECT_TRUE(mayUsePilotVoice(*again.find("S01")));
+}
+
+TEST_F(People, APilotAnswerWithoutADateIsNotRead) {
+  fs::create_directories(dir / "state");
+  std::ofstream(file) << "{\"format\":1,\"people\":[{\"id\":\"S01\",\"consent\":true,\"consent_date\":\"2026-11-01\",\"pilot_voice\":true}]}";
+  PeopleStore s(file);
+  EXPECT_NE(s.load(), "");
+}
+
 TEST_F(People, UnreadableFileIsNeverOverwritten) {
   fs::create_directories(dir / "state");
   for (const char* t : {"not json", "{\"format\":2,\"people\":[]}", "{\"format\":1,\"people\":[{\"id\":\"S01\"}]}"}) {

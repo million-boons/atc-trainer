@@ -155,6 +155,7 @@ TEST_F(Login, OnlyListedTraineesAndOnlyTheInstructorManages) {
   EXPECT_TRUE(a->loginTrainee("S01"));
   EXPECT_FALSE(a->addPerson("S03", "", "", true, "2026-11-24"));
   EXPECT_FALSE(a->setConsent("S02", true, "2026-11-24"));
+  EXPECT_FALSE(a->setPilotVoice("S02", true, "2026-11-24"));
   EXPECT_EQ(people.size(), 2u);
   EXPECT_FALSE(a->people()[0].toMap().contains("name"));  // names are for the instructor
   pin("482913");
@@ -221,6 +222,11 @@ TEST_F(Login, StoredSoundIsForTheInstructorAndDeleteNeedsThePlayer) {  // D-120
 
 TEST_F(Login, ConsentTextNamesTheLocalNetworkAndNoCloud) {  // D-114
   EXPECT_TRUE(a->consentText().contains("Consent covers copies to project machines on the local network (offline, never cloud)."));
+}
+
+TEST_F(Login, PilotVoiceTextSaysWhoHearsIt) {  // D-133
+  EXPECT_TRUE(a->pilotVoiceText().contains("heard by other trainees"));
+  EXPECT_FALSE(a->people()[0].toMap()["pilot"].toBool());
 }
 
 TEST_F(Login, SavedOnlyForAConsentingTrainee) {
