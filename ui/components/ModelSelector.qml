@@ -52,9 +52,10 @@ Item {
             id: status
             width: ms.readOnly ? Math.min(ms.width, Theme.px(260)) : Theme.px(104); height: Theme.touch
             StateIcon { id: ic; level: ms.stt.level; anchors.verticalCenter: st.verticalCenter }
-            Label { id: st; x: ic.width + Theme.px(5); y: sub.text ? Theme.px(7) : (parent.height - height) / 2
+            Label { id: st; x: ic.width + Theme.px(5); y: sub.text ? (parent.height - height - sub.height) / 2 : (parent.height - height) / 2
                     text: ms.stt.stateText; font { pixelSize: Theme.caption; weight: Font.DemiBold } }
-            Label { id: sub; y: Theme.px(26); width: parent.width; font.pixelSize: Theme.caption; color: Theme.textSecondary
+            Label { id: sub; objectName: "loadedModel"; y: st.y + st.height; width: parent.width; font.pixelSize: Theme.caption; color: Theme.textSecondary
+                    wrapMode: Text.WordWrap; maximumLineCount: 2; lineHeight: 0.95   // the whole name (D-126)
                     // Which model is loaded, when it is not the one in the dropdown.
                     text: ms.stt.loadedName && (ms.readOnly || ms.stt.loadedName !== ms.stt.selectedName) ? ms.stt.loadedName : "" }
         }

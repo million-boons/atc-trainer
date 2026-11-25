@@ -113,6 +113,7 @@ Item {
         readonly property int small: Math.round((s.fullW - 3 * spacing) * 0.19)
         PrimaryButton { width: s.fullW - 3 * start.spacing - 3 * start.small; height: parent.height
                         enabled: s.dash.startEnabled; focusPolicy: Qt.NoFocus
+                        onClicked: s.dash.startExercise()
                         text: s.dash.startEnabled ? qsTr("START EXERCISE") : qsTr("START EXERCISE (disabled)")
                         font { pixelSize: Theme.h2; weight: Font.DemiBold } }
         DangerButton { width: start.small; height: parent.height; text: qsTr("STOP"); enabled: s.dash.running
@@ -141,7 +142,7 @@ Item {
     Component {
         id: clipDialog
         ConfirmDialog {
-            title: qsTr("Missing clips (%1)").arg(s.dash.missingClips.length)
+            title: qsTr("Voice bank: %1").arg((s.dash.tiles[4] || {}).state || "")   // missing clips, or why the check failed
             rows: s.dash.missingClips
             closeText: qsTr("Close")
             onClosed: s.showClips = false

@@ -89,7 +89,8 @@ class LabController : public QObject {
   void setButtons(bool right, bool left);
   void setText(const QString& t, const QString& state, bool partial, const QString& resultInfo, bool placeholder);
   void setNotice(Level l, const QString& text);
-  void setAlert(Level l, const QString& text);
+  // ptt: it says that the PTT device is lost or missing. The footer says that once (D-126).
+  void setAlert(Level l, const QString& text, bool ptt = false);
   void addEvent(double t, const QString& src, const QString& edge, const QString& detail, bool warn);
   void setWords(const QStringList& words, const QList<double>& conf);
   void addRecording(LabRecording rec, const QString& time);
@@ -121,6 +122,7 @@ class LabController : public QObject {
   bool pilotCut() const { return pilotCut_; }
   Level alertLevel() const { return alertLevel_; }
   QString alert() const { return alert_; }
+  bool alertIsPtt() const { return alertPtt_; }
   bool hasRecording() const { return sel_ >= 0; }
   QString recordingInfo() const;
   QVariantList checks() const;
@@ -156,7 +158,7 @@ class LabController : public QObject {
   atc::TxDisplay tx_ = atc::TxDisplay::Idle;
   int txId_ = 0;
   QString txTime_;
-  bool rx_ = false, pilotCut_ = false, micOpen_ = false;
+  bool rx_ = false, pilotCut_ = false, micOpen_ = false, alertPtt_ = false;
   double mic_ = -120;
   QString pttSource_;
   bool right_ = false, left_ = false;

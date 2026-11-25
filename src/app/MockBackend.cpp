@@ -104,8 +104,10 @@ MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs,
     stt_->showScripted(st);
   });
   const auto go = [this](const char* id) { return [this, id] { run(id); }; };
+  connect(&status_, &StatusFeed::startExerciseRequested, this, go("exstart"));
   connect(&exercise_, &ExerciseController::startRequested, this, go("excall"));
   connect(&exercise_, &ExerciseController::stopRequested, this, go("exresulta"));
+  connect(&exercise_, &ExerciseController::continueRequested, this, go("exwait"));
   connect(&exercise_, &ExerciseController::resultRequested, this, go("exresult"));
   connect(&exercise_, &ExerciseController::screenPttRequested, this, go("exwait"));
   connect(&exercise_, &ExerciseController::runAgainRequested, this, go("exstart"));
@@ -330,7 +332,7 @@ void MockBackend::run(const QString& id) {
       present_ = false;
       ptt_->deviceLost(now_, "RIGHT");
       lab_->setNotice(LabController::Fault, tr("PTT disconnected. Reconnect it, or use Screen PTT."));
-      lab_->setAlert(LabController::Fault, tr("PTT device lost during a transmission"));
+      lab_->setAlert(LabController::Fault, tr("PTT device lost during a transmission"), true);
     });
     freeze = 4700;
   }

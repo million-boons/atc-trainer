@@ -128,8 +128,9 @@ void LabController::setNotice(Level l, const QString& text) {
   emit noticeChanged();
 }
 
-void LabController::setAlert(Level l, const QString& text) {
-  if (l == alertLevel_ && text == alert_) return;
+void LabController::setAlert(Level l, const QString& text, bool ptt) {
+  if (l == alertLevel_ && text == alert_ && ptt == alertPtt_) return;
+  alertPtt_ = ptt;
   alertLevel_ = l;
   alert_ = text;
   emit noticeChanged();

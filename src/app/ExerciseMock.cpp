@@ -60,6 +60,7 @@ void result(ExerciseController& c, bool stopped) {
                {"duration", "3:17"},
                {"steps", steps},
                {"ptt", ptt},
+               {"suspectedLevel", int(L::Caution)},
                {"suspectedTitle", t("1, not counted against the trainee")},
                {"suspectedText", t("Line up, attempt 2: runway heard as \"0.9\", classed AMBIGUOUS. The pilot said \"say again\".")},
                {"speech", speech}},
@@ -86,7 +87,7 @@ QVariantList cases() {
   const std::pair<const char*, const char*> all[] = {
       {"exstart", "Start dialog"}, {"excall", "Pilot calls first"}, {"exwait", "Waiting for ATC"}, {"extx", "Transmitting"},
       {"exproc", "Processing"}, {"exrx", "Pilot replying"}, {"examb", "Ambiguous: say again"}, {"exwrong", "Wrong runway"},
-      {"excs", "Wrong callsign: silence"}, {"extime", "No call: pilot calls again"}, {"excut", "PILOT CUT"}, {"exblocked", "BLOCKED"},
+      {"excs", "Wrong callsign: silence"}, {"extime", "No call: pilot calls again"}, {"exchoice", "No call: instructor decides"}, {"excut", "PILOT CUT"}, {"exblocked", "BLOCKED"},
       {"exqueued", "Queued"}, {"exlimit", "Say-again limit"}, {"exlost", "PTT lost"}, {"exwd", "Pilot voice fault"},
       {"exdone", "All steps complete"}, {"exresult", "RESULT: completed"}, {"exresulta", "RESULT: stopped"}};
   QVariantList l;
@@ -157,6 +158,11 @@ void show(ExerciseController& c, const QString& id, bool assessed, bool consent)
     c.addPilot("10:42:40", "holding short runway 09, EAGLE-421");
     c.setNotice(L::Caution, t("The pilot is calling again (1 of 2)."));
     c.setWaiting({});
+  } else if (id == "exchoice") {
+    call(c); taxi(c);
+    c.addNote(L::Caution, t("No ATC call for 30 s"));
+    c.setWaiting({});
+    c.setChoice(t("Line up"), 2);
   } else if (id == "excut") {
     call(c); taxi(c);
     c.setNotice(L::Caution, t("You keyed over the pilot. The reply will be repeated."));

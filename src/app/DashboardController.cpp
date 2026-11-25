@@ -9,9 +9,6 @@
 using namespace atc;
 
 namespace {
-// Start is connected in package 3b. Until then it is never enabled.
-constexpr bool kStartBuilt = false;
-
 QString wordOf(StartEffect e) {
   return e == StartEffect::Ready ? DashboardController::tr("READY")
          : e == StartEffect::Warns ? DashboardController::tr("WARNS") : DashboardController::tr("BLOCKS START");
@@ -90,8 +87,9 @@ void DashboardController::refresh() {
   blockText_.clear();
   startEnabled_ = false;
   readyLevel_ = LabController::None;
-  readyAlert_.clear();
-  readyShort_.clear();
+  blockers_.clear();
+  pttBlocks_ = pttMissing_ = false;
+  warns_ = 0;
   if (!feed_) {
     chips_.clear();
     emit changed();
@@ -102,7 +100,6 @@ void DashboardController::refresh() {
   const ModelReady model = modelState();
   const Readiness r = readiness({.mic = in.mic, .speaker = in.speaker, .ptt = in.ptt, .model = model, .bank = in.bank,
                                  .storage = in.storage, .pttMissingBlocks = in.pttMissingBlocks && !fallback_});
-  QStringList blockers;
   const auto add = [&](ReadyTile t, const QString& title, const QString& state, const QString& line1, const QString& line2,
                        const QString& action, bool actionEnabled, const QString& action2 = {}, bool action2Enabled = false) {
     const StartEffect e = r.of(t);
@@ -111,7 +108,8 @@ void DashboardController::refresh() {
                               {"action2", action2}, {"action2Enabled", action2Enabled}});
     if (e != StartEffect::Blocks) return;
     reasons_.append(tr("%1: %2").arg(title, state.toLower()));
-    blockers.append(tr("%1 %2").arg(title, state.toLower()));
+    if (t == ReadyTile::Ptt && in.ptt == PttReady::Missing) pttBlocks_ = true;
+    else blockers_.append(tr("%1 %2").arg(title, state.toLower()));
   };
   const bool idle = !in.running;
 
@@ -163,18 +161,11 @@ void DashboardController::refresh() {
   const bool newChips = chips != chips_;  // the level meter changes the tiles, not the chips
   chips_ = chips;
 
-  const int blocks = r.count(StartEffect::Blocks), warns = r.count(StartEffect::Warns);
-  readyLevel_ = status_words::level(blocks ? StartEffect::Blocks : warns ? StartEffect::Warns : StartEffect::Ready);
-  const QString more = warns ? tr("; %1 warn").arg(warns) : QString();
-  readyShort_ = in.running && blocks ? blockers.join(", ") + more : in.running && warns ? tr("%1 warn").arg(warns) : QString();
-  if (in.running)
-    readyAlert_ = blocks ? tr("Exercise running: %1%2").arg(blockers.join(", "), more)
-                  : warns ? tr("Exercise running; %1 warn").arg(warns) : tr("Exercise running");
-  else
-    readyAlert_ = blocks ? tr("Not ready to start: %1%2").arg(blockers.join(", "), more)
-                  : warns ? tr("%1 warn, none block Start").arg(warns) : tr("All systems ready");
-  startEnabled_ = kStartBuilt && idle && !r.blocked();
-  if (!kStartBuilt) reasons_.append(tr("Exercise not built yet (package 3b)"));
+  const int blocks = r.count(StartEffect::Blocks);
+  warns_ = r.count(StartEffect::Warns);
+  pttMissing_ = in.ptt == PttReady::Missing;
+  readyLevel_ = status_words::level(blocks ? StartEffect::Blocks : warns_ ? StartEffect::Warns : StartEffect::Ready);
+  startEnabled_ = idle && !r.blocked();
   emit changed();
   if (newChips) emit chipsChanged();
   refreshAlert();
@@ -188,12 +179,34 @@ void DashboardController::refreshAlert() {
     level = std::max(level, l);
     parts.append(text);
   };
-  if (lab_) add(lab_->alertLevel(), lab_->alert());
+  // D-126: a PTT that is lost is said once, by the paused exercise or by the tile.
+  const bool paused = exercise_ && exercise_->phase() == ExerciseController::Paused;
+  const bool labPtt = lab_ && lab_->alertIsPtt() && (pttMissing_ || paused);
+  if (lab_ && !labPtt) add(lab_->alertLevel(), lab_->alert());
   const bool exercise = exercise_ && exercise_->phase() != ExerciseController::Idle;
   if (exercise) add(exercise_->alertLevel(), exercise_->alert());
-  // Beside an alert of the exercise (it may be paused) "Exercise running" would be wrong.
-  if (readyLevel_ >= LabController::Caution) parts.append(parts.isEmpty() || readyShort_.isEmpty() ? readyAlert_ : readyShort_);
-  const QString text = !parts.isEmpty() ? parts.join("  |  ") : exercise ? exercise_->alert() : readyAlert_;
+
+  const bool runs = feed_ && feed_->inputs().running;
+  QStringList blockers = blockers_;
+  if (pttBlocks_ && !paused) blockers.prepend(labPtt ? tr("PTT device lost") : tr("PTT missing"));
+  const QString more = warns_ ? tr("; %1 warn").arg(warns_) : QString();
+  QString ready;
+  if (paused) {
+    if (!parts.isEmpty() && (!blockers.isEmpty() || warns_)) parts.last() += blockers.isEmpty() ? more : "; " + blockers.join(", ") + more;
+  } else if (!blockers.isEmpty()) {
+    // Beside an alert of a running exercise "Exercise running" would repeat it.
+    ready = blockers.join(", ") + more;
+    if (!runs) ready = tr("Not ready to start: %1").arg(ready);
+    else if (parts.isEmpty()) ready = tr("Exercise running: %1").arg(ready);
+  } else if (warns_) {
+    const QString lost = labPtt ? tr("PTT device lost, ") : QString();
+    ready = runs ? (parts.isEmpty() ? tr("Exercise running; %1%2 warn") : QString("%1%2 warn")).arg(lost).arg(warns_)
+                 : tr("%1%2 warn, none block Start").arg(lost).arg(warns_);
+  } else {
+    ready = !feed_ ? QString() : runs ? tr("Exercise running") : tr("All systems ready");
+  }
+  if (readyLevel_ >= LabController::Caution && !ready.isEmpty()) parts.append(ready);
+  const QString text = !parts.isEmpty() ? parts.join("  |  ") : exercise ? exercise_->alert() : ready;
   if (level == alertLevel_ && text == alert_) return;
   alertLevel_ = level;
   alert_ = text;
@@ -221,6 +234,10 @@ void DashboardController::toneHeard() {
 
 void DashboardController::cancelTests() {
   if (feed_) emit feed_->cancelTestsRequested();
+}
+
+void DashboardController::startExercise() {
+  if (startEnabled_) emit feed_->startExerciseRequested();
 }
 
 void DashboardController::stopExercise() {

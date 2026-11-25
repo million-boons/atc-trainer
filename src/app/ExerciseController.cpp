@@ -22,6 +22,7 @@ void ExerciseController::begin(ExerciseContext c, bool assessed, bool consent, c
   steps_.clear();
   done_ = 0;
   notice_ = alert_ = {};
+  choice_ = false;
   result_.clear();
   transcript_.reset();
   timeline_.reset();
@@ -69,6 +70,27 @@ void ExerciseController::setNotice(int level, const QString& t, bool verdict) {
 void ExerciseController::setAlert(int level, const QString& t, bool verdict) {
   alert_ = {level, t, verdict};
   emit changed();
+}
+
+void ExerciseController::setChoice(const QString& step, int pilotCalls) {
+  choice_ = true;
+  choiceStep_ = step;
+  choiceCalls_ = pilotCalls;
+  notice_ = {LabController::Caution, tr("Instructor notified")};
+  alert_ = {LabController::Caution, tr("Instructor notified")};
+  emit changed();
+}
+
+void ExerciseController::clearChoice() {
+  if (!choice_) return;
+  choice_ = false;
+  notice_ = {};
+  alert_ = {LabController::Ok, tr("Exercise running")};
+  emit changed();
+}
+
+QString ExerciseController::choiceText() const {
+  return hide() ? tr("No ATC call.") : tr("%1: %2 pilot calls without an ATC call.").arg(choiceStep_).arg(choiceCalls_);
 }
 
 int ExerciseController::alertLevel() const { return hide() && alert_.verdict ? int(LabController::Ok) : alert_.level; }
@@ -125,6 +147,10 @@ void ExerciseController::start(bool assessed) {
 
 void ExerciseController::stop() {
   if (pttLive()) emit stopRequested();
+}
+
+void ExerciseController::continueExercise() {
+  if (choice()) emit continueRequested();
 }
 
 void ExerciseController::showResult() {

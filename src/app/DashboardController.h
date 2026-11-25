@@ -35,6 +35,7 @@ class DashboardController : public QObject {
   Q_PROPERTY(ExerciseController* exercise READ exercise WRITE setExercise NOTIFY alertChanged)  // may be null
   Q_PROPERTY(QVariantList chips READ chips NOTIFY chipsChanged)     // 5 x {name, value, level}
   // Footer: the radio alert, the exercise alert, then the tiles. Its level is the worst of them, on every screen.
+  // A lost PTT is said once (D-126).
   Q_PROPERTY(int alertLevel READ alertLevel NOTIFY alertChanged)    // LabController.Level
   Q_PROPERTY(QString alert READ alert NOTIFY alertChanged)
  public:
@@ -72,6 +73,7 @@ class DashboardController : public QObject {
   Q_INVOKABLE bool tileAction(int i);
   Q_INVOKABLE void toneHeard();  // "I heard it" on the Speaker tile (D-306)
   Q_INVOKABLE void cancelTests();
+  Q_INVOKABLE void startExercise();  // opens the Start dialog
   Q_INVOKABLE void stopExercise();
 
  signals:
@@ -94,5 +96,8 @@ class DashboardController : public QObject {
   QStringList reasons_;
   bool startEnabled_ = false, fallback_ = false;
   int readyLevel_ = 0, alertLevel_ = 0;
-  QString readyAlert_, readyShort_, alert_;  // readyShort_: beside another alert
+  QStringList blockers_;  // tiles that block, without a missing PTT
+  bool pttBlocks_ = false, pttMissing_ = false;
+  int warns_ = 0;
+  QString alert_;
 };
