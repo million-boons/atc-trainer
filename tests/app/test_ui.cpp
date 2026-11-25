@@ -30,6 +30,15 @@ void walk(QQuickItem* i, const std::function<void(QQuickItem*)>& f) {
   for (QQuickItem* c : i->childItems()) walk(c, f);
 }
 bool isButton(const QQuickItem* i) { return i->inherits("QQuickButton"); }
+// Outside the visible part of a list or pane that scrolls.
+bool scrolledOut(QQuickItem* i) {
+  for (QQuickItem* f = i->parentItem(); f; f = f->parentItem()) {
+    if (!f->inherits("QQuickFlickable")) continue;
+    const QRectF r = i->mapRectToItem(f, {0, 0, i->width(), i->height()});
+    if (r.top() < -0.5 || r.bottom() > f->height() + 0.5) return true;
+  }
+  return false;
+}
 bool isText(const QQuickItem* i) { return i->inherits("QQuickText"); }
 
 struct Ui : testing::Test {
@@ -141,6 +150,7 @@ TEST_P(UiAll, EveryCaseLoadsWithoutWarningsAndNoButtonIsCutOff) {
           EXPECT_FALSE(isText(x) && x->property("truncated").toBool()) << id.toStdString() << ": " << s.toStdString();
         }
       });
+      if (scrolledOut(i)) return;
       const QPointF a = i->mapToScene({0, 0}), b = i->mapToScene({i->width(), i->height()});
       EXPECT_GE(a.x(), -0.5) << id.toStdString();
       EXPECT_LE(b.x(), win->width() + 0.5) << id.toStdString() << ": " << i->property("text").toString().toStdString();
@@ -639,6 +649,99 @@ TEST_F(Ui, AWithdrawnTakeCanOnlyBeDeleted) {  // D-133
   clickButton("Delete take");
   settle();
   EXPECT_TRUE(mock->studio()->takes().isEmpty());
+}
+
+// ---- Exercise Planner (04 section 5g)
+
+TEST_F(Ui, ThePlannerIsForTheInstructorOnly) {
+  load();
+  run("planoff");
+  EXPECT_EQ(screen(), "train");
+  EXPECT_TRUE(allText().contains("Instructor only. Log in to plan exercises."));
+  EXPECT_FALSE(allText().contains("Departure, runway 27"));
+}
+
+TEST_F(Ui, ThePlannerShowsPlanPreviewAndChecks) {
+  load();
+  run("plan");
+  waitLogin();
+  settle(200);
+  const QString t = allText();
+  for (const char* w : {"Departure, runway 27", "3 runs, 25 Nov 16:20", "Ready", "Scenario changed", "Warns: preset changed", "FALCON-732  AN-32", "43 of 200",
+                        "Values: fixed   Trainee S01   Practice   Normal", "Voice bank: 22 clips", "Text is PLACEHOLDER", "Trainee record S01", "Assessed: scenario not Validated"})
+    EXPECT_TRUE(t.contains(w)) << w;
+  walk(win->contentItem(), [&](QQuickItem* x) {
+    for (const char* n : {"planState", "planCheck", "planMessage"})
+      if (x->objectName() == n) { EXPECT_FALSE(x->property("truncated").toBool()) << n << ": " << x->property("text").toString().toStdString(); }
+  });
+}
+
+TEST_F(Ui, TheTrainingTabsChangeBetweenPhrasesAndExercises) {
+  load();
+  run("plan");
+  waitLogin();
+  settle(200);
+  clickButton("Phrases");
+  EXPECT_TRUE(allText().contains("READBACK_TAXI"));
+  clickButton("Exercises");
+  EXPECT_TRUE(allText().contains("ON THE DASHBOARD"));
+}
+
+TEST_F(Ui, AMisfitIsMarkedInWords) {
+  load();
+  run("planmis");
+  waitLogin();
+  settle(200);
+  EXPECT_TRUE(allText().contains("does not fit"));
+  EXPECT_TRUE(allText().contains("The values do not fit together."));
+  EXPECT_FALSE(find("Save", true)->isEnabled());
+}
+
+TEST_F(Ui, TheNameFieldIsTakenOverAndEdited) {
+  load();
+  run("plannew");
+  waitLogin();
+  settle(200);
+  EXPECT_TRUE(allText().contains("NEW PLAN"));
+  QQuickItem* label = find("Name", false);
+  ASSERT_TRUE(label);
+  QTest::mouseClick(win, Qt::LeftButton, {}, label->mapToScene({20, label->height() + 24}).toPoint());
+  for (char ch : std::string("M 1")) QTest::keyClick(win, ch);  // Space is text here, never PTT
+  settle();
+  EXPECT_EQ(mock->planner()->plan()["name"].toString(), "M 1");
+  EXPECT_EQ(lab.txTone(), LabController::Neutral);
+  clickButton("Save");
+  settle();
+  EXPECT_EQ(mock->planner()->planCount(), 5);
+}
+
+TEST_F(Ui, TheCardShowsThePlanAndTheStartDialogTheSameValues) {  // D-321
+  load();
+  run("dashplan");
+  settle(200);
+  const QString t = allText();
+  for (const char* w : {"Departure, runway 27", "plan, Departure 01: Taxi, line up, takeoff", "FALCON-732", "AN-32", "27", "B2",
+                        "Values: fixed   Trainee S01   Practice   Normal", "Listen for the runway. Read the card first."})
+    EXPECT_TRUE(t.contains(w)) << w;
+  clickButton("Briefing");
+  clickButton("Close");
+  clickButton("START EXERCISE");
+  settle();
+  EXPECT_TRUE(allText().contains("FALCON-732   AN-32   RWY 27   TWY B2"));
+  EXPECT_TRUE(allText().contains("Plan: Departure, runway 27   run 4"));
+}
+
+TEST_F(Ui, AGuestChoosesAPlanForAnyone) {
+  load();
+  run("planoff");
+  run("dashready");
+  clickButton("Choose plan");
+  EXPECT_FALSE(allText().contains("Departure S02"));
+  EXPECT_FALSE(allText().contains("Departure, runway 27"));
+  clickButton("Departure, random");
+  settle();
+  EXPECT_FALSE(allText().contains("Choose a plan"));
+  EXPECT_TRUE(allText().contains("Values: random   Anyone   Practice   Normal"));
 }
 
 int main(int argc, char** argv) {

@@ -8,6 +8,8 @@ Item {
     id: s
     property StudioController studio
     property string dialog            // "", session, changes, add, delete, export, unused, differing, scenario, filter
+    property bool exercisesOn: false
+    signal tabAsked(string id)
     signal loginAsked()
     signal keyboardFree()
     readonly property int gap: Theme.s8
@@ -41,35 +43,23 @@ Item {
     MouseArea { anchors.fill: parent; onPressed: s.free() }
 
     // ---- tabs of Training Content, recording session
-    Rectangle {
+    TrainingTabs {
         id: tabs
         x: s.gap; y: s.gap; width: s.width - 2 * s.gap; height: Theme.px(56)
-        color: Theme.surface
-        radius: Theme.radius
-        border { color: Theme.border; width: Theme.line }
-        Row {
-            x: Theme.s12; height: parent.height
-            spacing: Theme.s8
-            Label { height: parent.height; text: qsTr("TRAINING CONTENT"); color: Theme.textSecondary; font { pixelSize: Theme.caption; weight: Font.DemiBold; letterSpacing: Theme.px(1) } }
-            ChoiceButton { anchors.verticalCenter: parent.verticalCenter; text: qsTr("Phrases"); selected: true; font.pixelSize: Theme.small }
-            ChoiceButton { anchors.verticalCenter: parent.verticalCenter; text: qsTr("Scenarios: later"); enabled: false; font.pixelSize: Theme.small }
-            ChoiceButton { anchors.verticalCenter: parent.verticalCenter; text: qsTr("Exercises: next"); enabled: false; font.pixelSize: Theme.small }
-        }
-        Row {
-            anchors { right: parent.right; rightMargin: Theme.s8 }
-            height: parent.height
-            spacing: Theme.s8
-            visible: s.on
-            Label { height: parent.height; text: s.studio.changedHere ? qsTr("changed on this machine") : ""; font.pixelSize: Theme.caption; color: Theme.caution }
-            SecondaryButton { anchors.verticalCenter: parent.verticalCenter; text: qsTr("Export..."); font.pixelSize: Theme.small; focusPolicy: Qt.NoFocus
-                              enabled: s.studio.changedHere; onClicked: s.dialog = "export" }
-            Label { height: parent.height; mono: true; font.pixelSize: Theme.small; text: s.studio.session ? qsTr("Speaker %1").arg(s.studio.speaker) : "" }
-            BaseButton { anchors.verticalCenter: parent.verticalCenter; width: Theme.px(148); font.pixelSize: Theme.small; focusPolicy: Qt.NoFocus
+        current: "phrases"
+        exercisesOn: s.exercisesOn
+        onPicked: (id) => { s.free(); s.tabAsked(id) }
+        items: [
+            Label { visible: s.on; height: parent.height; text: s.studio.changedHere ? qsTr("changed on this machine") : ""; font.pixelSize: Theme.caption; color: Theme.caution },
+            SecondaryButton { visible: s.on; anchors.verticalCenter: parent.verticalCenter; text: qsTr("Export..."); font.pixelSize: Theme.small; focusPolicy: Qt.NoFocus
+                              enabled: s.studio.changedHere; onClicked: s.dialog = "export" },
+            Label { visible: s.on; height: parent.height; mono: true; font.pixelSize: Theme.small; text: s.studio.session ? qsTr("Speaker %1").arg(s.studio.speaker) : "" },
+            BaseButton { visible: s.on; anchors.verticalCenter: parent.verticalCenter; width: Theme.px(148); font.pixelSize: Theme.small; focusPolicy: Qt.NoFocus
                          text: s.studio.session ? qsTr("End session") : s.studio.starting ? qsTr("Cancel start") : qsTr("Start session...")
                          tint: s.studio.session ? Theme.caution : Theme.accent
                          enabled: s.studio.session || s.studio.starting || (!s.studio.busy && !s.studio.trainerBusy)
                          onClicked: { s.free(); if (s.studio.session || s.studio.starting) s.studio.endSession(); else s.dialog = "session" } }
-        }
+        ]
     }
 
     Column {
@@ -244,28 +234,11 @@ Item {
     }
 
     // ---- dialogs
-    component Pick: ModalPanel {
-        id: pick
-        property var options: []      // {id, text, note, off}
-        property string chosenId
-        signal picked(string id)
-        signal closed()
-        ListView {
-            width: parent.width; height: Math.min(contentHeight, Theme.px(320))
-            clip: true
-            boundsBehavior: Flickable.StopAtBounds
-            spacing: Theme.s4
-            model: pick.options
-            delegate: ChoiceButton { width: ListView.view.width; text: modelData.note ? modelData.text + "   " + modelData.note : modelData.text
-                                     enabled: !modelData.off; selected: modelData.id === pick.chosenId; onClicked: pick.picked(modelData.id) }
-        }
-        SecondaryButton { text: qsTr("Cancel"); focusPolicy: Qt.NoFocus; onClicked: pick.closed() }
-    }
     Loader {
         anchors.fill: parent
         active: s.dialog === "session"
         sourceComponent: Component {
-            Pick { title: qsTr("Who records?")
+            PickDialog { title: qsTr("Who records?")
                    options: s.studio.speakers.map(p => ({ id: p.id, text: p.id, note: p.why, off: !p.may }))
                    onPicked: (id) => { s.dialog = ""; s.studio.startSession(id) }
                    onClosed: s.dialog = "" }
@@ -275,7 +248,7 @@ Item {
         anchors.fill: parent
         active: s.dialog === "scenario"
         sourceComponent: Component {
-            Pick { title: qsTr("Coverage of"); chosenId: s.studio.scenario
+            PickDialog { title: qsTr("Coverage of"); chosenId: s.studio.scenario
                    options: s.studio.scenarios.map(x => ({ id: x, text: x }))
                    onPicked: (id) => { s.dialog = ""; s.studio.setScenario(id) }
                    onClosed: s.dialog = "" }
@@ -285,7 +258,7 @@ Item {
         anchors.fill: parent
         active: s.dialog === "filter"
         sourceComponent: Component {
-            Pick { title: qsTr("Missing clips of"); chosenId: s.studio.filter
+            PickDialog { title: qsTr("Missing clips of"); chosenId: s.studio.filter
                    options: ["all", "this", "pools", "initial", "medial", "final"].map(x => ({ id: x, text: bar.filterNames[x] }))
                    onPicked: (id) => { s.dialog = ""; s.studio.setFilter(id) }
                    onClosed: s.dialog = "" }

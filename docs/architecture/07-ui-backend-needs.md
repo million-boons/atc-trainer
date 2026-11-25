@@ -97,6 +97,17 @@ Rules to keep in the backend, not only on the screen:
 - The waveform gets peaks (at most 1000 pairs), not samples.
 - Nothing the Studio writes is in git: audio outside the work tree (D-31, D-418). `data/phraseology` **is** in git and read-only in an installed program: the Studio saves into a writable copy outside the repository and the installation, with Export; changed intents become Draft (G-3, D-318). To settle by b2 (P): the copy is in the writable folder; once it exists every program reads it instead of the installed data (loader, parser, coverage check), and the screen says "changed on this machine"; if the installed data is newer than the copy's origin, the Studio says so and never merges by itself; Export writes a file at a place that the user chooses, never into a work tree by itself.
 
+### Planner interface (proposed, for b2)
+
+`src/app/PlannerBackend.h`, in the form of the Studio interface; functions as 08 section 2. Points for b2:
+
+- `load` answers for everybody (the Dashboard's "Choose plan" needs it); saving, deleting and presets: instructor, checked again in the backend. `revision` covers plans and presets; counting a run must not change it.
+- `choose(plan, person)` draws the values (never exactly the combination of that person's previous run, D-142), sets `StatusFeed`'s scenario (the values that run, plus `PlannerController::card()`), starts the coverage check and answers with the values and the run number (0: unnumbered). For a plan of one person the draw looks at that person's runs, whoever chooses.
+- Run again: the same plan; the backend shows the new values first (D-321).
+- The Start dialog needs `ExerciseContext::plan` (name, trainee, mode, run): set by `ExerciseView` from the chosen plan. Not connected yet; `LiveExercise` and `ExerciseView` are ui's and wait for the approved design.
+- The header of the log needs plan id, name, run number, exact values and difficulty (08 section 3).
+- `setEvents(plansChanged)`: after a run is counted, or the file was replaced.
+
 ## Order and dependencies
 
 1. Studio (D-136): writing, pending folder, record mode, consent checks.

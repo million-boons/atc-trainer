@@ -39,3 +39,11 @@ Branch and worktree `ui`, everything committed. Next free decision number: D-141
 - **For b2, `ui/CMakeLists.txt`** (b2's file): QML `components/ClipDot.qml SegmentChip.qml SegmentStrip.qml PhraseEdit.qml TrimWaveform.qml TakeList.qml RecorderPanel.qml CoverageBar.qml`, `screens/Studio.qml`; sources `StudioBackend.h StudioController.h/.cpp StudioMock.h/.cpp`. Without them this commit does not build. `tests/app/CMakeLists.txt` has the new `studio_tests`.
 - `main.cpp` needs nothing: live, `Main.qml`'s `studio` property is null and the entry says why it is off.
 - Mock cases: phroff, phr, phrrec, phrtake, phrwd, phrmiss, phrint.
+
+## Studio interface (D-331) and Exercise Planner (2026-11-25, night; nothing compiled)
+- 3c accepted by the user. Studio: 7415e16 (interface of 09 section 8), no new files.
+- Planner on a mock (D-146). **For b2, `ui/CMakeLists.txt`:** QML `components/TrainingTabs.qml PickDialog.qml NoteEdit.qml DelayStep.qml`, `screens/Planner.qml`; sources `PlannerBackend.h PlannerController.h/.cpp PlannerMock.h/.cpp`. `tests/app/CMakeLists.txt` has the new `planner_tests`.
+- `main.cpp` needs nothing: live, `Main.qml`'s `planner` property is null, the tab is disabled and the Dashboard has no "Choose plan".
+- Mock cases: planoff, plan, plannew, planmis, planchg, planold, dashplan.
+- Waits for the design of the Planner backend and the user's approval: plan in `ExerciseView` and `LiveExercise`.
+- Next free ui decision number: D-147.

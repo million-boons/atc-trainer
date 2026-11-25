@@ -30,6 +30,13 @@ if(Qt6_FOUND)
   target_include_directories(studio_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${APP})
   target_link_libraries(studio_tests PRIVATE atc_logic Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
   gtest_discover_tests(studio_tests)
+  add_executable(planner_tests test_planner.cpp ${APP}/PlannerBackend.h ${APP}/PlannerController.h ${APP}/PlannerController.cpp
+    ${APP}/PlannerMock.h ${APP}/PlannerMock.cpp ${APP}/AccessController.h ${APP}/AccessController.cpp
+    ${APP}/RowModel.h ${APP}/LabController.h ${APP}/LabController.cpp)
+  set_target_properties(planner_tests PROPERTIES AUTOMOC ON)
+  target_include_directories(planner_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${APP})
+  target_link_libraries(planner_tests PRIVATE atc_logic Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
+  gtest_discover_tests(planner_tests)
   # The live exercise (3b): real engine, simulated time, no radio.
   if(TARGET atc_exercise)
     add_executable(live_exercise_tests test_live_exercise.cpp ${APP}/LiveExercise.h ${APP}/LiveExercise.cpp

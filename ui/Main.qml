@@ -21,6 +21,9 @@ Window {
     readonly property ExerciseController ex: mock ? mock.exercise : exercise
     property StudioController studio: null   // live; null: no Studio backend in this build
     readonly property StudioController phrases: mock ? mock.studio : studio
+    property PlannerController planner: null   // live; null: no Planner backend in this build
+    readonly property PlannerController plans: mock ? mock.planner : planner
+    property string trainTab: phrases !== null ? "phrases" : "exercises"
     readonly property bool exActive: ex !== null && ex.active
     readonly property bool exResult: ex !== null && ex.phase === ExerciseController.Result
     width: 1280; height: 800
@@ -35,6 +38,8 @@ Window {
     Component.onCompleted: Theme.mode = themeMode
 
     Binding { target: root.phrases; property: "trainerBusy"; value: root.exActive; when: root.phrases !== null }
+
+    Binding { target: root.plans; property: "trainerBusy"; value: root.exActive; when: root.plans !== null }
 
     // Space is a fallback PTT; losing focus always releases it.
     onActiveChanged: if (!active) lab.releaseRequested("SPACE")
@@ -54,7 +59,8 @@ Window {
         function onCurrentChanged() {
             const c = root.mock.current
             if (c.startsWith("dash")) root.screen_ = "dash"
-            else if (c.startsWith("phr")) root.screen_ = "train"
+            else if (c.startsWith("phr")) { root.trainTab = "phrases"; root.screen_ = "train" }
+            else if (c.startsWith("plan")) { root.trainTab = "exercises"; root.screen_ = "train" }
             else if (c.startsWith("set")) root.screen_ = "set"
             else if (c.startsWith("sav") || c === "login") root.screen_ = "lab"
             root.loginOpen = c === "login"
@@ -72,7 +78,7 @@ Window {
         focus: true
         Rectangle { anchors.fill: parent; color: Theme.bg }
         Keys.onPressed: (e) => {
-            // In the Studio the keys record and play; none of them transmits there.
+            // In the Studio the keys record and play; no key transmits in Training Content.
             if (root.screen_ === "train" && !root.loginOpen && train.item && train.item.handleKey(e.key, e.isAutoRepeat)) e.accepted = true
             else if (e.key === Qt.Key_Space) { if (!e.isAutoRepeat && !root.loginOpen && (root.screen_ === "lab" || dashCtl.pttTesting || (root.screen_ === "ex" && root.ex.pttLive))) root.lab.pressRequested("SPACE"); e.accepted = true }
             else if (e.key === Qt.Key_M && root.mock) { panel.active = !panel.active; e.accepted = true }
@@ -110,7 +116,7 @@ Window {
                 { id: "lab", name: qsTr("Speech Lab"), enabled: !root.exActive, off: true, why: nav.busy, icon: "M 7 3 L 13 3 L 13 11 L 7 11 Z M 4 9 L 4 14 L 16 14 L 16 9 M 10 14 L 10 18" },
                 { id: "ass", name: qsTr("Assessment"), enabled: root.exResult, off: root.ex !== null, why: root.exActive ? nav.busy : root.mock ? qsTr("No result yet. Mock: press M and choose a RESULT case.") : root.ex ? qsTr("No result yet. It opens after an exercise.") : qsTr("This build cannot run an exercise."),
                   icon: "M 4 16 L 4 10 M 10 16 L 10 4 M 16 16 L 16 8" },
-                { id: "train", name: qsTr("Training"), enabled: root.phrases !== null && !root.exActive, off: root.phrases !== null, why: root.exActive ? nav.busy : qsTr("The Studio's backend is not built yet. It opens here when it is."),
+                { id: "train", name: qsTr("Training"), enabled: train.built && !root.exActive, off: train.built, why: root.exActive ? nav.busy : qsTr("The backends of the Studio and the Planner are not built yet. They open here when they are."),
                   icon: "M 4 4 L 12 4 L 12 16 L 4 16 Z M 15 6 L 15 14 M 18 8 L 18 12" },
                 { id: "set", name: qsTr("Settings"), enabled: !root.exActive, off: true, why: nav.busy,
                   icon: "M 3 6 L 17 6 M 13 4 L 13 8 M 3 14 L 17 14 M 7 12 L 7 16" }
@@ -124,7 +130,7 @@ Window {
         Loader {
             anchors { top: status.bottom; bottom: alert.top; left: nav.right; right: parent.right }
             active: root.screen_ === "dash"
-            sourceComponent: Component { Dashboard { dash: dashCtl; onSettingsAsked: root.screen_ = "set" } }
+            sourceComponent: Component { Dashboard { dash: dashCtl; planner: root.plans; onSettingsAsked: root.screen_ = "set" } }
         }
         Loader {
             anchors { top: status.bottom; bottom: alert.top; left: nav.right; right: parent.right }
@@ -147,9 +153,20 @@ Window {
         }
         Loader {
             id: train
+            readonly property bool built: root.phrases !== null || root.plans !== null
             anchors { top: status.bottom; bottom: alert.top; left: nav.right; right: parent.right }
-            active: root.phrases !== null && root.screen_ === "train"
-            sourceComponent: Component { Studio { studio: root.phrases; onLoginAsked: root.loginOpen = true; onKeyboardFree: shell.forceActiveFocus() } }
+            active: built && root.screen_ === "train"
+            sourceComponent: root.trainTab === "phrases" ? studioScreen : plannerScreen
+        }
+        Component {
+            id: studioScreen
+            Studio { studio: root.phrases; exercisesOn: root.plans !== null; onTabAsked: (id) => root.trainTab = id
+                     onLoginAsked: root.loginOpen = true; onKeyboardFree: shell.forceActiveFocus() }
+        }
+        Component {
+            id: plannerScreen
+            Planner { planner: root.plans; phrasesOn: root.phrases !== null; onTabAsked: (id) => root.trainTab = id; onDashboardAsked: root.screen_ = "dash"
+                      onLoginAsked: root.loginOpen = true; onKeyboardFree: shell.forceActiveFocus() }
         }
         Loader {
             anchors { top: status.bottom; bottom: alert.top; left: nav.right; right: parent.right }

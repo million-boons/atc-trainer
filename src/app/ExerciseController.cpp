@@ -121,6 +121,8 @@ QVariantMap ExerciseController::context() const {
 }
 
 QString ExerciseController::assessedNote() const {
+  if (ctx_.plan && !ctx_.plan->assessed && !ctx_.placeholder) return tr("The plan is for Practice.");
+  if (ctx_.plan && ctx_.plan->assessed && !planned()) return tr("This plan is for %1.").arg(ctx_.plan->trainee);
   return ctx_.placeholder ? tr("Scenario text is PLACEHOLDER. The verdict would be hidden until the debrief.")
                           : tr("The verdict is hidden until the debrief.");
 }
@@ -141,7 +143,7 @@ QString ExerciseController::progressText() const {
 }
 
 void ExerciseController::start(bool assessed) {
-  if (phase_ == Starting && (!assessed || assessedAvailable())) emit startRequested(assessed);
+  if (phase_ == Starting && (assessed ? assessedAvailable() : practiceAvailable())) emit startRequested(assessed);
 }
 
 void ExerciseController::stop() {

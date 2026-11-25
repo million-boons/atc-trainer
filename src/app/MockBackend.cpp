@@ -1,6 +1,7 @@
 #include "app/MockBackend.h"
 
 #include "app/ExerciseMock.h"
+#include "app/PlannerMock.h"
 #include "app/StudioMock.h"
 
 #include <QDateTime>
@@ -46,6 +47,7 @@ MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs,
     : QObject(parent), lab_(lab), stt_(stt), pilotCutMs_(pilotCutMs) {
   exercise_.setAudioConnected();  // the mock shows both consent cases
   studio_.setBackend(mockStudio());
+  planner_.setBackend(mockPlanner([this](const PlanChoice& c) { showChoice(c); }));
   connect(lab, &LabController::pressRequested, this, [this](const QString& s) { userEdge(s, true); });
   connect(lab, &LabController::releaseRequested, this, [this](const QString& s) { userEdge(s, false); });
   connect(lab, &LabController::playRequested, this,
@@ -144,7 +146,9 @@ QVariantList MockBackend::scripts() const {
       {"dash", "Dashboard: not ready"}, {"dashready", "Dashboard: all ready"}, {"dashrun", "Dashboard: running"},
       {"dashfault", "Dashboard: faults"},
       {"phroff", "Studio: not logged in"}, {"phr", "Studio"}, {"phrrec", "Studio: recording"}, {"phrtake", "Studio: pending take"},
-      {"phrwd", "Studio: consent withdrawn"}, {"phrmiss", "Studio: clip missing"}, {"phrint", "Studio: ATC intent"}};
+      {"phrwd", "Studio: consent withdrawn"}, {"phrmiss", "Studio: clip missing"}, {"phrint", "Studio: ATC intent"},
+      {"planoff", "Planner: not logged in"}, {"plan", "Planner"}, {"plannew", "Planner: new plan"}, {"planmis", "Planner: values do not fit"},
+      {"planchg", "Planner: scenario changed"}, {"planold", "Planner: preset changed"}, {"dashplan", "Dashboard: plan chosen"}};
   QVariantList l;
   for (auto [id, name] : all) l.append(QVariantMap{{"id", id}, {"name", name}});
   return l;
@@ -311,6 +315,7 @@ void MockBackend::run(const QString& id) {
   if (id == "mother") st.modelId = "vosk-grammar";
   if (id == "mlocked" || id == "dashrun" || exercise_mock::running(id)) st.locked = true;
   stt_->showScripted(st);
+  if (!ex && id != "dashready" && id != "dashplan" && !id.startsWith("plan")) chosen_.reset();
   setStatusCase(id);
   double freeze = 200;
   const auto talk = [&](double release) {
@@ -372,7 +377,7 @@ void MockBackend::run(const QString& id) {
   advanceTo(Ns(freeze * 1e6));
   current_ = id;
   loginCase(id);
-  if (ex) exercise_mock::show(exercise_, id, assessed_, consent_);
+  if (ex) exercise_mock::show(exercise_, id, assessed_, consent_, chosen_ ? &*chosen_ : nullptr);
   else if (exercise_.phase() != ExerciseController::Idle) {
     exercise_.begin({}, false, false);
     emit exercise_.screenRequested(id.startsWith("dash") ? "dash" : "lab");
@@ -383,10 +388,10 @@ void MockBackend::run(const QString& id) {
 void MockBackend::loginCase(const QString& id) {
   if (!access_) return;
   studio_.leave();
-  if (id == "login" || id == "setoff" || id == "phroff") access_->logout();
-  else if (id == "savyes") access_->loginTrainee("S01");
+  if (id == "login" || id == "setoff" || id == "phroff" || id == "planoff") access_->logout();
+  else if (id == "savyes" || id == "dashplan") access_->loginTrainee("S01");
   else if (id == "savno") access_->loginTrainee("S02");
-  else if (id == "setinstr" || id.startsWith("phr")) access_->loginInstructor("123456");  // the mock's PIN
+  else if (id == "setinstr" || id.startsWith("phr") || id.startsWith("plan")) access_->loginInstructor("123456");  // the mock's PIN
 }
 
 void MockBackend::studioCase() {
@@ -406,6 +411,29 @@ void MockBackend::studioCase() {
     if (id == "phrrec") studio_.startSession("S01");
   });
   if (id == "phrrec") step(90, [this] { studio_.toggleRecord(); });
+}
+
+void MockBackend::plannerCase() {
+  const QString id = current_;
+  if (id == "dashplan") {
+    planner_.enter();
+    QTimer::singleShot(20, this, [this, id] { if (current_ == id) planner_.choose("p1"); });
+  }
+  if (!id.startsWith("plan") || !planner_.instructor()) return;
+  planner_.undo();
+  QTimer::singleShot(20, this, [this, id] {
+    if (current_ != id) return;
+    planner_.select(id == "planchg" ? "p3" : id == "planold" ? "p4" : "p1");
+    if (id == "plannew") planner_.newPlan();
+    if (id == "planmis") planner_.setRunway("09");
+  });
+}
+
+void MockBackend::showChoice(const PlanChoice& c) {
+  chosen_ = c;
+  StatusInputs s = status_.inputs();
+  s.scenario.insert(PlannerController::card(c));
+  status_.set(std::move(s));
 }
 
 void MockBackend::goLive() {
@@ -428,7 +456,7 @@ void MockBackend::setStatusCase(const QString& id) {
   micTestTicks_ = pttTestTicks_ = 0;
   statusTimer_.stop();
   testHold_.invalidate();
-  const bool ready = id == "dashready" || id == "dashrun" || exercise_mock::isCase(id), fault = id == "dashfault";
+  const bool ready = id == "dashready" || id == "dashplan" || id == "dashrun" || exercise_mock::isCase(id), fault = id == "dashfault";
   StatusInputs s;
   s.micName = tr("H540 (simulated)");
   s.micDbfs = -12;
@@ -451,6 +479,7 @@ void MockBackend::setStatusCase(const QString& id) {
   s.scenario = QVariantMap{{"name", tr("Departure 01")}, {"summary", tr("Taxi, line up, takeoff")}, {"callsign", "EAGLE-421"},
                 {"type", "C295"}, {"runway", "09"}, {"taxiway", "A3"}, {"rule", tr("interrupt")}, {"steps", 3},
                 {"sop", QString()}, {"placeholder", true}};
+  if (chosen_) s.scenario.insert(PlannerController::card(*chosen_));
   status_.set(std::move(s));
 }
 

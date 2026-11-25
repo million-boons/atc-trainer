@@ -26,7 +26,7 @@ Item {
                     StateIcon { level: s.r.level || 0; size: Theme.px(20); anchors.verticalCenter: parent.verticalCenter }
                     Label { text: s.r.title || ""; font { pixelSize: Theme.h1; weight: Font.Bold } }
                 }
-                Label { text: qsTr("%1   %2").arg(s.ex.modeText).arg(s.r.sub || ""); color: Theme.textSecondary; font.pixelSize: Theme.caption }
+                Label { text: [s.ex.modeText, s.ex.runText, s.r.sub || ""].filter(x => x !== "").join("   "); color: Theme.textSecondary; font.pixelSize: Theme.caption }
             }
             Repeater {
                 model: [[s.r.stepsDone, qsTr("steps completed")], [s.r.missed, qsTr("missed responses")], [s.r.duration, qsTr("duration")]]
