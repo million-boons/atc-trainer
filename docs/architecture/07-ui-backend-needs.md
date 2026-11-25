@@ -31,7 +31,7 @@ Common rules: file work never on the GUI thread or RadioCore's thread; answers a
 | Trend | last 20 of one trainee and one scenario: errors, missed responses, response median, suspected STT; never added together | From the list |
 | Not used | pilot readback errors (H-4), score, pass mark, comparison of trainees (H-5), export | – |
 
-Guest logs: they exist as files but no screen shows them after the result is closed. Retention of these files is **not ruled**; proposed: kept like other results, deleted by the instructor. They need some way to be seen for that: open question G-1.
+Guest results (D-131): no list on any screen. The store gives the instructor their count, and deletes them all in one action; each file deleted is a line in the deletion log, written first. The confirmation shows the count; if it changed since, the store refuses and the new count is shown (P).
 
 ## 5f Settings
 
@@ -45,7 +45,7 @@ Values: read, default, "set by user" flag, allowed range, who may change, when i
 | PTT, log | each change of a timing goes to the header of the next exercise log (E-2) | **Missing** in `EventLogHeader`: engine's contract |
 | Speech | exercise model, installed models, memory | `SttController` |
 | Voice bank | folder, voice, clip count, placeholder, radio effect (default light), test sentence | `VoiceBank`, `applyRadioEffect`; test sentence through `playLocal`. One bank per voice (S-5): choosing = another folder, then the coverage check |
-| Recordings | switch, free space, limits, folder, list | Exists (1c) |
+| Recordings | switch, free space, limits, folder, list. Guest results (D-131): count, "Delete guest results" with confirmation, instructor only | Exists (1c); **missing:** guest count and deletion |
 | Instructor | idle minutes; change PIN on screen, old PIN first (E-3) | `AccessController`; **missing:** changing the PIN from the app (today `set_instructor_pin`) |
 | About | versions, model and bank hashes, licences, folders | **Missing:** hashes as text |
 
@@ -66,7 +66,7 @@ Instructor only (D-25). Logic is engine's (`atc-scenario-pilot-engine`); the lis
 | Pending (S-1) | undecided takes in a separate `pending` folder, never read by bank, check or player; Accept moves to the bank as primary or alternate and writes the manifest; Reject keeps the file as rejected | **Missing** |
 | Coverage | per scenario: needed, primary, missing, unused | `checkCoverage` and the above |
 
-Voices of people recorded here are recordings: consent and D-31 (never in git) apply. Who may speak, and whether that needs a record, is **not ruled**: open question G-2.
+Speakers (D-132): only a person with a record and consent "yes"; the instructor starts the session and chooses the speaker; the ID (never name or rank) is stored with each take, also in `pending` and in the manifest. Consent is checked when the session starts and before each take is saved (P). D-31 applies: never in git. **Missing:** a speaker field in the manifest (engine's format). Not ruled: the consent text for this use, and takes of somebody whose consent becomes "no".
 
 ## Order and dependencies
 
