@@ -5,7 +5,7 @@ Branch and worktree `ui`, everything committed. Next free decision number: D-141
 **User's words (pasted into ui, meant for b2):** while ui is closed, b2 may fix compile errors, warnings and failing tests in ui's files during the merges, minimal, and list them for ui. Bigger UI changes wait for ui.
 
 ## State when closed
-- On `main` (e471207): 97f09d2, 8a2df27. Being merged by b2: 5090b5a (3b; b2: 490 of 491 tests before its test fix). Then ba27fee, then everything up to this commit in one build.
+- On `main` (79e142f): 97f09d2, 8a2df27, 5090b5a (3b; b2 reported 490 of 491 tests before its test fix, the repeat was not reported to ui). Next ba27fee, then everything up to this commit in one build.
 - **Not compiled or tested by ui:** every code commit from 5090b5a on.
 - Fixed by b2 in the merges so far: `src/app/EngineHeaders.h` (Qt's `slots`; includes of ExerciseView.h, LiveExercise.h/.cpp, test_live_exercise.cpp), `-Wsequence-point` at `++calls_` in ExerciseView, `Ui.InstructorChoiceLeavesTheRadioBarFree`.
 
