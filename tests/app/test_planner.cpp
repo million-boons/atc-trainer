@@ -614,7 +614,7 @@ TEST_F(Planner, OneChoiceAtATime) {
 
 TEST_F(Planner, ACountedRunIsReadAgainAndKeepsAnEdit) {
   std::function<void()> changed;
-  b.setEvents = [&changed](std::function<void()> f) { changed = std::move(f); };
+  b.setEvents = [&changed](PlannerEvents e) { changed = std::move(e.plansChanged); };
   p->setBackend(b);
   login();
   open("p1");
