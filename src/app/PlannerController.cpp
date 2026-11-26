@@ -378,15 +378,20 @@ QVariantMap PlannerController::card(const PlanChoice& c) {
           {"callsign", q(c.values.callsign)}, {"type", q(c.values.type)}, {"runway", q(c.values.runway)}, {"taxiway", q(c.values.taxiway)}};
 }
 
+// The card as the Dashboard would show it: always the SAVED plan, never values of an edit (D-152).
 QVariantMap PlannerController::preview() const {
   if (!open_) return {};
-  const PlanScenario* s = scenarioOf(draft_.scenario);
+  const Plan* saved = find(draft_.id);
+  if (!saved) return {{"saved", false}, {"unsaved", true}};
+  const PlanScenario* s = scenarioOf(saved->scenario);
   PlanChoice c;
-  c.plan = draft_;
-  if (draft_.fixed) c.values = draft_.values;
-  c.scenarioName = s ? s->name : draft_.scenario;
+  c.plan = *saved;
+  if (saved->fixed) c.values = saved->values;
+  c.scenarioName = s ? s->name : saved->scenario;
   QVariantMap m = card(c);
-  m["drawn"] = !draft_.fixed;
+  m["saved"] = true;
+  m["unsaved"] = dirty();
+  m["drawn"] = !saved->fixed;
   m["placeholder"] = s && s->placeholder;
   return m;
 }

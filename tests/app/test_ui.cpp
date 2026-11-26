@@ -1,6 +1,8 @@
 // Clicks through the real QML with the mock backend, off-screen. Any QML warning fails the test.
 #include <gtest/gtest.h>
 
+#include <cmath>
+
 #include <QFontDatabase>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
@@ -667,6 +669,40 @@ TEST_F(Ui, AWithdrawnTakeCanOnlyBeDeleted) {  // D-133
   EXPECT_TRUE(mock->studio()->takes().isEmpty());
 }
 
+// The user's review of 2026-11-26 (D-152): at 1280x800 the third take's state was under the buttons.
+struct UiTakes : Ui, testing::WithParamInterface<QSize> {};
+TEST_P(UiTakes, EveryShownTakeIsWholeWithItsStateAboveTheButtons) {
+  load(GetParam());
+  for (const char* id : {"phr", "phrtake", "phrwd"}) {
+    run(id);
+    waitLogin();
+    settle(200);
+    QQuickItem* list = nullptr;
+    QQuickItem* primary = find("Primary", true);
+    walk(win->contentItem(), [&](QQuickItem* x) {
+      if (x->objectName() == "takeList") list = x;
+    });
+    ASSERT_TRUE(list && primary) << id;
+    const double touch = 48 * std::max(1.0, std::min(win->height() / 800.0, win->width() / 1280.0));
+    const double top = list->mapToScene({0, 0}).y(), bottom = list->mapToScene({0, list->height()}).y();
+    EXPECT_GE(list->height(), touch - 1) << id;
+    const double row = std::round(touch);
+    EXPECT_NEAR(list->height(), std::round(list->height() / row) * row, 0.5) << id << ": only whole rows";
+    EXPECT_LE(bottom, primary->mapToScene({0, 0}).y()) << id;
+    int shown = 0;
+    walk(win->contentItem(), [&](QQuickItem* x) {
+      if (x->objectName() != "takeState" || !x->isVisible()) return;
+      const double y0 = x->mapToScene({0, 0}).y(), y1 = x->mapToScene({0, x->height()}).y();
+      if (y0 >= bottom - 1 || y1 <= top + 1) return;  // scrolled away
+      ++shown;
+      EXPECT_LE(y1, bottom + 1) << id << ": " << x->property("text").toString().toStdString();
+      EXPECT_FALSE(x->property("truncated").toBool()) << id << ": " << x->property("text").toString().toStdString();
+    });
+    EXPECT_GE(shown, 1) << id;
+  }
+}
+INSTANTIATE_TEST_SUITE_P(Sizes, UiTakes, testing::Values(QSize(1280, 800), QSize(1920, 1080)));
+
 TEST_F(Ui, RecordingIsShownForThePedalToo) {  // ST-1: from the backend's state
   load();
   StudioEvents e;
@@ -911,6 +947,21 @@ TEST_F(Ui, AMisfitIsMarkedInWords) {
   EXPECT_TRUE(allText().contains("The values do not fit together."));
   ASSERT_TRUE(find("Save", true));
   EXPECT_FALSE(find("Save", true)->isEnabled());
+  // D-152: the card keeps the saved values and says so; the misfit 09 is never on it
+  EXPECT_FALSE(allText().contains("RWY 09"));
+  EXPECT_TRUE(allText().contains("RWY 27"));
+  EXPECT_TRUE(allText().contains("Unsaved changes"));
+  EXPECT_TRUE(allText().contains("CHECKS OF THE EDIT"));
+}
+
+TEST_F(Ui, ANewPlanIsNotOnTheCardBeforeItIsSaved) {  // D-152
+  load();
+  run("plannew");
+  waitLogin();
+  settle(200);
+  EXPECT_TRUE(allText().contains("Not saved yet"));
+  EXPECT_TRUE(allText().contains("The Dashboard gets a plan when it is saved."));
+  EXPECT_FALSE(allText().contains("RWY "));
 }
 
 TEST_F(Ui, NewPresetValuesAreOfferedOnlyIfThePresetChanged) {  // D-147

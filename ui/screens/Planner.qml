@@ -276,9 +276,24 @@ Item {
             width: Theme.px(336); height: parent.height
             title: qsTr("ON THE DASHBOARD")
             readonly property var v: s.planner.preview
+            headerItems: Row {  // the card shows the saved plan only (D-152)
+                anchors.right: parent.right
+                height: parent.height
+                spacing: Theme.s4
+                visible: s.planner.hasPlan && (side.v.unsaved || false)
+                StateIcon { level: LabController.Caution; anchors.verticalCenter: parent.verticalCenter }
+                Label { objectName: "unsavedNote"; height: parent.height; text: side.v.saved ? qsTr("Unsaved changes") : qsTr("Not saved yet")
+                        font.pixelSize: Theme.caption }
+            }
+            Label {
+                x: Theme.s12; y: Theme.s8; width: parent.width - 2 * x
+                visible: s.planner.hasPlan && !(side.v.saved || false)
+                text: qsTr("The Dashboard gets a plan when it is saved.")
+                color: Theme.textSecondary; font.pixelSize: Theme.small; wrapMode: Text.WordWrap
+            }
             Column {
                 x: Theme.s12; y: Theme.s8; width: parent.width - 2 * x
-                visible: s.planner.hasPlan
+                visible: s.planner.hasPlan && (side.v.saved || false)
                 spacing: Theme.s4
                 Label { width: parent.width; height: Theme.px(26); text: side.v.name || qsTr("No name"); font { pixelSize: Theme.h2; weight: Font.DemiBold } }
                 Label { width: parent.width; text: side.v.planNote || ""; color: Theme.textSecondary; font.pixelSize: Theme.caption }
@@ -289,7 +304,7 @@ Item {
                 Label { width: parent.width; text: side.v.planLine || ""; font.pixelSize: Theme.caption; wrapMode: Text.WordWrap }
                 Label { width: parent.width; height: Theme.px(52); text: side.v.briefing || ""; font.pixelSize: Theme.small; wrapMode: Text.WordWrap; maximumLineCount: 3; verticalAlignment: Text.AlignTop }
             }
-            SectionHeader { id: chk; y: Theme.px(236); width: parent.width; text: qsTr("CHECKS") }
+            SectionHeader { id: chk; y: Theme.px(236); width: parent.width; text: s.planner.dirty ? qsTr("CHECKS OF THE EDIT") : qsTr("CHECKS") }
             Column {
                 x: Theme.s12; width: parent.width - 2 * x
                 anchors { top: chk.bottom; topMargin: Theme.s4 }

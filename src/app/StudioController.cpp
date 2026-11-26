@@ -656,7 +656,7 @@ QVariantList StudioController::takes() const {
   for (const StudioTake& t : c->takes)
     l.append(QVariantMap{{"number", t.number}, {"who", t.synthetic ? tr("synthetic") : q(t.speaker)}, {"state", takeState(t.state)},
                          {"level", takeLevel(t.state)}, {"info", tr("%1 s  %2 dBFS").arg(t.seconds, 0, 'f', 2).arg(t.levelDb, 0, 'f', 0)},
-                         {"selected", t.id == takeId_}});
+                         {"selected", t.id == takeId_}, {"withdrawn", t.state == State::Withdrawn}});
   return l;
 }
 

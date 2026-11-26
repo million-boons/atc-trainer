@@ -179,9 +179,44 @@ TEST_F(Planner, AircraftIsCallsignAndType) {
   login();
   open("p1");
   p->setAircraft("EAGLE-421  C295");
-  EXPECT_EQ(p->preview()["callsign"].toString(), "EAGLE-421");
-  EXPECT_EQ(p->preview()["type"].toString(), "C295");
+  EXPECT_EQ(p->plan()["aircraft"].toString(), "EAGLE-421  C295");
   EXPECT_TRUE(p->canSave());
+}
+
+// The user's review of 2026-11-26 (D-152): the card shows the saved values that will run, never those of an edit.
+TEST_F(Planner, TheCardShowsTheSavedPlanAndSaysThatThereAreUnsavedChanges) {
+  login();
+  open("p1");
+  const QVariantMap before = p->preview();
+  ASSERT_TRUE(before["saved"].toBool());
+  EXPECT_FALSE(before["unsaved"].toBool());
+  p->setAircraft("EAGLE-421  C295");
+  p->setRunway("09");  // with B2 this does not fit (as "planmis")
+  QVariantMap m = p->preview();
+  EXPECT_TRUE(m["unsaved"].toBool());
+  for (const char* k : {"callsign", "type", "runway", "taxiway", "name", "planLine", "briefing"}) EXPECT_EQ(m[k], before[k]) << k;
+  p->undo();
+  drain();
+  EXPECT_FALSE(p->preview()["unsaved"].toBool());
+  p->setAircraft("EAGLE-421  C295");
+  ASSERT_TRUE(p->canSave());
+  p->save();
+  drain();
+  m = p->preview();
+  EXPECT_FALSE(m["unsaved"].toBool());
+  EXPECT_EQ(m["callsign"].toString(), "EAGLE-421");  // saved: now it is what runs
+}
+
+TEST_F(Planner, ANewPlanShowsNoValuesBeforeItIsSaved) {
+  login();
+  p->newPlan();
+  drain();
+  ASSERT_TRUE(p->hasPlan());
+  const QVariantMap m = p->preview();
+  EXPECT_FALSE(m["saved"].toBool());
+  EXPECT_TRUE(m["unsaved"].toBool());
+  EXPECT_FALSE(m.contains("callsign"));
+  EXPECT_FALSE(m.contains("runway"));
 }
 
 TEST_F(Planner, AScenarioWithErrorsCannotBeChosen) {
