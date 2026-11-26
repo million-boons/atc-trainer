@@ -577,3 +577,12 @@ int main(int argc, char** argv) {
   QCoreApplication app(argc, argv);
   return RUN_ALL_TESTS();
 }
+
+TEST(ViewTitle, EachEndHasItsOwnHeading) {  // D-333: a closed program is not a time limit
+  using R = atc::out::EndReason;
+  EXPECT_EQ(ExerciseView::endTitle(std::nullopt), "LOG INCOMPLETE");
+  EXPECT_EQ(ExerciseView::endTitle(R::Completed), "COMPLETED");
+  EXPECT_EQ(ExerciseView::endTitle(R::InstructorStop), "STOPPED BY INSTRUCTOR");
+  EXPECT_EQ(ExerciseView::endTitle(R::TimeLimit), "TIME LIMIT");
+  EXPECT_EQ(ExerciseView::endTitle(R::ProgramClosed), "PROGRAM CLOSED");
+}
