@@ -97,7 +97,7 @@ ScenarioBackend ScenarioService::backend() {
           list.push_back(std::move(s));
           continue;
         }
-        s.id = e.scenario.id;
+        // The file name is the key of coverage() and select(); the loader does not require it to equal the scenario's id.
         s.name = e.scenario.name;
         if (s.category.empty()) s.category = e.scenario.category;
         s.airfield = e.airfield.id;

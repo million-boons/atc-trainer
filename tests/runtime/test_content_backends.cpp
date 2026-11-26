@@ -280,6 +280,28 @@ TEST(HistoryServiceTest, DeletingIsForTheInstructorAndLoggedFirst) {
   EXPECT_EQ(lines(dir / "deletions.log").size(), 3u);
 }
 
+// A file whose name is not its scenario's id can still be checked and chosen: the file name is the key.
+TEST(ScenarioServiceTest, TheFileNameIsTheKey) {
+  TempDir t;
+  fs::create_directories(t.path / "scenarios");
+  fs::copy(paths().data + "/airfields", t.path / "airfields", fs::copy_options::recursive);
+  fs::copy(paths().data + "/phraseology", t.path / "phraseology", fs::copy_options::recursive);
+  fs::copy_file(paths().data + "/scenarios/DEPARTURE-01.json", t.path / "scenarios/OTHER-NAME.json");
+  std::vector<std::string> selected;
+  ScenarioService s({t.path.string(), (t.path / "none").string()}, {{}, {}, {}, [](std::function<void()> f) { f(); }, [&](const std::string& f) { selected.push_back(f); }});
+  auto b = s.backend();
+  std::vector<ScenarioInfo> list;
+  b.load([&](std::vector<ScenarioInfo> l, const std::string&) { list = std::move(l); });
+  s.wait();
+  ASSERT_EQ(list.size(), 1u);
+  EXPECT_EQ(list[0].id, "OTHER-NAME");
+  std::string why = "(none)";
+  b.select(list[0].id, [&](const std::string& w) { why = w; });
+  s.wait();
+  EXPECT_EQ(why, "");
+  EXPECT_EQ(selected.size(), 1u);
+}
+
 TEST(ScenarioServiceTest, ListsChecksAndSelects) {
   bool active = false;
   std::vector<std::string> selected;
