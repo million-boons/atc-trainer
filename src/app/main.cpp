@@ -2,6 +2,7 @@
 #include <QDate>
 #include <QDateTime>
 #include <QFile>
+#include <QFileInfo>
 #include <QFontDatabase>
 #include <QGuiApplication>
 #include <QImage>
@@ -21,14 +22,23 @@
 #include "app/MockBackend.h"
 #ifdef ATC_HAVE_LIVE
 #include "app/LiveBackend.h"
+#include "app/HistoryService.h"
 #include "app/PlannerService.h"
+#include "app/ScenarioService.h"
+#include "app/SetupService.h"
+#ifdef ATC_HAVE_PIN
+#include "storage/InstructorPin.h"
+#endif
 #include "app/StudioService.h"
 #include "storage/ConsentView.h"
 #include "storage/DataCopy.h"
 #include "stt/SttFactory.h"
 #endif
 #include "app/SettingsController.h"
+#include "app/HistoryController.h"
 #include "app/PlannerController.h"
+#include "app/ScenarioController.h"
+#include "app/SetupController.h"
 #include "app/StudioController.h"
 #include "app/SttController.h"
 #include "core/PathResolver.h"
@@ -88,6 +98,35 @@ int main(int argc, char** argv) {
   } else {
     qWarning("%s not found; using defaults", qPrintable(f.fileName()));
   }
+  // 5f: what the user chose in Settings wins over ui.json, from this start on (D-335, ASSUMED).
+  const QJsonObject starting = cfg;  // the screen shows these as the starting values
+  const std::string setupFile = paths.writable + "/setup.json";
+  if (!useMock && havePaths) {
+    const auto chosen = atc::SetupService::stored(setupFile);
+    const auto number = [&](const char* key, const char* cfgKey, double scale = 1) {
+      if (const auto it = chosen.find(key); it != chosen.end()) cfg[cfgKey] = std::stoi(it->second) * scale;
+    };
+    number("cut", "pilotCutNoticeMs");
+    number("toneMs", "sideToneMs");
+    number("toneHz", "sideToneHz");
+    number("toneDb", "sideToneDbfs");
+    number("free", "recordingsMinFreeMb");
+    number("idle", "instructorIdleMinutes");
+    number("tap", "txShortTapMs");
+    number("preroll", "txPreRollMs");
+    number("tail", "txTailMs");
+    number("longest", "txLongestMs", 1000);
+    number("debounce", "pttDebounceMs");
+    number("settle", "txQueueSettleMs");
+    const auto text = [&](const char* key) { const auto it = chosen.find(key); return it == chosen.end() ? QString() : QString::fromStdString(it->second); };
+    if (!text("theme").isEmpty()) cfg["theme"] = text("theme");
+    if (!text("motion").isEmpty()) cfg["reduceMotion"] = text("motion") == "reduce";
+    if (!text("clock").isEmpty()) cfg["clock"] = text("clock");
+    if (!text("sidetone").isEmpty()) cfg["sideTone"] = text("sidetone") == "on";
+    if (!text("model").isEmpty()) cfg["exerciseModel"] = text("model");
+    if (!text("radio").isEmpty()) cfg["radioEffect"] = text("radio");
+    if (!text("bank").isEmpty() && QFileInfo(text("bank") + "/manifest.json").exists()) paths.voices = text("bank").toStdString();  // S-5
+  }
 
   for (const char* n : {"Inter-Regular.otf", "Inter-SemiBold.otf", "Inter-Bold.otf", "JetBrainsMono-Regular.ttf",
                         "JetBrainsMono-Bold.ttf"})
@@ -120,6 +159,9 @@ int main(int argc, char** argv) {
   RecordingsController recordings(&lab, &access, &settings);
   recordings.setBackend(useMock ? mockRecordings(recordings)
                                 : realRecordings(paths.writable, cfg["recordingsMinFreeMb"].toInt(200), recordings));
+  std::vector<std::string> modelIds;  // installed, for Settings
+  for (const auto& m : models)
+    if (m.installed) modelIds.push_back(m.id);
   std::unique_ptr<MockBackend> mockBackend;
   if (useMock) {
     stt.start(std::move(models), MockBackend::fakeEngine, [](const atc::SttModel& m) { return "{\"mock\":\"" + m.id + "\"}"; });
@@ -132,9 +174,15 @@ int main(int argc, char** argv) {
   auto phraseology = std::make_shared<atc::DataCopy>(paths.data + "/phraseology", paths.writable);
   StudioController studio(&access);
   PlannerController planner(&access);
+  ScenarioController scenarios;
+  HistoryController history(&access, [] { return QDateTime::currentMSecsSinceEpoch(); });
+  SetupController setupScreen(&access);
   std::unique_ptr<LiveExercise> exercise;  // before the backend, which calls it until its radio has stopped
   std::unique_ptr<atc::StudioService> studioService;
   std::unique_ptr<atc::PlannerService> plannerService;
+  std::unique_ptr<atc::ScenarioService> scenarioService;
+  std::unique_ptr<atc::HistoryService> historyService;
+  std::unique_ptr<atc::SetupService> setupService;
   std::unique_ptr<LiveBackend> live;
   if (!useMock) {
     LiveConfig lc;
@@ -148,6 +196,13 @@ int main(int argc, char** argv) {
     lc.devices.micSource = cfg["micSource"].toString().toStdString();
     lc.devices.pulseServer = cli.value(pulseOpt).toStdString();
     lc.radio.pilotCutNotice = atc::ms(cfg["pilotCutNoticeMs"].toInt(2000));
+    const auto msOf = [&](const char* key, atc::Ns fallback) { return cfg.contains(key) ? atc::ms(cfg[key].toInt()) : fallback; };
+    lc.radio.tx.minDuration = msOf("txShortTapMs", lc.radio.tx.minDuration);
+    lc.radio.tx.preRoll = msOf("txPreRollMs", lc.radio.tx.preRoll);
+    lc.radio.tx.tail = msOf("txTailMs", lc.radio.tx.tail);
+    lc.radio.tx.maxDuration = msOf("txLongestMs", lc.radio.tx.maxDuration);
+    lc.radio.tx.queueSettle = msOf("txQueueSettleMs", lc.radio.tx.queueSettle);
+    lc.radio.ptt.debounce = msOf("pttDebounceMs", lc.radio.ptt.debounce);
     lc.status.pttName = lc.pttName;
     lc.status.pttStandIn = cfg["pttStandIn"].toBool(!lc.devices.pttGrab);  // an exclusive device is the pedal
     lc.status.pttMissingBlocks = cfg["pttMissingBlocks"].toBool(true);
@@ -230,6 +285,48 @@ int main(int argc, char** argv) {
       ex->setPlanner(plannerService.get());
       planner.setBackend(plannerService->backend());
       QObject::connect(&access, &AccessController::changed, ex, [service = plannerService.get()] { service->accessChanged(); });
+      // 5d, 5e, 5f (D-335).
+      const auto gui = [ex](std::function<void()> f) { QMetaObject::invokeMethod(ex, std::move(f), Qt::QueuedConnection); };
+      const auto who = [&access] { return std::pair{access.role(), access.personId().toStdString()}; };
+      const auto now = [] { return QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm").toStdString(); };
+      scenarioService = std::make_unique<atc::ScenarioService>(
+          atc::ScenarioService::Config{paths.data, paths.voices},
+          atc::ScenarioService::Rules{[ex] { return ex->active(); }, [phraseology] { return phraseology->dir(); },
+                                      [consent](const std::string& id) { return consent->mayUse(id); }, gui,
+                                      [ex](const std::string& file) { ex->useScenario(file); }});
+      scenarios.setBackend(scenarioService->backend());
+      historyService = std::make_unique<atc::HistoryService>(atc::HistoryService::Config{paths.data, paths.writable + "/exercises"},
+                                                             atc::HistoryService::Rules{who, now});
+      history.setBackend(historyService->backend());
+      atc::SetupService::Config setupCfg{setupFile, paths.voices, paths.writable + "/voices", {}, {}, {}};
+      for (auto it = starting.begin(); it != starting.end(); ++it) {
+        static const std::map<QString, std::string> keys{{"pilotCutNoticeMs", "cut"}, {"sideToneMs", "toneMs"}, {"sideToneHz", "toneHz"},
+                                                         {"sideToneDbfs", "toneDb"}, {"recordingsMinFreeMb", "free"}, {"instructorIdleMinutes", "idle"},
+                                                         {"theme", "theme"}, {"radioEffect", "radio"}, {"exerciseModel", "model"}};
+        if (const auto k = keys.find(it.key()); k != keys.end()) setupCfg.starting[k->second] = it.value().isString() ? it.value().toString().toStdString() : std::to_string(it.value().toInt());
+      }
+      setupCfg.starting["sidetone"] = starting["sideTone"].toBool(true) ? "on" : "off";
+      setupCfg.starting["motion"] = starting["reduceMotion"].toBool(false) ? "reduce" : "normal";
+      setupCfg.models = modelIds;
+      setupCfg.facts = {{"voice", "Folder", paths.voices}, {"recordings", "Folder", paths.writable}, {"about", "Data", paths.data},
+                        {"about", "Speech model", cfg["exerciseModel"].toString("whisper-tiny-genprompt").toStdString()},
+                        {"about", "Licences", "Inter, JetBrains Mono (SIL OFL); Qt (LGPL); whisper.cpp (MIT); Vosk (Apache-2.0)"}};
+      setupService = std::make_unique<atc::SetupService>(
+          setupCfg, atc::SetupService::Rules{[&access] { return access.role(); }, [ex] { return ex->active(); },
+#ifdef ATC_HAVE_PIN
+                                             [pinFile = paths.writable + "/instructor.pin"](const std::string& oldPin, const std::string& newPin) -> std::string {
+                                               const auto hash = atc::loadPinHash(pinFile);
+                                               if (!hash || !atc::checkPin(oldPin, *hash)) return "the old PIN is wrong";
+                                               if (!atc::validPin(newPin)) return "the PIN must be 6 to 12 digits";
+                                               const auto next = atc::hashPin(newPin);
+                                               return next && atc::savePinHash(pinFile, *next) ? "" : "the PIN could not be stored";
+                                             },
+#else
+                                             {},
+#endif
+                                             {}, [h = historyService.get()] { return h->guests(); },
+                                             [h = historyService.get()](int expected, int& count) { return h->deleteGuests(expected, count); }});
+      setupScreen.setBackend(setupService->backend());
     }
     live = std::make_unique<LiveBackend>(&lab, &stt, lc, &recordings);
     live->start();
@@ -266,13 +363,22 @@ int main(int argc, char** argv) {
 #endif
   StudioController* studioView = nullptr;
   PlannerController* plannerView = nullptr;
+  ScenarioController* scenariosView = nullptr;
+  HistoryController* historyView = nullptr;
+  SetupController* setupView = nullptr;
 #ifdef ATC_HAVE_LIVE
+  if (scenarioService) scenariosView = &scenarios;
+  if (historyService) historyView = &history;
+  if (setupService) setupView = &setupScreen;
   if (studioService) studioView = &studio;
   if (plannerService) plannerView = &planner;
 #endif
   engine.setInitialProperties({{"lab", QVariant::fromValue(&lab)},
                                {"studio", QVariant::fromValue(studioView)},
                                {"planner", QVariant::fromValue(plannerView)},
+                               {"scenarios", QVariant::fromValue(scenariosView)},
+                               {"history", QVariant::fromValue(historyView)},
+                               {"setup", QVariant::fromValue(setupView)},
                                {"exercise", QVariant::fromValue(exerciseView)},
                                {"mock", QVariant::fromValue(mockBackend.get())},
                                {"stt", QVariant::fromValue(&stt)},

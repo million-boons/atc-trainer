@@ -52,6 +52,7 @@ class PlannerService {
 
   // GUI thread.
   void accessChanged();  // PB-6: a personal plan goes when its person has logged out
+  void forget() { chosen_.reset(); }  // a scenario was chosen instead (5d)
   // Before the Start dialog: checks everything again for the person of now, and redraws Random values that are that
   // person's previous combination. Empty, or why it cannot start.
   std::string beforeStart(PlanSelection& s);

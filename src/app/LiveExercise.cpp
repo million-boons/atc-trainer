@@ -120,6 +120,14 @@ void LiveExercise::usePlan(std::optional<PlanSelection> p) {
   else newSeed();
 }
 
+void LiveExercise::useScenario(const std::string& file) {
+  if (active()) return;
+  plan_.reset();
+  if (planner_) planner_->forget();
+  scenario_ = file;
+  recheck();
+}
+
 // The Start dialog.
 void LiveExercise::prepare() {
   const auto p = c_.phase();

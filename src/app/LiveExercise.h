@@ -64,13 +64,15 @@ class LiveExercise : public QObject {
   // by seed. GUI thread.
   void setPlanner(atc::PlannerService* p) { planner_ = p; }
   void usePlan(std::optional<atc::PlanSelection> p);
+  // 5d: the scenario of the Dashboard, for this run of the program (C-3); replaces a plan.
+  void useScenario(const std::string& file);
 
  private:
   template <class F> void ui(F f) { QMetaObject::invokeMethod(this, std::move(f), Qt::QueuedConnection); }
   void checked(const atc::CheckResult& r);
   void newSeed();
   void showPlan();
-  const std::string& scenarioFile() const { return plan_ ? plan_->scenarioFile : cfg_.scenarioFile; }
+  const std::string& scenarioFile() const { return plan_ ? plan_->scenarioFile : !scenario_.empty() ? scenario_ : cfg_.scenarioFile; }
   void prepare();
   void start(bool assessed);
   void leave();
@@ -91,6 +93,7 @@ class LiveExercise : public QObject {
   bool starting_ = false, assessed_ = false, recheck_ = false;
   atc::PlannerService* planner_ = nullptr;
   std::optional<atc::PlanSelection> plan_;
+  std::string scenario_;  // chosen on the screen; empty: the one of ui.json
   std::string session_;  // of the latest start
   QDateTime startedAt_;
   std::unique_ptr<atc::ExerciseCheck> check_;  // last: joins its thread before the rest goes
