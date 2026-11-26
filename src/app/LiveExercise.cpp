@@ -39,6 +39,7 @@ ExerciseRuntime::Callbacks LiveExercise::callbacks() {
     ui([this, ok, why] {
       starting_ = false;
       if (!ok) return view_.refused(q(why));
+      if (plan_ && planner_) planner_->started(*plan_, session_);  // counted from the start (PB-1)
       if (status_.running) status_.running(true);
       view_.started(assessed_, startedAt_);
       second_.start();
@@ -60,9 +61,9 @@ void LiveExercise::connectRadio(ExerciseRadio radio, ExerciseStatus status, Stat
   connect(&c_, &ExerciseController::phaseChanged, this, [this] {
     if (recheck_) ui([this] { if (recheck_) recheck(); });  // later: while an exercise begins the phase is idle for a moment
   });
-  if (cfg_.check) return checked(cfg_.check(cfg_.scenarioFile));
+  if (cfg_.check) return checked(cfg_.check(scenarioFile()));
   check_ = std::make_unique<ExerciseCheck>(cfg_.data, cfg_.voices, [this](const CheckResult& r) { ui([this, r] { checked(r); }); }, cfg_.mayUse, cfg_.phraseology);
-  check_->select(cfg_.scenarioFile);
+  check_->select(scenarioFile());
 }
 
 bool LiveExercise::active() const {
@@ -74,8 +75,8 @@ void LiveExercise::recheck() {
   if (!cfg_.check && !check_) return;
   recheck_ = active();
   if (recheck_) return;
-  if (cfg_.check) checked(cfg_.check(cfg_.scenarioFile));
-  else check_->select(cfg_.scenarioFile);
+  if (cfg_.check) checked(cfg_.check(scenarioFile()));
+  else check_->select(scenarioFile());
 }
 
 void LiveExercise::checked(const CheckResult& r) {
@@ -84,7 +85,8 @@ void LiveExercise::checked(const CheckResult& r) {
   QStringList lines;
   for (const auto& m : r.missing) lines << q(m);
   for (const auto& e : r.errors) lines << q(toString(e));
-  if (ready_) newSeed();
+  if (ready_ && plan_) showPlan();
+  else if (ready_) newSeed();
   else if (status_.scenario) status_.scenario({{"name", QFileInfo(q(r.scenarioFile)).completeBaseName()}, {"placeholder", true}});
   if (!status_.bank) return;
   status_.bank(r.state == S::Checking ? BankReady::Checking : r.state == S::Covered ? BankReady::CoverageOk
@@ -98,18 +100,49 @@ void LiveExercise::newSeed() {
   if (status_.scenario) status_.scenario(ExerciseView::card(*ready_.exercise, seed_));
 }
 
+void LiveExercise::showPlan() {
+  if (!ready_ || !plan_ || !status_.scenario) return;
+  QVariantMap m = ExerciseView::card(*ready_.exercise, plan_->values);
+  if (cfg_.planCard) {
+    const QVariantMap keys = cfg_.planCard(*plan_);
+    for (auto it = keys.begin(); it != keys.end(); ++it)
+      if (it.key() != "callsign" && it.key() != "type" && it.key() != "runway" && it.key() != "taxiway") m[it.key()] = it.value();  // the values that run
+  }
+  status_.scenario(m);
+}
+
+void LiveExercise::usePlan(std::optional<PlanSelection> p) {
+  if (active()) return;  // never under an exercise or its dialog
+  const std::string before = scenarioFile();
+  plan_ = std::move(p);
+  if (scenarioFile() != before) return recheck();
+  if (plan_) showPlan();
+  else newSeed();
+}
+
 // The Start dialog.
 void LiveExercise::prepare() {
   const auto p = c_.phase();
   if (!ready_ || (p != ExerciseController::Idle && p != ExerciseController::Result)) return;
+  std::string why;
+  std::optional<ExercisePlan> shown;
+  if (plan_ && planner_) {
+    why = planner_->beforeStart(*plan_);  // the person of now: run number, previous values (D-154)
+    showPlan();
+    shown = ExercisePlan{q(plan_->plan.name), q(plan_->plan.trainee), plan_->plan.assessed, plan_->run};
+  }
   view_.prepare({.exercise = ready_.exercise, .seed = seed_,
                  .model = stt_ ? stt_->nameOf(cfg_.model) : q(cfg_.model), .trainee = access_ && access_->trainee() ? access_->personId() : QString(),
-                 .consent = access_ && access_->consent()});
+                 .consent = access_ && access_->consent(),
+                 .values = plan_ ? std::optional<ParamValues>(plan_->values) : std::nullopt, .plan = shown});
   emit c_.screenRequested("ex");
+  if (!why.empty()) view_.refused(q(why));
 }
 
 void LiveExercise::start(bool assessed) {
   if (starting_ || !ready_ || !radio_.start) return;
+  if (plan_ && assessed != plan_->plan.assessed)
+    return view_.refused(plan_->plan.assessed ? tr("This plan is Assessed.") : tr("This plan is Practice."));
   startedAt_ = QDateTime::currentDateTime();
   ExerciseOptions o;
   o.seed = seed_;
@@ -120,6 +153,15 @@ void LiveExercise::start(bool assessed) {
   o.model = cfg_.model;
   o.pttFallback = !cfg_.pttMissingBlocks || (settings_ && settings_->pttFallback());
   o.radio = cfg_.radio;
+  if (plan_) {  // D-334: exactly what the card and the dialog show
+    const PlanDifficulty& d = plan_->plan.difficulty;
+    o.values = plan_->values;
+    o.replyDelay = std::pair{ms(d.replyFromMs), ms(d.replyToMs)};
+    if (const auto r = radioIntensityFromString(d.radio)) o.radio = *r;
+    static const char* presets[] = {"easy", "normal", "hard", "custom"};
+    o.plan = {plan_->plan.id, plan_->plan.name, presets[int(d.preset)], plan_->run};
+  }
+  session_ = o.sessionId;
   starting_ = true;  // before start(): started() may come at once
   assessed_ = assessed;
   const std::string why = radio_.start(ready_, o, cfg_.makeLog ? cfg_.makeLog() : std::make_unique<JsonlEventLog>(cfg_.logs));
@@ -134,7 +176,12 @@ void LiveExercise::ended(const ExerciseResult& r) {
   view_.ended(r, QDateTime::currentDateTime());
   // No Lab result comes for a transmission of the exercise.
   if (lab_) lab_->setText({}, tr("Waiting"), false, {}, false);
-  newSeed();
+  if (plan_ && planner_) {
+    planner_->ended(*plan_);  // Random: new values, shown before they are used (PB-4)
+    showPlan();
+  } else {
+    newSeed();
+  }
 }
 
 void LiveExercise::leave() {

@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -20,9 +21,10 @@ constexpr std::optional<ExerciseMode> exerciseModeFromString(std::string_view s)
   return std::nullopt;
 }
 
-// First entry of every log. Nothing in it changes during the exercise (D-39, D-416).
+// First entry of every log. Nothing in it changes during the exercise (D-39, D-416). Version 2 (D-334): the values
+// that run, the difficulty and the plan; a version 1 log has only the seed.
 struct EventLogHeader {
-  int version = 1;
+  int version = 2;
   std::string sessionId;
   std::string scenarioId, scenarioHash;
   std::uint64_t seed = 0;
@@ -30,6 +32,11 @@ struct EventLogHeader {
   ExerciseMode mode = ExerciseMode::Practice;
   std::string traineeId;  // a code, not a name; empty until A-5 is answered
   std::string modelId, modelConfig;
+  std::map<std::string, std::string> values;  // generator -> value: exactly what was said and expected
+  int replyFromMs = 0, replyToMs = 0;
+  std::string radio;
+  std::string planId, planName, planPreset;  // empty: no plan
+  int planRun = 0;                           // 0: unnumbered
 };
 
 // Letters, digits, - and _: the same rule as speaker IDs in ptt_record.

@@ -21,12 +21,14 @@
 #include "app/MockBackend.h"
 #ifdef ATC_HAVE_LIVE
 #include "app/LiveBackend.h"
+#include "app/PlannerService.h"
 #include "app/StudioService.h"
 #include "storage/ConsentView.h"
 #include "storage/DataCopy.h"
 #include "stt/SttFactory.h"
 #endif
 #include "app/SettingsController.h"
+#include "app/PlannerController.h"
 #include "app/StudioController.h"
 #include "app/SttController.h"
 #include "core/PathResolver.h"
@@ -129,8 +131,10 @@ int main(int argc, char** argv) {
   auto consent = std::make_shared<atc::ConsentView>();
   auto phraseology = std::make_shared<atc::DataCopy>(paths.data + "/phraseology", paths.writable);
   StudioController studio(&access);
+  PlannerController planner(&access);
   std::unique_ptr<LiveExercise> exercise;  // before the backend, which calls it until its radio has stopped
   std::unique_ptr<atc::StudioService> studioService;
+  std::unique_ptr<atc::PlannerService> plannerService;
   std::unique_ptr<LiveBackend> live;
   if (!useMock) {
     LiveConfig lc;
@@ -167,6 +171,14 @@ int main(int argc, char** argv) {
       ec.pttMissingBlocks = lc.status.pttMissingBlocks;
       ec.mayUse = [consent](const std::string& id) { return consent->mayUse(id); };
       ec.phraseology = [phraseology] { return phraseology->dir(); };
+      ec.planCard = [](const atc::PlanSelection& s) {
+        PlanChoice c;
+        c.plan = s.plan;
+        c.scenarioName = s.scenarioName;
+        c.run = s.run;
+        c.onlyCombination = s.onlyCombination;
+        return PlannerController::card(c);
+      };
       const std::string effect = cfg["radioEffect"].toString("light").toStdString();
       if (const auto r = atc::radioIntensityFromString(effect)) ec.radio = *r;
       else qWarning("radioEffect \"%s\" is not known; using light", effect.c_str());
@@ -204,6 +216,20 @@ int main(int argc, char** argv) {
         service->consentChanged();  // also at log-out
         if (differs) ex->recheck();
       });
+      // The Exercise Planner (10, D-334).
+      plannerService = std::make_unique<atc::PlannerService>(
+          atc::PlannerService::Config{.data = paths.data, .plans = paths.writable + "/planner", .voices = paths.voices},
+          atc::PlannerService::Rules{
+              .who = [&access] { return std::pair{access.role(), access.personId().toStdString()}; },
+              .exerciseActive = [ex] { return ex->active(); },
+              .phraseology = [phraseology] { return phraseology->dir(); },
+              .mayUse = [consent](const std::string& id) { return consent->mayUse(id); },
+              .now = [] { return QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm").toStdString(); },
+              .gui = [ex](std::function<void()> f) { QMetaObject::invokeMethod(ex, std::move(f), Qt::QueuedConnection); }},
+          [ex](std::optional<atc::PlanSelection> s) { ex->usePlan(std::move(s)); });
+      ex->setPlanner(plannerService.get());
+      planner.setBackend(plannerService->backend());
+      QObject::connect(&access, &AccessController::changed, ex, [service = plannerService.get()] { service->accessChanged(); });
     }
     live = std::make_unique<LiveBackend>(&lab, &stt, lc, &recordings);
     live->start();
@@ -239,11 +265,14 @@ int main(int argc, char** argv) {
   if (exercise) exerciseView = exercise->controller();
 #endif
   StudioController* studioView = nullptr;
+  PlannerController* plannerView = nullptr;
 #ifdef ATC_HAVE_LIVE
   if (studioService) studioView = &studio;
+  if (plannerService) plannerView = &planner;
 #endif
   engine.setInitialProperties({{"lab", QVariant::fromValue(&lab)},
                                {"studio", QVariant::fromValue(studioView)},
+                               {"planner", QVariant::fromValue(plannerView)},
                                {"exercise", QVariant::fromValue(exerciseView)},
                                {"mock", QVariant::fromValue(mockBackend.get())},
                                {"stt", QVariant::fromValue(&stt)},

@@ -46,6 +46,13 @@ struct ExerciseOptions {
   std::string model;         // the configured exercise model; another loaded one is refused (D-414)
   bool pttFallback = false;  // a missing PTT only warns (D-116)
   RadioIntensity radio = RadioIntensity::Light;
+  // D-334, a plan: its exact values (checked again here, never corrected), reply delay, and what is logged of it.
+  std::optional<ParamValues> values;
+  std::optional<std::pair<Ns, Ns>> replyDelay;
+  struct Plan {
+    std::string id, name, preset;
+    int run = 0;
+  } plan;
 };
 
 struct RuntimeConfig {
@@ -79,6 +86,9 @@ class ExerciseRuntime {
   // The reason if refused at once; otherwise empty, and started() reports whether the radio was free.
   std::string start(PreparedExercise ready, ExerciseOptions opt, std::unique_ptr<IEventLog> log);
   void stop();                // instructor stop: the pilot is silent at once
+  // The program closes (D-333): the exercise ends with "program closed" and its log is complete. Call only after
+  // RadioCore has stopped: it runs on the caller's thread.
+  void programClosed();
   void resume();              // the instructor continues after missed responses (D-424)
   void useFallback();         // on-screen PTT instead of a lost one
   // A speech result. False: not a transmission of an exercise, the Lab's.
@@ -120,12 +130,13 @@ class ExerciseRuntime {
   void presence(bool present);
   void finish();
   void tick(Ns now);
-  void fault(const std::string& why) { if (cb_.fault) cb_.fault(why); }
+  void fault(const std::string& why) { if (cb_.fault && !closing_) cb_.fault(why); }
 
   const RuntimeConfig cfg_;
   const ParserRules rules_;
   ISpeechModel& speech_;
   const Callbacks cb_;
+  bool closing_ = false;  // the program closes: the log is completed, nobody is told any more (D-333)
   RadioCore* core_ = nullptr;
   std::atomic<ExercisePhase> phase_{ExercisePhase::Idle};
   std::atomic<bool> starting_{false};

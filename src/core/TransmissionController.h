@@ -55,7 +55,8 @@ enum class PilotStop {
   Interrupted,     // rule Interrupt
   PressCameFirst,  // the press was made before the speech began; the reply is kept
   Timeout,         // no end reported in time: a fault, to be logged and shown
-  Withdrawn        // dropPilot(): the exercise was stopped
+  Withdrawn,       // dropPilot(): the exercise was stopped
+  Superseded       // never spoken: a newer transmission was made (D-333); reported by replyDropped
 };
 
 // Half-duplex arbitration. Pure logic: time is passed in, output through callbacks.
@@ -75,6 +76,8 @@ class TransmissionController {
     std::function<void(Ns)> pressQueued{};
     std::function<void(Ns)> queuedOpened{};   // just before txBegin: side-tone click (D-24)
     std::function<void(Ns)> queuedDropped{};  // released or lost before the pilot finished
+    // D-333: a reply that was not spoken yet and is not owed is dropped once a newer transmission has been made.
+    std::function<void(const Reply&)> replyDropped{};
   };
 
   TransmissionController(TxConfig cfg, Callbacks cb) : cfg_(cfg), cb_(std::move(cb)) {}
@@ -122,6 +125,11 @@ class TransmissionController {
   std::map<std::uint64_t, std::optional<std::optional<Reply>>> open_;
   std::deque<Reply> replies_;
   std::map<std::uint64_t, Reply> cut_;  // by the transmission that cut it
+  // D-333: not owed and not yet spoken, put aside by the open transmission; dropped if it is a real one, back if a tap.
+  std::deque<Reply> held_;
+  std::uint64_t lastReal_ = 0;  // the newest transmission that was not a short tap
+  bool supersedes(const Reply& r) const { return !r.owed && !r.first; }
+  void drop(std::deque<Reply>& rs);
   std::optional<Reply> speaking_;
   PlaybackId playback_ = 0;
   Ns pilotStart_ = 0, pilotDeadline_ = 0;

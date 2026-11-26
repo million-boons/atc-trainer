@@ -1,6 +1,7 @@
 #include "runtime/ExerciseRuntime.h"
 
 #include <algorithm>
+#include <tuple>
 #include <utility>
 
 #include "audio/UtteranceChecks.h"
@@ -30,6 +31,9 @@ std::string ExerciseRuntime::start(PreparedExercise ready, ExerciseOptions opt, 
   if (!ready) return "no checked scenario";
   if (!log) return "no event log";
   if (auto why = modeError(*ready.exercise, opt.mode); !why.empty()) return why;
+  if (std::string why; opt.values && !fitsParams(ready.exercise->scenario, ready.exercise->airfield, *opt.values, why))
+    return "the plan's values do not fit: " + why;  // before the model is locked
+  if (opt.replyDelay && (opt.replyDelay->first < 0 || opt.replyDelay->second < opt.replyDelay->first)) return "the reply delay is not valid";
   if (running() || starting_.exchange(true)) return "an exercise is already running";
   const auto refuse = [this](std::string why) {
     starting_ = false;
@@ -57,11 +61,24 @@ std::string ExerciseRuntime::start(PreparedExercise ready, ExerciseOptions opt, 
   h.traineeId = opt.traineeId;
   h.modelId = model.modelId;
   h.modelConfig = model.modelConfig;
+  EngineConfig engine = cfg_.engine;
+  if (opt.replyDelay) std::tie(engine.replyDelayMin, engine.replyDelayMax) = *opt.replyDelay;
+  ParamValues values;
+  if (opt.values) values = *opt.values;
+  else generateParams(ready.exercise->scenario, ready.exercise->airfield, opt.seed, values);
+  h.values = values;
+  h.replyFromMs = int(engine.replyDelayMin / ms(1));
+  h.replyToMs = int(engine.replyDelayMax / ms(1));
+  h.radio = std::string(toString(opt.radio));
+  h.planId = opt.plan.id;
+  h.planName = opt.plan.name;
+  h.planPreset = opt.plan.preset;
+  h.planRun = opt.plan.run;
   std::string error;
   if (!r->log->begin(h, error)) return refuseLocked("event log: " + error);
   r->modelId = model.modelId;
   r->modelConfig = model.modelConfig;
-  r->engine = std::make_unique<LoggedEngine>(SequenceEngine(ready.exercise, opt.seed, cfg_.engine), *r->log);
+  r->engine = std::make_unique<LoggedEngine>(SequenceEngine(ready.exercise, opt.seed, engine, values), *r->log);
   r->takes.seed(opt.seed ^ 0xD1B54A32D192ED03ull);
   r->ready = std::move(ready);
   r->opt = std::move(opt);
@@ -95,6 +112,11 @@ void ExerciseRuntime::stop() {
   core_->call([this] { if (running()) apply(core_->now(), in::InstructorStop{}); });
 }
 
+void ExerciseRuntime::programClosed() {
+  closing_ = true;  // the screens and the radio's users may be gone already
+  if (running()) apply(core_->now(), in::ProgramClosed{});
+}
+
 void ExerciseRuntime::resume() {
   core_->call([this] { if (running()) apply(core_->now(), in::InstructorContinue{}); });
 }
@@ -108,7 +130,7 @@ void ExerciseRuntime::useFallback() {
 }
 
 void ExerciseRuntime::apply(Ns t, const EngineInput& i) {
-  if (cb_.input) cb_.input(t, i);
+  if (cb_.input && !closing_) cb_.input(t, i);
   for (const auto& o : run_->engine->apply(t, i)) take(t, o);
   if (run_ && !run_->lostReported && run_->log->lost()) {
     run_->lostReported = true;
@@ -126,7 +148,7 @@ void ExerciseRuntime::take(Ns t, const EngineOutput& o) {
                       [&](const out::Ended& x) { run_->reason = x.reason; },
                       [](const auto&) {}},
              o);
-  if (cb_.output) cb_.output(t, o);
+  if (cb_.output && !closing_) cb_.output(t, o);
 }
 
 // The sound is made when it is asked for, so that it is in memory when the pilot starts.
@@ -200,7 +222,7 @@ void ExerciseRuntime::finish() {
   auto r = std::move(run_);
   const ExerciseResult result = buildResult(r->ready.exercise->scenario, r->log->events);
   if (r->log->lost() && !r->lostReported) fault("the event log is incomplete: entries could not be written");
-  if (cb_.ended) cb_.ended(result);
+  if (cb_.ended && !closing_) cb_.ended(result);
   // The log's file is closed here, after the last write: not on the radio's thread.
   if (closer_.joinable()) closer_.join();
   closer_ = std::thread([r = std::move(r)]() mutable { r.reset(); });
@@ -300,10 +322,11 @@ RadioCore::Events ExerciseRuntime::wrap(RadioCore::Events lab) {
     if (l->pilotEnded) l->pilotEnded(r, heardToEnd);
   };
   e.pilotStopped = [this, l](const Reply& r, PilotStop why) {
-    if (running() && why == PilotStop::Timeout) run_->sounds.erase(r.id);
+    if (running() && (why == PilotStop::Timeout || why == PilotStop::Superseded)) run_->sounds.erase(r.id);
     if (running() && why != PilotStop::Withdrawn)
       apply(core_->now(), in::PilotEnded{r.id, why == PilotStop::Interrupted      ? in::PilotEnd::Interrupted
                                                : why == PilotStop::PressCameFirst ? in::PilotEnd::PressCameFirst
+                                               : why == PilotStop::Superseded     ? in::PilotEnd::Superseded
                                                                                   : in::PilotEnd::TimedOut});
     if (l->pilotStopped) l->pilotStopped(r, why);
   };

@@ -1,4 +1,7 @@
 #include <gtest/gtest.h>
+
+#include <map>
+#include <random>
 #include <unistd.h>
 
 #include <filesystem>
@@ -290,6 +293,46 @@ TEST_F(Departure, GeneratedValuesAreAlwaysValidAndAllOccur) {
     seen.insert(v["runway"] + v["callsign"]);
   }
   EXPECT_EQ(seen.size(), 4u);
+}
+// D-334: the draw gives every combination an equal share. 40 000 fixed seeds, so the test is the same on every run;
+// the tolerance is about 6 standard deviations of a fair draw.
+TEST_F(Departure, EveryCombinationIsDrawnAboutEquallyOften) {
+  ASSERT_TRUE(load()) << all();
+  std::map<std::string, int> n;
+  std::mt19937_64 seeds(20261126);
+  const int draws = 40'000;
+  for (int i = 0; i < draws; ++i) {
+    ParamValues v;
+    ASSERT_TRUE(generateParams(e.scenario, e.airfield, seeds() >> 11, v));  // below 2^53, as the program's seeds
+    ++n[v["callsign"] + " " + v["runway"]];
+  }
+  ASSERT_EQ(n.size(), 4u);
+  for (const auto& [k, c] : n) EXPECT_NEAR(c, draws / 4, 520) << k;
+}
+TEST_F(Departure, CombinationsAndFitsAgree) {
+  ASSERT_TRUE(load()) << all();
+  bool tooMany = true;
+  const auto all = combinations(e.scenario, e.airfield, 100, tooMany);
+  EXPECT_FALSE(tooMany);
+  ASSERT_EQ(all.size(), 4u);
+  std::string why;
+  for (const auto& v : all) EXPECT_TRUE(fitsParams(e.scenario, e.airfield, v, why)) << why;
+  EXPECT_EQ(combinations(e.scenario, e.airfield, 3, tooMany).size(), 3u);
+  EXPECT_TRUE(tooMany);
+  ParamValues v = all[0];
+  v["taxiway"] = v["runway"] == "09" ? "B2" : "A3";
+  EXPECT_FALSE(fitsParams(e.scenario, e.airfield, v, why));
+  EXPECT_EQ(why, v["taxiway"] + " does not serve " + v["runway"]);
+  v = all[0];
+  v["runway"] = "18";
+  EXPECT_FALSE(fitsParams(e.scenario, e.airfield, v, why));
+  EXPECT_NE(why.find("18"), std::string::npos);
+  v = all[0];
+  v.erase("callsign");
+  EXPECT_FALSE(fitsParams(e.scenario, e.airfield, v, why));
+  v = all[0];
+  v["extra"] = "x";
+  EXPECT_FALSE(fitsParams(e.scenario, e.airfield, v, why));
 }
 TEST_F(Departure, SameSeedSameValues) {
   ASSERT_TRUE(load()) << all();

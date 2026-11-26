@@ -21,10 +21,11 @@ std::string fillSlots(const std::string& text, const ParamValues& values) {
   return r;
 }
 
-SequenceEngine::SequenceEngine(std::shared_ptr<const Exercise> exercise, std::uint64_t seed, EngineConfig cfg)
+SequenceEngine::SequenceEngine(std::shared_ptr<const Exercise> exercise, std::uint64_t seed, EngineConfig cfg, std::optional<ParamValues> values)
     : exercise_(std::move(exercise)), cfg_(cfg), rng_(seed ^ 0x9E3779B97F4A7C15ull) {
   // loadExercise has checked that a combination exists.
-  generateParams(exercise_->scenario, exercise_->airfield, seed, ctx_.params);
+  if (values) ctx_.params = std::move(*values);
+  else generateParams(exercise_->scenario, exercise_->airfield, seed, ctx_.params);
 }
 
 SequenceEngine::Outputs SequenceEngine::handle(Ns t, const EngineInput& input) {
@@ -184,6 +185,10 @@ void SequenceEngine::on(Ns, const in::FallbackPttUsed&, Outputs&) {}  // in the 
 
 void SequenceEngine::on(Ns, const in::InstructorStop&, Outputs& o) {
   if (running()) finish(out::EndReason::InstructorStop, o);
+}
+
+void SequenceEngine::on(Ns, const in::ProgramClosed&, Outputs& o) {
+  if (running()) finish(out::EndReason::ProgramClosed, o);
 }
 
 // The pilot's calls start again; the step is unchanged.

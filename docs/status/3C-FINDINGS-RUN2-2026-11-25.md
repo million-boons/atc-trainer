@@ -24,7 +24,7 @@ Build: `0b39f01` (18:43). Three exercises, all Practice, `whisper-tiny-genprompt
 2. **Release to text**, 14 transmissions: median 2.81 s, lowest 2.70, highest 3.01; none at or below 2 s (D-323, run T, stt). Run 1 was 2.83 s over 8.
 3. **Two "say again" in a row** (b2, exercise 1, 13 to 27 s). The second transmission was opened 1.5 s after the first release, before the first result. Both results were AMBIGUOUS; both replies were spoken, 1.25 s apart, 7 s of pilot speech. The cut rule (D-325) covers only a reply that was playing. Proposal, **needs the user**: a reply that is not owed is dropped when a newer transmission has been received; only the newest is answered, a readback is always spoken.
 4. **Log without an end** (b2, exercise 2). Last entry: transmission 7 cancelled after 0.36 s, at 20:06:55; the program was started again at 20:07:02. No crash report of that time (apport's last entry is 18:15). Not proven: that the window was closed. In the code, closing the program in an exercise writes no `ended`. Proposal: write `ended` with the reason "program closed". Ask the user how the program ended.
-5. All three had the same values. With four combinations this is chance one time in 16 for three equal; the seeds differ. In exercise 2 the user spoke A3, 09 while the engine had B2, 27: ask whether the screen showed A3, 09 (D-321 again) or whether it was test C1.
+5. **Closed (D-333): not a fault, words mixed up by the user.** All three had the same values. With four combinations this is chance one time in 16 for three equal; the seeds differ. In exercise 2 the user spoke A3, 09 while the engine had B2, 27: ask whether the screen showed A3, 09 (D-321 again) or whether it was test C1.
 
 ## Not tried yet (by the logs)
 

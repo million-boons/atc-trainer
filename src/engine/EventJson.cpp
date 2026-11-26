@@ -16,6 +16,7 @@ const char* name(in::PilotEnd e) {
     case in::PilotEnd::Interrupted: return "interrupted";
     case in::PilotEnd::PressCameFirst: return "press_came_first";
     case in::PilotEnd::TimedOut: return "timed_out";
+    case in::PilotEnd::Superseded: return "superseded";
   }
   return "";
 }
@@ -23,7 +24,8 @@ const char* name(in::Timer t) {
   return t == in::Timer::StepTimeout ? "step_timeout" : t == in::Timer::OnEnter ? "on_enter" : "exercise_limit";
 }
 const char* name(out::EndReason r) {
-  return r == out::EndReason::Completed ? "completed" : r == out::EndReason::InstructorStop ? "instructor_stop" : "time_limit";
+  return r == out::EndReason::Completed ? "completed" : r == out::EndReason::InstructorStop ? "instructor_stop"
+         : r == out::EndReason::ProgramClosed ? "program_closed" : "time_limit";
 }
 std::string str(std::string_view s) { return std::string(s); }
 
@@ -64,6 +66,7 @@ json j(const in::TimerFired& x) { return {{"timer", name(x.timer)}, {"generation
 json j(const in::PttPresence& x) { return json{{"present", x.present}}; }
 json j(const in::FallbackPttUsed& x) { return {{"tx", x.tx}, {"source", x.source}}; }
 json j(const in::InstructorStop&) { return json::object(); }
+json j(const in::ProgramClosed&) { return json::object(); }
 json j(const in::InstructorContinue&) { return json::object(); }
 json j(const out::StepEntered& x) { return json{{"step", x.step}}; }
 json j(const out::Judged& x) {
@@ -91,7 +94,7 @@ std::string line(const json& v) { return v.dump(-1, ' ', false, json::error_hand
 }  // namespace
 
 std::string headerJson(const EventLogHeader& h) {
-  return line({{"log", "atc-exercise"},
+  json j{{"log", "atc-exercise"},
                {"version", h.version},
                {"session", h.sessionId},
                {"scenario", h.scenarioId},
@@ -101,7 +104,12 @@ std::string headerJson(const EventLogHeader& h) {
                {"mode", str(toString(h.mode))},
                {"trainee", h.traineeId},
                {"modelId", h.modelId},
-               {"modelConfig", h.modelConfig}});
+               {"modelConfig", h.modelConfig},
+               {"values", h.values},
+               {"replyDelayMs", {h.replyFromMs, h.replyToMs}},
+               {"radio", h.radio}};
+  if (!h.planId.empty()) j["plan"] = {{"id", h.planId}, {"name", h.planName}, {"preset", h.planPreset}, {"run", h.planRun}};
+  return line(j);
 }
 
 std::string eventJson(const EngineEvent& e) {

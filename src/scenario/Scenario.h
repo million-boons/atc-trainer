@@ -112,5 +112,10 @@ bool templateSlots(const std::string& text, std::vector<std::string>& slots);
 using ParamValues = std::map<std::string, std::string>;
 std::uint64_t combinationCount(const Scenario& s, const Airfield& a);
 bool generateParams(const Scenario& s, const Airfield& a, std::uint64_t seed, ParamValues& out);
+// D-334, Planner: every valid combination, at most max (tooMany is set if there are more).
+std::vector<ParamValues> combinations(const Scenario& s, const Airfield& a, std::size_t max, bool& tooMany);
+// Values given by a plan: each one is a value of its pool and fits the others. False with the reason, e.g.
+// "B2 does not serve 09". Nothing is corrected.
+bool fitsParams(const Scenario& s, const Airfield& a, const ParamValues& v, std::string& why);
 
 }  // namespace atc

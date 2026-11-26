@@ -56,14 +56,14 @@ if(Qt6_FOUND)
   target_link_libraries(setup_screen_tests PRIVATE atc_logic Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
   gtest_discover_tests(setup_screen_tests)
   # The live exercise (3b): real engine, simulated time, no radio.
-  if(TARGET atc_exercise)
+  if(TARGET atc_studio)
     add_executable(live_exercise_tests test_live_exercise.cpp ${APP}/LiveExercise.h ${APP}/LiveExercise.cpp
       ${APP}/ExerciseView.h ${APP}/ExerciseView.cpp ${APP}/ExerciseController.h ${APP}/ExerciseController.cpp
       ${APP}/StatusFeed.h ${APP}/RowModel.h ${APP}/SttController.h ${APP}/SttController.cpp ${APP}/LabController.h ${APP}/LabController.cpp
       ${APP}/AccessController.h ${APP}/AccessController.cpp ${APP}/SettingsController.h ${APP}/SettingsController.cpp)
     set_target_properties(live_exercise_tests PROPERTIES AUTOMOC ON)
     target_include_directories(live_exercise_tests PRIVATE ${CMAKE_SOURCE_DIR}/src ${APP})
-    target_link_libraries(live_exercise_tests PRIVATE atc_exercise atc_logic Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
+    target_link_libraries(live_exercise_tests PRIVATE atc_studio atc_exercise atc_logic Qt6::Core Qt6::Qml GTest::gtest Threads::Threads)
     gtest_discover_tests(live_exercise_tests)
   endif()
 endif()

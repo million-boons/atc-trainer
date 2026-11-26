@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <map>
 #include <memory>
+#include <optional>
 #include <random>
 #include <set>
 #include <string>
@@ -27,7 +28,9 @@ class SequenceEngine {
   enum class Status { Ready, Running, Ended };
   using Outputs = std::vector<EngineOutput>;
 
-  SequenceEngine(std::shared_ptr<const Exercise> exercise, std::uint64_t seed, EngineConfig cfg = {});
+  // values: given by a plan and checked with fitsParams (D-334); otherwise the seed's.
+  SequenceEngine(std::shared_ptr<const Exercise> exercise, std::uint64_t seed, EngineConfig cfg = {},
+                 std::optional<ParamValues> values = {});
 
   Outputs handle(Ns t, const EngineInput& input);
 
@@ -54,6 +57,7 @@ class SequenceEngine {
   void on(Ns t, const in::PttPresence&, Outputs& o);
   void on(Ns t, const in::FallbackPttUsed&, Outputs& o);
   void on(Ns t, const in::InstructorStop&, Outputs& o);
+  void on(Ns t, const in::ProgramClosed&, Outputs& o);
   void on(Ns t, const in::InstructorContinue&, Outputs& o);
 
   bool running() const { return status_ == Status::Running; }

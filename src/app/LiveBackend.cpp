@@ -76,6 +76,7 @@ LiveBackend::~LiveBackend() {
   if (recordings_) recordings_->setPlayer({});
   if (cfg_.studio) cfg_.studio->connect({});
   core_->stop();  // hands over a take that is being recorded
+  if (runtime_) runtime_->programClosed();  // D-333: after the radio, on this thread
 }
 
 void LiveBackend::result(quint64 tx, const QString& model, const QString& config, const QString& text, const QStringList& words,

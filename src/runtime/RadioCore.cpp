@@ -395,6 +395,9 @@ void RadioCore::build() {
     if (why == PilotStop::Interrupted) cutUntil_ = clock_() + cfg_.pilotCutNotice;
     if (ev_.pilotStopped) ev_.pilotStopped(r, why);
   };
+  cb.replyDropped = [this](const Reply& r) {
+    if (ev_.pilotStopped) ev_.pilotStopped(r, PilotStop::Superseded);  // it never sounded: nothing to silence
+  };
   cb.pressBlocked = [this](Ns t) { if (ev_.pressNotOpened) ev_.pressNotOpened(in::PressResult::Blocked, t); };
   cb.pressQueued = [this](Ns t) { if (ev_.pressNotOpened) ev_.pressNotOpened(in::PressResult::Queued, t); };
   cb.queuedDropped = [this](Ns t) { if (ev_.pressNotOpened) ev_.pressNotOpened(in::PressResult::QueueDropped, t); };
