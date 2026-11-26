@@ -126,6 +126,13 @@ class PlannerController : public QObject {
 
  private:
   enum class Field { None, Aircraft, Runway, Taxiway };
+  enum class Fit { Incomplete, Checking, Yes, No };
+  struct FitAnswer {         // the backend's fits() for the plan being edited
+    std::string scenario{};
+    PlanValues values{};
+    bool answered = false, ok = false;
+    std::string why{};
+  };
   struct State {
     int level = 0;
     QString text{};
@@ -135,7 +142,10 @@ class PlannerController : public QObject {
   const Plan* find(const std::string& id) const;
   const PlanDifficulty* presetOf(PlanPreset p) const;
   State stateOf(const Plan& p) const;
-  bool fits(const PlanValues& v, const PlanScenario& s) const;
+  bool fits(const PlanValues& v, const PlanScenario& s) const;  // by the list; with tooMany unknown
+  Fit draftFit() const;
+  QString fitWhy() const;                    // the backend's reason, if the values of the edit do not fit
+  void askFits();
   bool misfit(Field f) const;
   bool known(const std::string& trainee) const;
   bool mayChoose(const Plan& p) const;
@@ -163,10 +173,11 @@ class PlannerController : public QObject {
   std::vector<PlanDifficulty> editPresets_;
   std::string draftRevision_, want_;         // want_: the plan to open after the next load
   PlanCoverage coverage_;
+  FitAnswer fit_;
   QString search_, filter_ = QStringLiteral("all"), message_;
   Field last_ = Field::None;                 // the value chosen last is never the one that is marked
   bool loaded_ = false, open_ = false, wasInstructor_ = false, trainerBusy_ = false, choosing_ = false;
   int waiting_ = 0, messageLevel_ = 0;
-  unsigned loadNo_ = 0, coverageNo_ = 0, chooseNo_ = 0;  // answers to older questions are ignored
+  unsigned loadNo_ = 0, coverageNo_ = 0, chooseNo_ = 0, fitNo_ = 0;  // answers to older questions are ignored
   PlannerBackend b_;                         // last: it finishes its work before the rest goes
 };

@@ -64,7 +64,12 @@ MockBackend::MockBackend(LabController* lab, SttController* stt, int pilotCutMs,
     s.scenario.insert(*chosenScenario_);
     status_.set(std::move(s));
   }));
-  planner_.setBackend(mockPlanner([this](const PlanChoice& c) { showChoice(c); }));
+  {
+    MockPlanner m = mockPlanner([this](const PlanChoice& c) { showChoice(c); },
+                                [this] { return access_ && access_->trainee() ? access_->personId().toStdString() : std::string(); });
+    plannerAccess_ = std::move(m.accessChanged);
+    planner_.setBackend(std::move(m.backend));
+  }
   connect(lab, &LabController::pressRequested, this, [this](const QString& s) { userEdge(s, true); });
   connect(lab, &LabController::releaseRequested, this, [this](const QString& s) { userEdge(s, false); });
   connect(lab, &LabController::playRequested, this,
@@ -472,10 +477,16 @@ void MockBackend::screenCase() {
 }
 
 void MockBackend::showChoice(const PlanChoice& c) {
-  chosen_ = c;
-  chosenScenario_.reset();
   StatusInputs s = status_.inputs();
-  s.scenario.insert(PlannerController::card(c));
+  if (!chosen_) beforePlan_ = s.scenario;  // what the Dashboard showed without a plan
+  chosenScenario_.reset();
+  if (c.plan.id.empty()) {  // taken off the Dashboard (PB-6)
+    chosen_.reset();
+    s.scenario = beforePlan_;
+  } else {
+    chosen_ = c;
+    s.scenario.insert(PlannerController::card(c));
+  }
   status_.set(std::move(s));
 }
 

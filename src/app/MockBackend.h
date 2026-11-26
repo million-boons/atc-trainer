@@ -56,6 +56,9 @@ class MockBackend : public QObject {
     connect(a, &AccessController::confirmed, &exercise_, &ExerciseController::endConfirmed);
     studio_.setAccess(a);
     planner_.setAccess(a);
+    connect(a, &AccessController::changed, this, [this] {
+      if (plannerAccess_) plannerAccess_();
+    });
     history_.setAccess(a);
     setup_.setAccess(a);
     connect(a, &AccessController::loggedIn, this, [this] {
@@ -125,6 +128,8 @@ class MockBackend : public QObject {
   SetupController setup_;
   std::optional<QVariantMap> chosenScenario_;   // the card of a selected scenario
   std::optional<PlanChoice> chosen_;
+  QVariantMap beforePlan_;                // the Dashboard's scenario before a plan was put on it
+  std::function<void()> plannerAccess_;   // the mock Planner puts a personal plan away at log-out (PB-6)
   bool assessed_ = false, consent_ = false;
   bool exPressed_ = false;    // a press in an Exercise case
   QTimer statusTimer_;
