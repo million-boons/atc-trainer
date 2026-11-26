@@ -609,6 +609,27 @@ TEST(ExerciseRuntime, SilenceIsUnintelligibleWithoutFault) {
   EXPECT_TRUE(r.logged<in::TxClosed>()[0].report.empty);
 }
 
+// D-333, the 3c case: the trainee speaks again before the first answer; only the newer one is answered, and the
+// engine does not wait for the dropped one.
+TEST(ExerciseRuntime, OnlyTheAnswerToTheNewerTransmissionIsSpoken) {
+  Rig r;
+  ASSERT_EQ(r.start(), "");
+  r.hearPilot();
+  const auto first = r.transmit();
+  const auto second = r.transmit();  // before the first result
+  r.text(first, "mumble");
+  r.text(second, "mumble");
+  const int before = r.plays;
+  r.hearPilot();
+  r.pass(3000);
+  EXPECT_EQ(r.plays, before + 1);
+  int superseded = 0;
+  for (const auto& e : r.logged<in::PilotEnded>()) superseded += e.end == in::PilotEnd::Superseded;
+  EXPECT_EQ(superseded, 1);
+  r.say(r.taxi());  // the exercise goes on: nothing is waited for
+  EXPECT_EQ(r.outcomes().back(), Outcome::Correct);
+}
+
 TEST(ExerciseRuntime, StartIsRefusedWithAReason) {
   Rig r;
   r.model.allow = false;

@@ -52,7 +52,7 @@ struct PilotStarted {
   static constexpr std::string_view kName = "pilot_started";
   std::uint64_t utterance = 0;
 };
-enum class PilotEnd { Completed, Interrupted, PressCameFirst, TimedOut };
+enum class PilotEnd { Completed, Interrupted, PressCameFirst, TimedOut, Superseded };  // Superseded: never spoken (D-333)
 struct PilotEnded {
   static constexpr std::string_view kName = "pilot_ended";
   std::uint64_t utterance = 0;
@@ -74,6 +74,8 @@ struct FallbackPttUsed {  // D-311: this transmission was keyed on screen or key
   std::string source;  // SCREEN or SPACE
 };
 struct InstructorStop { static constexpr std::string_view kName = "instructor_stop"; };
+// The program was closed during the exercise (D-333): the log still ends.
+struct ProgramClosed { static constexpr std::string_view kName = "program_closed"; };
 struct InstructorContinue {  // answer to an alert that asks for a choice: the pilot calls again
   static constexpr std::string_view kName = "instructor_continue";
 };
@@ -123,7 +125,7 @@ struct InstructorAlert {  // e.g. too many "say again" in one step
   std::string why;
   bool choice = false;  // the instructor decides: in::InstructorContinue or in::InstructorStop (D-424)
 };
-enum class EndReason { Completed, InstructorStop, TimeLimit };
+enum class EndReason { Completed, InstructorStop, TimeLimit, ProgramClosed };  // ProgramClosed: D-333
 struct Ended {
   static constexpr std::string_view kName = "ended";
   EndReason reason = EndReason::Completed;
@@ -133,7 +135,7 @@ struct Ended {
 
 using EngineInput = std::variant<in::Started, in::TxOpened, in::TxClosed, in::TxCancelled, in::PressNotOpened,
                                  in::Recognised, in::PilotStarted, in::PilotEnded, in::TimerFired, in::PttPresence,
-                                 in::InstructorStop, in::InstructorContinue, in::FallbackPttUsed>;
+                                 in::InstructorStop, in::InstructorContinue, in::FallbackPttUsed, in::ProgramClosed>;
 using EngineOutput = std::variant<out::StepEntered, out::Judged, out::PilotRequested, out::NoReply, out::TimerSet,
                                   out::TimerCancelled, out::InstructorAlert, out::Ended, out::AtcBeforePilot>;
 

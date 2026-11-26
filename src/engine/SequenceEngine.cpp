@@ -186,6 +186,10 @@ void SequenceEngine::on(Ns, const in::InstructorStop&, Outputs& o) {
   if (running()) finish(out::EndReason::InstructorStop, o);
 }
 
+void SequenceEngine::on(Ns, const in::ProgramClosed&, Outputs& o) {
+  if (running()) finish(out::EndReason::ProgramClosed, o);
+}
+
 // The pilot's calls start again; the step is unchanged.
 void SequenceEngine::on(Ns, const in::InstructorContinue&, Outputs&) {
   if (!running() || !callsExhausted_) return;

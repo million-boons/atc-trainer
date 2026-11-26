@@ -95,6 +95,10 @@ void ExerciseRuntime::stop() {
   core_->call([this] { if (running()) apply(core_->now(), in::InstructorStop{}); });
 }
 
+void ExerciseRuntime::programClosed() {
+  if (running()) apply(core_->now(), in::ProgramClosed{});
+}
+
 void ExerciseRuntime::resume() {
   core_->call([this] { if (running()) apply(core_->now(), in::InstructorContinue{}); });
 }
@@ -300,10 +304,11 @@ RadioCore::Events ExerciseRuntime::wrap(RadioCore::Events lab) {
     if (l->pilotEnded) l->pilotEnded(r, heardToEnd);
   };
   e.pilotStopped = [this, l](const Reply& r, PilotStop why) {
-    if (running() && why == PilotStop::Timeout) run_->sounds.erase(r.id);
+    if (running() && (why == PilotStop::Timeout || why == PilotStop::Superseded)) run_->sounds.erase(r.id);
     if (running() && why != PilotStop::Withdrawn)
       apply(core_->now(), in::PilotEnded{r.id, why == PilotStop::Interrupted      ? in::PilotEnd::Interrupted
                                                : why == PilotStop::PressCameFirst ? in::PilotEnd::PressCameFirst
+                                               : why == PilotStop::Superseded     ? in::PilotEnd::Superseded
                                                                                   : in::PilotEnd::TimedOut});
     if (l->pilotStopped) l->pilotStopped(r, why);
   };

@@ -79,6 +79,9 @@ class ExerciseRuntime {
   // The reason if refused at once; otherwise empty, and started() reports whether the radio was free.
   std::string start(PreparedExercise ready, ExerciseOptions opt, std::unique_ptr<IEventLog> log);
   void stop();                // instructor stop: the pilot is silent at once
+  // The program closes (D-333): the exercise ends with "program closed" and its log is complete. Call only after
+  // RadioCore has stopped: it runs on the caller's thread.
+  void programClosed();
   void resume();              // the instructor continues after missed responses (D-424)
   void useFallback();         // on-screen PTT instead of a lost one
   // A speech result. False: not a transmission of an exercise, the Lab's.

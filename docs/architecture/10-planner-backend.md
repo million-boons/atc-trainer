@@ -1,6 +1,6 @@
-# 10 Exercise Planner: backend (DRAFT, for the user's approval)
+# 10 Exercise Planner: backend (approved 2026-11-26, D-334; PB-6 as D-333)
 
-By b2, night of 2026-11-26. **No Planner backend code before approval.** It is the rest of 08 (sections 2 and 3). Screen: 04 §5g (ui, approved D-143). Interface: ui's `src/app/PlannerBackend.h` (a proposal); answers in section 8. Binding: D-116, D-120, D-127, D-129, D-135, D-141 to D-148, D-318, D-321, D-326, D-327. Already approved by the user: plans store exact values, and the change of engine's contract for it. "Exists" was read in the code, not run. Nothing here is measured. Points for the user: **PB-1 to PB-9** (section 10).
+By b2, night of 2026-11-26. Approved by the user on 2026-11-26 (D-334): PB-1 to PB-5 and PB-7 to PB-9 as recommended; **PB-6: a personal plan is put away when its person logs out; Anyone plans stay.** It is the rest of 08 (sections 2 and 3). Screen: 04 §5g (ui, approved D-143). Interface: ui's `src/app/PlannerBackend.h` (a proposal); answers in section 8. Binding: D-116, D-120, D-127, D-129, D-135, D-141 to D-148, D-318, D-321, D-326, D-327. Already approved by the user: plans store exact values, and the change of engine's contract for it. "Exists" was read in the code, not run. Nothing here is measured. Points for the user: **PB-1 to PB-9** (section 10).
 
 ## 1. Parts
 

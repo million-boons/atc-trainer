@@ -855,3 +855,26 @@ TEST(FillSlots, ReplacesKnownSlots) {
   EXPECT_EQ(fillSlots("runway {runway}, {callsign}", {{"runway", "09"}, {"callsign", "EAGLE-421"}}), "runway 09, EAGLE-421");
   EXPECT_EQ(fillSlots("plain", {}), "plain");
 }
+
+// D-333: a reply that was never spoken because a newer instruction came is no longer waited for.
+TEST_F(Engine, ASupersededReplyIsNoLongerOutstanding) {
+  SequenceEngine e(ex, 1);
+  const auto t = timerIn(e.handle(0, in::Started{}), in::Timer::OnEnter);
+  ASSERT_TRUE(t);
+  const auto id = utteranceIn(e.handle(ms(1000), in::TimerFired{in::Timer::OnEnter, t->generation}));
+  const auto o = e.handle(ms(1500), in::PilotEnded{id, in::PilotEnd::Superseded});
+  EXPECT_TRUE(timerIn(o, in::Timer::StepTimeout).has_value());  // the step waits for ATC again
+}
+
+// D-333: closing the program ends the exercise with its own reason.
+TEST_F(Engine, ClosingTheProgramEndsTheExercise) {
+  SequenceEngine e(ex, 1);
+  e.handle(0, in::Started{});
+  const auto o = e.handle(ms(5000), in::ProgramClosed{});
+  bool ended = false;
+  for (const auto& x : o)
+    if (const auto* end = std::get_if<out::Ended>(&x)) ended = end->reason == out::EndReason::ProgramClosed;
+  EXPECT_TRUE(ended);
+  EXPECT_EQ(e.status(), SequenceEngine::Status::Ended);
+  EXPECT_TRUE(e.handle(ms(6000), in::ProgramClosed{}).empty());
+}

@@ -439,6 +439,9 @@ TEST_F(LiveDeparture, ClosingTheAppInAnExerciseKeepsTheLog) {
   live.reset();
   spin(100);
   EXPECT_FALSE(logLines().filter("tx_opened").isEmpty());
+  // D-333: the log ends, and says why.
+  EXPECT_EQ(logLines().filter("program_closed").size(), 2) << logLines().join('\n').toStdString();  // input and end reason
+  EXPECT_TRUE(logLines().last().contains("\"ended\"")) << logLines().last().toStdString();
 }
 
 int main(int argc, char** argv) {

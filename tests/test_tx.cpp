@@ -41,7 +41,8 @@ struct Tx : ::testing::Test {
         [this](Ns t) { log.push_back("blocked@" + std::to_string(t / ms(1))); },
         [this](Ns t) { log.push_back("queued@" + std::to_string(t / ms(1))); },
         [this](Ns t) { log.push_back("click@" + std::to_string(t / ms(1))); },
-        [this](Ns t) { log.push_back("dropped@" + std::to_string(t / ms(1))); }});
+        [this](Ns t) { log.push_back("dropped@" + std::to_string(t / ms(1))); },
+        [this](const Reply& r) { log.push_back("superseded " + r.text); }});
   }
   using V = std::vector<std::string>;
 };
@@ -95,7 +96,9 @@ TEST_F(Tx, PilotWaitsForDelayAndPedal) {
   c.onPress(ms(1000));
   c.onRelease(ms(2000), ReleaseReason::Normal);
   c.tick(ms(2200));
-  c.onProcessed(1, Reply{"rb", ms(500)}, ms(2300));
+  Reply rb{"rb", ms(500)};
+  rb.owed = true;  // a readback: never dropped (D-333)
+  c.onProcessed(1, rb, ms(2300));
   EXPECT_EQ(c.state(), S::PilotDelay);
   c.onPress(ms(2500));  // trainee keys again before the pilot starts
   c.tick(ms(4000));
@@ -126,11 +129,13 @@ TEST_F(Tx, CutReadbackFollowsTheNewAnswer) {
   EXPECT_FALSE(playing);
   c.onProcessed(1, Reply{.text = "new", .id = 3}, ms(1400));
   EXPECT_EQ(log.back(), "pilot new");
-  for (const char* next : {"pilot readback", "pilot later"}) {
-    playing = false;
-    c.onPlaybackDone(pid, ms(3000));
-    EXPECT_EQ(log.back(), next);
-  }
+  playing = false;
+  c.onPlaybackDone(pid, ms(3000));
+  EXPECT_EQ(log.back(), "pilot readback");
+  playing = false;
+  c.onPlaybackDone(pid, ms(4000));
+  EXPECT_EQ(log.back(), "pilot readback");  // "later" was not spoken yet when the press came: dropped (D-333)
+  EXPECT_NE(std::find(log.begin(), log.end(), "superseded later"), log.end());
 }
 TEST_F(Tx, CutReplyThatIsNotOwedIsDroppedByANewInstruction) {
   auto c = make();
@@ -225,9 +230,11 @@ TEST_F(Tx, LateResultCannotBeOvertaken) {
   c.onPress(ms(1300));
   c.onRelease(ms(2300), ReleaseReason::Normal);
   c.tick(ms(2500));
-  c.onProcessed(2, Reply{"second", 0}, ms(2600));
+  Reply first{"first", 0}, second{"second", 0};
+  first.owed = second.owed = true;  // readbacks: none is dropped (D-333)
+  c.onProcessed(2, second, ms(2600));
   EXPECT_FALSE(playing);
-  c.onProcessed(1, Reply{"first", 0}, ms(2700));
+  c.onProcessed(1, first, ms(2700));
   EXPECT_EQ(log.back(), "pilot first");
   playing = false;
   c.onPlaybackDone(pid, ms(4000));
@@ -300,7 +307,7 @@ TEST_F(Tx, QueueOpensWhenPilotFinishes) {
   EXPECT_FALSE(c.pressQueued());
   c.onRelease(ms(4000), ReleaseReason::Normal);
   c.tick(ms(4200));
-  EXPECT_EQ(log, (V{"pilot call", "queued@100", "click@2025", "begin1@2025", "end1 2025-4200"}));
+  EXPECT_EQ(log, (V{"pilot call", "queued@100", "click@2025", "begin1@2025", "end1 2025-4200", "superseded next"}));  // D-333
 }
 TEST_F(Tx, QueuedPressReleasedEarlyIsDropped) {
   cfg.pressDuringPilot = PressRule::Queue;
@@ -484,7 +491,8 @@ TEST_F(Tx, PressStampedBeforePilotStartButDeliveredAfterComesFirst) {
     c.tick(ms(2200));
     c.onProcessed(1, std::nullopt, ms(2300));
     c.tick(ms(2800));
-    EXPECT_EQ(log.back(), "pilot call");
+    EXPECT_EQ(log.back(), "superseded call");  // it was not spoken, and a newer transmission came (D-333)
+    EXPECT_FALSE(playing);
   }
 }
 TEST_F(Tx, PressStampedDuringSpeechButDeliveredAfterItsEndFollowsTheRule) {
@@ -805,4 +813,98 @@ TEST_F(Tx, DropPilotLetsAQueuedPressOpen) {
   c.dropPilot(ms(1500));
   c.tick(ms(1600));
   EXPECT_EQ(c.state(), S::TxOpen);
+}
+
+// D-333: a reply that was not spoken yet is dropped when a newer transmission is made; a readback is always spoken.
+TEST_F(Tx, AnOlderUnspokenReplyIsDroppedByANewerTransmission) {
+  auto c = make();
+  self = &c;
+  c.onPress(ms(1000));
+  c.onRelease(ms(2000), ReleaseReason::Normal);
+  c.tick(ms(2300));
+  c.onPress(ms(2500));  // before the first result
+  c.onProcessed(1, Reply{"say again 1", ms(800)}, ms(3000));
+  c.onRelease(ms(4000), ReleaseReason::Normal);
+  c.tick(ms(4300));
+  EXPECT_EQ(log.back(), "superseded say again 1");
+  c.onProcessed(2, Reply{"say again 2", ms(800)}, ms(5000));
+  c.tick(ms(6000));
+  EXPECT_EQ(log.back(), "pilot say again 2");
+  playing = false;
+  c.onPlaybackDone(pid, ms(7000));
+  // Queued and waiting for its delay: dropped the same way.
+  c.onPress(ms(8000));
+  c.onRelease(ms(9000), ReleaseReason::Normal);
+  c.tick(ms(9300));
+  c.onProcessed(3, Reply{"query 3", ms(1500)}, ms(9400));
+  c.onPress(ms(10000));
+  c.onRelease(ms(11000), ReleaseReason::Normal);
+  c.tick(ms(11300));
+  EXPECT_EQ(log.back(), "superseded query 3");
+  c.onProcessed(4, Reply{"query 4", 0}, ms(11400));
+  c.tick(ms(11500));
+  EXPECT_EQ(log.back(), "pilot query 4");
+  EXPECT_EQ(std::count_if(log.begin(), log.end(), [](const std::string& l) { return l.rfind("pilot ", 0) == 0; }), 2);
+}
+
+TEST_F(Tx, AReadbackOrTheFirstCallIsNeverDroppedAndATapDropsNothing) {
+  auto c = make();
+  self = &c;
+  c.onPress(ms(1000));
+  c.onRelease(ms(2000), ReleaseReason::Normal);
+  c.tick(ms(2300));
+  Reply readback{"readback 1", ms(800)};
+  readback.owed = true;
+  c.onPress(ms(2500));
+  c.onProcessed(1, readback, ms(3000));
+  c.onRelease(ms(4000), ReleaseReason::Normal);
+  c.tick(ms(4300));
+  c.onProcessed(2, Reply{"say again 2", 0}, ms(4400));
+  c.tick(ms(6000));
+  EXPECT_EQ(log.back(), "pilot readback 1");
+  playing = false;
+  c.onPlaybackDone(pid, ms(7000));
+  c.tick(ms(7100));
+  EXPECT_EQ(log.back(), "pilot say again 2");
+  playing = false;
+  c.onPlaybackDone(pid, ms(8000));
+  Reply first{"request taxi", ms(2000)};
+  first.first = true;
+  c.requestPilot(first, ms(8000));
+  c.requestPilot(Reply{"standing by", ms(2000)}, ms(8000));
+  c.onPress(ms(8500));  // a short tap
+  c.onRelease(ms(8510), ReleaseReason::Normal);
+  c.tick(ms(9000));
+  EXPECT_EQ(log.back(), "cancel3");
+  c.tick(ms(11000));
+  EXPECT_EQ(log.back(), "pilot request taxi");
+  playing = false;
+  c.onPlaybackDone(pid, ms(12000));
+  c.tick(ms(15000));
+  EXPECT_EQ(log.back(), "pilot standing by");
+  EXPECT_EQ(std::count_if(log.begin(), log.end(), [](const std::string& l) { return l.rfind("superseded", 0) == 0; }), 0);
+}
+
+// D-333: a result that arrives after a newer transmission has ended is dropped as well; the first call never is.
+TEST_F(Tx, ALateResultAfterANewerTransmissionIsDroppedButNotTheFirstCall) {
+  auto c = make();
+  self = &c;
+  Reply first{"request taxi", ms(3000)};
+  first.first = true;
+  c.requestPilot(first, 0);
+  c.onPress(ms(1000));
+  c.onRelease(ms(2000), ReleaseReason::Normal);
+  c.tick(ms(2300));
+  c.onPress(ms(2500));
+  c.onRelease(ms(3500), ReleaseReason::Normal);
+  c.tick(ms(3800));  // the second transmission has ended
+  c.onProcessed(1, Reply{"say again 1", 0}, ms(3900));
+  EXPECT_EQ(log.back(), "superseded say again 1");
+  c.onProcessed(2, Reply{"say again 2", 0}, ms(4000));
+  c.tick(ms(7000));  // its delay counts from the free channel
+  EXPECT_EQ(log.back(), "pilot request taxi");
+  playing = false;
+  c.onPlaybackDone(pid, ms(9000));
+  c.tick(ms(9100));
+  EXPECT_EQ(log.back(), "pilot say again 2");
 }

@@ -64,6 +64,14 @@ void TransmissionController::openTx(Ns t, Ns audioFrom) {
   audioFrom_ = audioFrom;
   ++id_;
   open_[id_] = std::nullopt;
+  // D-333: what was not said yet waits for this transmission: a real one replaces it, a tap gives it back.
+  for (auto it = replies_.begin(); it != replies_.end();)
+    if (supersedes(*it)) {
+      held_.push_back(std::move(*it));
+      it = replies_.erase(it);
+    } else {
+      ++it;
+    }
   if (cb_.txBegin) cb_.txBegin(id_, audioFrom_);
 }
 
@@ -92,11 +100,17 @@ void TransmissionController::closeTx(Ns audioTo, TxEnd end) {
   tx_ = Tx::None;
   if (end == TxEnd::Normal && releaseT_ - pressT_ < cfg_.minDuration) {
     open_.erase(id_);
+    // A tap changes nothing (D-325): back to where they were, behind a first call.
+    const auto at = std::find_if(replies_.begin(), replies_.end(), [](const Reply& r) { return !r.first; });
+    replies_.insert(at, held_.begin(), held_.end());
+    held_.clear();
     if (const auto c = cut_.extract(id_)) replies_.push_front(c.mapped());  // nothing was said: again
     if (cb_.txCancelled) cb_.txCancelled(id_);
     return;
   }
+  lastReal_ = id_;
   if (cb_.txEnd) cb_.txEnd(id_, audioFrom_, audioTo, end);
+  drop(held_);  // after the end of the transmission that replaced them
 }
 
 void TransmissionController::onProcessed(std::uint64_t id, std::optional<Reply> reply, Ns now) {
@@ -109,8 +123,17 @@ void TransmissionController::onProcessed(std::uint64_t id, std::optional<Reply> 
     auto& r = *open_.begin()->second;
     const auto c = cut_.extract(open_.begin()->first);
     if (c && c.mapped().owed) replies_.push_front(c.mapped());
-    if (r && c) replies_.push_front(std::move(*r));  // the new instruction is answered first
-    else if (r) replies_.push_back(std::move(*r));
+    const std::uint64_t k = open_.begin()->first;
+    if (r && supersedes(*r) && k < lastReal_) {  // a newer instruction was given meanwhile (D-333)
+      std::deque<Reply> one{std::move(*r)};
+      drop(one);
+    } else if (r && supersedes(*r) && k < id_ && tx_ != Tx::None) {
+      held_.push_back(std::move(*r));  // decided by the transmission that is open now
+    } else if (r && c) {
+      replies_.push_front(std::move(*r));  // the new instruction is answered first
+    } else if (r) {
+      replies_.push_back(std::move(*r));
+    }
     open_.erase(open_.begin());
   }
   maybeStartPilot(now);
@@ -130,8 +153,14 @@ bool TransmissionController::setRules(PressRule pressDuringPilot, bool repeatInt
   return true;
 }
 
+void TransmissionController::drop(std::deque<Reply>& rs) {
+  for (auto& r : std::exchange(rs, {}))
+    if (cb_.replyDropped) cb_.replyDropped(r);
+}
+
 void TransmissionController::dropPilot(Ns now) {
   replies_.clear();
+  held_.clear();
   cut_.clear();
   for (auto& [id, processed] : open_)
     if (processed) processed->reset();  // answered, but waiting for an earlier one

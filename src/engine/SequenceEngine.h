@@ -54,6 +54,7 @@ class SequenceEngine {
   void on(Ns t, const in::PttPresence&, Outputs& o);
   void on(Ns t, const in::FallbackPttUsed&, Outputs& o);
   void on(Ns t, const in::InstructorStop&, Outputs& o);
+  void on(Ns t, const in::ProgramClosed&, Outputs& o);
   void on(Ns t, const in::InstructorContinue&, Outputs& o);
 
   bool running() const { return status_ == Status::Running; }
