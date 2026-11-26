@@ -49,7 +49,16 @@ void PlannerController::setAccess(AccessController* a) {
 
 void PlannerController::setBackend(PlannerBackend b) {
   b_ = std::move(b);
-  if (b_.setEvents) b_.setEvents([this] { queued([this] { reload(); }); });
+  if (!b_.setEvents) return;
+  PlannerEvents e;
+  e.plansChanged = [this] { queued([this] { reload(); }); };
+  e.putAway = [this](const std::string& name, const std::string& person) {
+    queued([this, name, person] {
+      say(L::Caution, tr("%1 logged out: their plan \"%2\" was taken off the Dashboard.").arg(q(person), q(name)));
+      emit planChanged();
+    });
+  };
+  b_.setEvents(std::move(e));
 }
 
 void PlannerController::queued(std::function<void()> f) { QMetaObject::invokeMethod(this, std::move(f), Qt::QueuedConnection); }
@@ -158,6 +167,7 @@ void PlannerController::open(const Plan& p) {
   open_ = true;
   last_ = Field::None;
   check();
+  askFits();
   allChanged();
   emit planLoaded();  // after planChanged: the fields read the new values
 }
@@ -207,6 +217,40 @@ bool PlannerController::fits(const PlanValues& v, const PlanScenario& s) const {
   return std::find(s.combinations.begin(), s.combinations.end(), v) != s.combinations.end();
 }
 
+PlannerController::Fit PlannerController::draftFit() const {
+  const PlanScenario* s = scenarioOf(draft_.scenario);
+  const PlanValues& v = draft_.values;
+  if (!s || v.callsign.empty() || v.runway.empty() || v.taxiway.empty()) return Fit::Incomplete;
+  if (!s->tooMany) return fits(v, *s) ? Fit::Yes : Fit::No;
+  const bool same = fit_.answered && fit_.scenario == draft_.scenario && fit_.values == v;
+  return !same ? Fit::Checking : fit_.ok ? Fit::Yes : Fit::No;
+}
+
+QString PlannerController::fitWhy() const {
+  const bool same = fit_.answered && fit_.scenario == draft_.scenario && fit_.values == draft_.values;
+  return same && !fit_.ok ? q(fit_.why) : QString();
+}
+
+// The backend says whether fixed values fit, with the reason (10 section 8). Needed with tooMany; otherwise the
+// list decides at once and the answer only adds the reason.
+void PlannerController::askFits() {
+  if (!open_ || !draft_.fixed || !b_.fits) return;
+  const PlanValues& v = draft_.values;
+  if (v.callsign.empty() || v.runway.empty() || v.taxiway.empty()) return;
+  if (fit_.scenario == draft_.scenario && fit_.values == v) return;  // asked already
+  fit_ = {draft_.scenario, v, false, false, {}};
+  const unsigned n = ++fitNo_;
+  b_.fits(draft_.scenario, v, [this, n](bool ok, const std::string& why) {
+    queued([this, n, ok, why] {
+      if (n != fitNo_) return;
+      fit_.answered = true;
+      fit_.ok = ok;
+      fit_.why = why;
+      emit planChanged();
+    });
+  });
+}
+
 namespace {
 // Do all values that are chosen (but those left out) occur together?
 bool agree(const PlanValues& v, const PlanScenario& s, bool aircraft, bool runway, bool taxiway) {
@@ -222,7 +266,7 @@ bool PlannerController::misfit(Field f) const {
   const PlanScenario* s = scenarioOf(draft_.scenario);
   const auto& v = draft_.values;
   const bool empty = f == Field::Aircraft ? v.callsign.empty() : f == Field::Runway ? v.runway.empty() : v.taxiway.empty();
-  if (!draft_.fixed || !s || empty || f == last_ || agree(v, *s, true, true, true)) return false;
+  if (!draft_.fixed || !s || s->tooMany || empty || f == last_ || agree(v, *s, true, true, true)) return false;
   const auto without = [&](Field x) { return x != last_ && agree(v, *s, x != Field::Aircraft, x != Field::Runway, x != Field::Taxiway); };
   const bool any = without(Field::Aircraft) || without(Field::Runway) || without(Field::Taxiway);
   return !any || without(f);
@@ -239,7 +283,8 @@ PlannerController::State PlannerController::stateOf(const Plan& p) const {
   if (!s) return {L::Fault, tr("Cannot start: no such scenario"), false};
   if (!s->errors.empty()) return {L::Fault, tr("Cannot start: scenario has errors"), false};
   if (s->hash != p.scenarioHash) return {L::Caution, tr("Scenario changed"), false};
-  if (p.fixed && !fits(p.values, *s)) return {L::Fault, tr("Cannot start: values do not fit"), false};
+  if (p.fixed && !p.valuesError.empty()) return {L::Fault, tr("Cannot start: %1").arg(q(p.valuesError)), false};
+  if (p.fixed && !s->tooMany && !fits(p.values, *s)) return {L::Fault, tr("Cannot start: values do not fit"), false};
   if (!p.fixed && s->combinations.empty()) return {L::Fault, tr("Cannot start: no values"), false};
   if (p.assessed && s->placeholder) return {L::Fault, tr("Cannot start: not Validated"), false};
   if (p.assessed && p.trainee.empty()) return {L::Fault, tr("Cannot start: no trainee"), false};
@@ -279,7 +324,9 @@ QString PlannerController::saveRefusal() const {
   if (draft_.fixed) {
     const auto& v = draft_.values;
     if (v.callsign.empty() || v.runway.empty() || v.taxiway.empty()) return tr("Choose callsign, runway and taxiway.");
-    if (!fits(v, *s)) return tr("The values do not fit together.");
+    const Fit f = draftFit();
+    if (f == Fit::Checking) return tr("Checking the values...");
+    if (f == Fit::No) return fitWhy().isEmpty() ? tr("The values do not fit together.") : tr("The values do not fit together: %1.").arg(fitWhy());
   } else if (s->combinations.empty()) {
     return tr("The scenario has no values.");
   }
@@ -328,6 +375,13 @@ QVariantList PlannerController::options(Field f) const {
   const PlanScenario* s = scenarioOf(draft_.scenario);
   if (!s) return l;
   QStringList seen;
+  if (s->tooMany) {  // the list is cut: every value of the pools, unmarked; fits() judges the whole (10 section 8)
+    if (f == Field::Aircraft)
+      for (const PlanValues& c : s->aircraft) l.append(QVariantMap{{"id", q(c.callsign) + "  " + q(c.type)}, {"text", q(c.callsign) + "  " + q(c.type)}, {"note", QString()}});
+    else
+      for (const std::string& x : f == Field::Runway ? s->runways : s->taxiways) l.append(QVariantMap{{"id", q(x)}, {"text", q(x)}, {"note", QString()}});
+    return l;
+  }
   for (const PlanValues& c : s->combinations) {
     const QString id = f == Field::Aircraft ? q(c.callsign) + "  " + q(c.type) : q(f == Field::Runway ? c.runway : c.taxiway);
     if (seen.contains(id)) continue;
@@ -378,15 +432,20 @@ QVariantMap PlannerController::card(const PlanChoice& c) {
           {"callsign", q(c.values.callsign)}, {"type", q(c.values.type)}, {"runway", q(c.values.runway)}, {"taxiway", q(c.values.taxiway)}};
 }
 
+// The card as the Dashboard would show it: always the SAVED plan, never values of an edit (D-152).
 QVariantMap PlannerController::preview() const {
   if (!open_) return {};
-  const PlanScenario* s = scenarioOf(draft_.scenario);
+  const Plan* saved = find(draft_.id);
+  if (!saved) return {{"saved", false}, {"unsaved", true}};
+  const PlanScenario* s = scenarioOf(saved->scenario);
   PlanChoice c;
-  c.plan = draft_;
-  if (draft_.fixed) c.values = draft_.values;
-  c.scenarioName = s ? s->name : draft_.scenario;
+  c.plan = *saved;
+  if (saved->fixed) c.values = saved->values;
+  c.scenarioName = s ? s->name : saved->scenario;
   QVariantMap m = card(c);
-  m["drawn"] = !draft_.fixed;
+  m["saved"] = true;
+  m["unsaved"] = dirty();
+  m["drawn"] = !saved->fixed;
   m["placeholder"] = s && s->placeholder;
   return m;
 }
@@ -405,10 +464,14 @@ QVariantList PlannerController::checks() const {
     if (coverage_.state == C::Checking) add(L::None, tr("Voice bank: checking"));
     else if (coverage_.state == C::Ok) add(L::Ok, tr("Voice bank: %1 clips").arg(coverage_.clips));
     else if (coverage_.state == C::Missing) add(L::Fault, tr("Voice bank: %1 clips missing").arg(coverage_.missing));
-    else add(L::Fault, tr("Voice bank: check failed"));
+    else add(L::Fault, coverage_.error.empty() ? tr("Voice bank: check failed") : tr("Voice bank: check failed: %1").arg(q(coverage_.error)));
     const auto n = s->combinations.size();
-    const bool all = !draft_.values.callsign.empty() && !draft_.values.runway.empty() && !draft_.values.taxiway.empty();
-    if (draft_.fixed) add(fits(draft_.values, *s) ? L::Ok : all ? L::Fault : L::Caution, fits(draft_.values, *s) ? tr("Values fit the pools") : all ? tr("Values do not fit") : tr("Values not chosen"));
+    const Fit f = draftFit();
+    if (draft_.fixed && f == Fit::Yes) add(L::Ok, tr("Values fit the pools"));
+    else if (draft_.fixed && f == Fit::No) add(L::Fault, fitWhy().isEmpty() ? tr("Values do not fit") : tr("Values do not fit: %1").arg(fitWhy()));
+    else if (draft_.fixed && f == Fit::Checking) add(L::None, tr("Values: checking"));
+    else if (draft_.fixed) add(L::Caution, tr("Values not chosen"));
+    else if (s->tooMany) add(L::Ok, tr("Random of more than %1 combinations").arg(n));
     else add(n > 1 ? L::Ok : n == 1 ? L::Caution : L::Fault, n == 1 ? tr("Only one combination: no change") : tr("Random of %1 combinations").arg(n));
     add(s->placeholder ? L::Caution : L::Ok, s->placeholder ? tr("Text is PLACEHOLDER") : tr("Text is Validated"));
   }
@@ -484,6 +547,7 @@ void PlannerController::copyPlan() {
 
 void PlannerController::touched() {
   if (messageLevel_ != L::None) clearMessage();
+  askFits();
   emit planChanged();
 }
 
@@ -533,7 +597,7 @@ void PlannerController::setFixed(bool on) {
 void PlannerController::setAircraft(const QString& id) {
   const PlanScenario* s = scenarioOf(draft_.scenario);
   if (!edit() || !s) return;
-  for (const PlanValues& c : s->combinations)
+  for (const PlanValues& c : s->tooMany ? s->aircraft : s->combinations)
     if (q(c.callsign) + "  " + q(c.type) == id) {
       draft_.values.callsign = c.callsign;
       draft_.values.type = c.type;
@@ -676,7 +740,7 @@ void PlannerController::ask(const std::string& id) {
   const unsigned n = ++chooseNo_;
   choosing_ = true;
   emit planChanged();
-  b_.choose(id, access_ && access_->trainee() ? access_->personId().toStdString() : std::string(), [this, n](PlanChoice c, const std::string& why) {
+  b_.choose(id, [this, n](PlanChoice c, const std::string& why) {  // the backend reads who is logged in itself
     queued([this, n, c = std::move(c), why] {
       if (n != chooseNo_) return;
       choosing_ = false;

@@ -279,6 +279,8 @@ TEST(PlannerServiceTest, AChangedScenarioOrValuesThatNoLongerFitCannotStart) {
   std::string text = slurp(file);
   text.replace(text.find("\"scenarioHash\": \"") + 17, 4, "0000");
   std::ofstream(file) << text;
+  const auto c = x.load();  // read again, as the screen does when it opens
+  EXPECT_NE(c.plans[0].scenarioHash, c.scenarios[0].hash);
   EXPECT_NE(x.choose(id).second.find("Scenario changed"), std::string::npos);
   PlanValues v = x.plan().values;
   v.taxiway = v.taxiway == "A3" ? "B2" : "A3";

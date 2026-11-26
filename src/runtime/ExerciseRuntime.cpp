@@ -113,6 +113,7 @@ void ExerciseRuntime::stop() {
 }
 
 void ExerciseRuntime::programClosed() {
+  closing_ = true;  // the screens and the radio's users may be gone already
   if (running()) apply(core_->now(), in::ProgramClosed{});
 }
 
@@ -129,7 +130,7 @@ void ExerciseRuntime::useFallback() {
 }
 
 void ExerciseRuntime::apply(Ns t, const EngineInput& i) {
-  if (cb_.input) cb_.input(t, i);
+  if (cb_.input && !closing_) cb_.input(t, i);
   for (const auto& o : run_->engine->apply(t, i)) take(t, o);
   if (run_ && !run_->lostReported && run_->log->lost()) {
     run_->lostReported = true;
@@ -147,7 +148,7 @@ void ExerciseRuntime::take(Ns t, const EngineOutput& o) {
                       [&](const out::Ended& x) { run_->reason = x.reason; },
                       [](const auto&) {}},
              o);
-  if (cb_.output) cb_.output(t, o);
+  if (cb_.output && !closing_) cb_.output(t, o);
 }
 
 // The sound is made when it is asked for, so that it is in memory when the pilot starts.
@@ -221,7 +222,7 @@ void ExerciseRuntime::finish() {
   auto r = std::move(run_);
   const ExerciseResult result = buildResult(r->ready.exercise->scenario, r->log->events);
   if (r->log->lost() && !r->lostReported) fault("the event log is incomplete: entries could not be written");
-  if (cb_.ended) cb_.ended(result);
+  if (cb_.ended && !closing_) cb_.ended(result);
   // The log's file is closed here, after the last write: not on the radio's thread.
   if (closer_.joinable()) closer_.join();
   closer_ = std::thread([r = std::move(r)]() mutable { r.reset(); });

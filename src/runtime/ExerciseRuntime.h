@@ -130,12 +130,13 @@ class ExerciseRuntime {
   void presence(bool present);
   void finish();
   void tick(Ns now);
-  void fault(const std::string& why) { if (cb_.fault) cb_.fault(why); }
+  void fault(const std::string& why) { if (cb_.fault && !closing_) cb_.fault(why); }
 
   const RuntimeConfig cfg_;
   const ParserRules rules_;
   ISpeechModel& speech_;
   const Callbacks cb_;
+  bool closing_ = false;  // the program closes: the log is completed, nobody is told any more (D-333)
   RadioCore* core_ = nullptr;
   std::atomic<ExercisePhase> phase_{ExercisePhase::Idle};
   std::atomic<bool> starting_{false};

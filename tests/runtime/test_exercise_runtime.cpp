@@ -659,7 +659,9 @@ TEST(ExerciseRuntime, APlansValuesRunAndAreLogged) {
   r.hearPilot();
   const auto said = r.logged<out::PilotRequested>().front().utterance.text;
   for (const auto& c : r.ready.exercise->airfield.callsigns)
-    if (c.id == other["callsign"]) EXPECT_NE(said.find(c.id), std::string::npos) << said;
+    if (c.id == other["callsign"]) {
+      EXPECT_NE(said.find(c.id), std::string::npos) << said;
+    }
 }
 
 TEST(ExerciseRuntime, StartIsRefusedWithAReason) {

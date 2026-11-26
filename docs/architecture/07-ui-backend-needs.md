@@ -97,16 +97,17 @@ Rules to keep in the backend, not only on the screen:
 - The waveform gets peaks (at most 1000 pairs), not samples.
 - Nothing the Studio writes is in git: audio outside the work tree (D-31, D-418). `data/phraseology` **is** in git and read-only in an installed program: the Studio saves into a writable copy outside the repository and the installation, with Export; changed intents become Draft (G-3, D-318). To settle by b2 (P): the copy is in the writable folder; once it exists every program reads it instead of the installed data (loader, parser, coverage check), and the screen says "changed on this machine"; if the installed data is newer than the copy's origin, the Studio says so and never merges by itself; Export writes a file at a place that the user chooses, never into a work tree by itself.
 
-### Planner interface (proposed, for b2)
+### Planner interface (agreed: 10-planner-backend.md section 8, PB-1 to PB-9 approved 2026-11-26)
 
-`src/app/PlannerBackend.h`, in the form of the Studio interface; functions as 08 section 2. Points for b2:
+`src/app/PlannerBackend.h`, in the form of the Studio interface. Changes made after the approval (ui, 2026-11-26, not compiled at writing):
 
-- `load` answers for everybody (the Dashboard's "Choose plan" needs it); saving, deleting and presets: instructor, checked again in the backend. `revision` covers plans and presets; counting a run must not change it.
-- `choose(plan, person)` draws the values (never exactly the combination of that person's previous run, D-142), sets `StatusFeed`'s scenario (the values that run, plus `PlannerController::card()`), starts the coverage check and answers with the values and the run number (0: unnumbered). For a plan of one person the draw looks at that person's runs, whoever chooses.
-- Run again: the same plan; the backend shows the new values first (D-321).
-- The Start dialog needs `ExerciseContext::plan` (name, trainee, mode, run): set by `ExerciseView` from the chosen plan. Not connected yet; `LiveExercise` and `ExerciseView` are ui's and wait for the approved design.
-- The header of the log needs plan id, name, run number, exact values and difficulty (08 section 3).
-- `setEvents(plansChanged)`: after a run is counted, or the file was replaced.
+- `choose(plan)` has **no person** any more: the backend reads who is logged in from `AccessController` itself, on the GUI thread in the call, never later. It checks role, plan and scenario again, and again at Start with the run number and previous run of the person of that moment.
+- `fits(scenario, values) -> (fits, why)`: by callback, with the reason ("B2 does not serve 09"). The controller asks it for every complete fixed set; without `tooMany` the list decides at once and the answer only adds the reason.
+- `PlanScenario::combinations` holds at most `kMaxPlanCombinations` (2000); `tooMany` is set when it is cut. Then the values to choose come from `aircraft`, `runways`, `taxiways` (every pool value), nothing is marked "does not fit", and Save waits for `fits()`. **Added by ui** (not in 10 section 8): these three pool lists, and `Plan::valuesError` (set by `load`: fixed values that do not fit now, with the reason), because with a cut list the controller can judge neither.
+- `PlanCoverage::error`: the reason of `Failed`.
+- `setEvents(PlannerEvents)`: `plansChanged` (a run counted, the Studio saved wording, a file changed) and `putAway(planName, person)`: a personal plan was taken off the Dashboard at its person's log-out, or when somebody else logged in instead (PB-6). A plan the instructor put on the Dashboard waits for its person. Anyone plans stay. The backend clears the card in `StatusFeed`; the controller only says it.
+- `PlanScenario::hash`: of the scenario file and its airfield file, not of the wording (PB-2).
+- Still to come: `ExerciseContext::plan` set by `ExerciseView` from the options that really ran.
 
 ## Every backend call of 5d, 5e and 5f (as written on the mocks, 2026-11-26; proposals for runtime)
 

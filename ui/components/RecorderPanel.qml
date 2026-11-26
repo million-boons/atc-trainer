@@ -123,7 +123,7 @@ Card {
             Act { text: r.take_.removable ? qsTr("Delete...") : qsTr("Reject"); tint: r.take_.removable ? Theme.fault : Theme.border; enabled: acts.on
                   onClicked: { r.touched(); r.take_.removable ? r.deleteAsked() : r.studio.reject() } }
         }
-        TakeList {
+        TakeList {  // shows whole rows only; more takes scroll
             anchors { top: plays.bottom; topMargin: Theme.s4; bottom: acts.top; bottomMargin: Theme.s4 }
             width: parent.width
             studio: r.studio

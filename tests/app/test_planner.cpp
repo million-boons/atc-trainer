@@ -20,6 +20,8 @@ struct Planner : testing::Test {
   int saved = 0, asked = 0;
   std::string saveAnswer;
   std::function<void(PlannerContent&)> change;  // of what load() gives
+  std::function<void()> mockAccess;              // the mock's PB-6 hook
+  std::vector<std::pair<std::string, std::string>> putAway;
 
   void SetUp() override {
     for (const char* id : {"S01", "S02"}) {
@@ -34,7 +36,18 @@ struct Planner : testing::Test {
     ab.checkPin = [](const std::string& x) { return x == "482913"; };
     a = std::make_unique<AccessController>(ab, [this] { return now; });
     p = std::make_unique<PlannerController>(a.get());
-    b = mockPlanner([this](const PlanChoice& c) { chosen.push_back(c); });
+    MockPlanner m = mockPlanner([this](const PlanChoice& c) { chosen.push_back(c); },
+                                [this] { return a->trainee() ? a->personId().toStdString() : std::string(); });
+    b = m.backend;
+    mockAccess = m.accessChanged;
+    QObject::connect(a.get(), &AccessController::changed, a.get(), [this] { mockAccess(); });
+    b.setEvents = [this, inner = b.setEvents](PlannerEvents e) {
+      e.putAway = [this, f = e.putAway](const std::string& name, const std::string& person) {
+        putAway.emplace_back(name, person);
+        if (f) f(name, person);
+      };
+      inner(e);
+    };
     b.load = [this, inner = b.load](auto done) {
       inner([this, done](PlannerContent c, const std::string& why) {
         if (change) change(c);
@@ -46,9 +59,9 @@ struct Planner : testing::Test {
       if (!saveAnswer.empty()) return done("", saveAnswer);
       inner(x, r, done);
     };
-    b.choose = [this, inner = b.choose](const std::string& id, const std::string& person, auto done) {
+    b.choose = [this, inner = b.choose](const std::string& id, auto done) {
       ++asked;
-      inner(id, person, done);
+      inner(id, done);
     };
     p->setBackend(b);
   }
@@ -179,9 +192,44 @@ TEST_F(Planner, AircraftIsCallsignAndType) {
   login();
   open("p1");
   p->setAircraft("EAGLE-421  C295");
-  EXPECT_EQ(p->preview()["callsign"].toString(), "EAGLE-421");
-  EXPECT_EQ(p->preview()["type"].toString(), "C295");
+  EXPECT_EQ(p->plan()["aircraft"].toString(), "EAGLE-421  C295");
   EXPECT_TRUE(p->canSave());
+}
+
+// The user's review of 2026-11-26 (D-152): the card shows the saved values that will run, never those of an edit.
+TEST_F(Planner, TheCardShowsTheSavedPlanAndSaysThatThereAreUnsavedChanges) {
+  login();
+  open("p1");
+  const QVariantMap before = p->preview();
+  ASSERT_TRUE(before["saved"].toBool());
+  EXPECT_FALSE(before["unsaved"].toBool());
+  p->setAircraft("EAGLE-421  C295");
+  p->setRunway("09");  // with B2 this does not fit (as "planmis")
+  QVariantMap m = p->preview();
+  EXPECT_TRUE(m["unsaved"].toBool());
+  for (const char* k : {"callsign", "type", "runway", "taxiway", "name", "planLine", "briefing"}) EXPECT_EQ(m[k], before[k]) << k;
+  p->undo();
+  drain();
+  EXPECT_FALSE(p->preview()["unsaved"].toBool());
+  p->setAircraft("EAGLE-421  C295");
+  ASSERT_TRUE(p->canSave());
+  p->save();
+  drain();
+  m = p->preview();
+  EXPECT_FALSE(m["unsaved"].toBool());
+  EXPECT_EQ(m["callsign"].toString(), "EAGLE-421");  // saved: now it is what runs
+}
+
+TEST_F(Planner, ANewPlanShowsNoValuesBeforeItIsSaved) {
+  login();
+  p->newPlan();
+  drain();
+  ASSERT_TRUE(p->hasPlan());
+  const QVariantMap m = p->preview();
+  EXPECT_FALSE(m["saved"].toBool());
+  EXPECT_TRUE(m["unsaved"].toBool());
+  EXPECT_FALSE(m.contains("callsign"));
+  EXPECT_FALSE(m.contains("runway"));
 }
 
 TEST_F(Planner, AScenarioWithErrorsCannotBeChosen) {
@@ -521,7 +569,7 @@ TEST_F(Planner, OneCombinationIsUsedAndSaid) {  // 04 section 5g
   login();
   open("p2");
   EXPECT_TRUE(hasCheck("Only one combination: no change"));
-  b.choose = [](const std::string&, const std::string&, auto done) {
+  b.choose = [](const std::string&, auto done) {
     PlanChoice c;
     c.plan.name = "N";
     c.onlyCombination = true;
@@ -536,7 +584,7 @@ TEST_F(Planner, OneCombinationIsUsedAndSaid) {  // 04 section 5g
 TEST_F(Planner, ARefusedChoiceIsShownAndNothingIsSignalled) {
   int signalled = 0;
   QObject::connect(p.get(), &PlannerController::chosen, p.get(), [&signalled] { ++signalled; });
-  b.choose = [](const std::string&, const std::string&, auto done) { done(PlanChoice{}, "the scenario changed on disk"); };
+  b.choose = [](const std::string&, auto done) { done(PlanChoice{}, "the scenario changed on disk"); };
   p->setBackend(b);
   login();
   p->put();
@@ -549,7 +597,7 @@ TEST_F(Planner, ARefusedChoiceIsShownAndNothingIsSignalled) {
 TEST_F(Planner, OneChoiceAtATime) {
   std::function<void(PlanChoice, const std::string&)> late;
   int n = 0;
-  b.choose = [&](const std::string&, const std::string&, auto done) {
+  b.choose = [&](const std::string&, auto done) {
     ++n;
     late = done;
   };
@@ -566,7 +614,7 @@ TEST_F(Planner, OneChoiceAtATime) {
 
 TEST_F(Planner, ACountedRunIsReadAgainAndKeepsAnEdit) {
   std::function<void()> changed;
-  b.setEvents = [&changed](std::function<void()> f) { changed = std::move(f); };
+  b.setEvents = [&changed](PlannerEvents e) { changed = std::move(e.plansChanged); };
   p->setBackend(b);
   login();
   open("p1");
@@ -642,4 +690,123 @@ int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   QCoreApplication app(argc, argv);
   return RUN_ALL_TESTS();
+}
+
+// ---- the interface agreed in 10-planner-backend.md section 8 and PB-6 (2026-11-26)
+
+TEST_F(Planner, APersonalPlanIsPutAwayWhenItsPersonLogsOut) {  // PB-6
+  p->enter();  // the Dashboard reads the plans
+  drain();
+  ASSERT_TRUE(a->loginTrainee("S01"));
+  p->choose("p1");  // S01's own plan
+  drain();
+  ASSERT_EQ(chosen.size(), 1u);
+  EXPECT_EQ(chosen[0].run, 4);  // the backend read S01 itself
+  a->logout();
+  drain();
+  ASSERT_EQ(putAway.size(), 1u);
+  EXPECT_EQ(putAway[0], (std::pair<std::string, std::string>{"Departure, runway 27", "S01"}));
+  ASSERT_EQ(chosen.size(), 2u);
+  EXPECT_TRUE(chosen[1].plan.id.empty());  // off the Dashboard
+  EXPECT_TRUE(p->message().contains("taken off the Dashboard"));
+}
+
+TEST_F(Planner, AnotherPersonLoggingInPutsAPersonalPlanAwayToo) {  // PB-6
+  p->enter();  // the Dashboard reads the plans
+  drain();
+  ASSERT_TRUE(a->loginTrainee("S01"));
+  p->choose("p1");
+  drain();
+  ASSERT_TRUE(a->loginTrainee("S02"));
+  drain();
+  EXPECT_EQ(putAway.size(), 1u);
+}
+
+TEST_F(Planner, APlanThatTheInstructorPutWaitsForItsPerson) {  // PB-6: "at that person's log-out"
+  login();
+  open("p1");  // S01's
+  p->put();
+  drain();
+  ASSERT_EQ(chosen.size(), 1u);
+  a->logout();  // the instructor
+  drain();
+  EXPECT_TRUE(putAway.empty());
+  ASSERT_TRUE(a->loginTrainee("S01"));
+  drain();
+  EXPECT_TRUE(putAway.empty());
+  a->logout();  // now S01
+  drain();
+  EXPECT_EQ(putAway.size(), 1u);
+}
+
+TEST_F(Planner, AnAnyonePlanStaysAtLogout) {  // PB-6
+  p->enter();  // the Dashboard reads the plans
+  drain();
+  ASSERT_TRUE(a->loginTrainee("S01"));
+  p->choose("p2");
+  drain();
+  ASSERT_EQ(chosen.size(), 1u);
+  a->logout();
+  drain();
+  EXPECT_TRUE(putAway.empty());
+  EXPECT_EQ(chosen.size(), 1u);
+}
+
+TEST_F(Planner, ValuesThatDoNotFitSayWhyFromTheBackend) {  // fits() with a reason
+  login();
+  open("p1");
+  p->setRunway("09");  // with B2
+  drain();
+  EXPECT_FALSE(p->canSave());
+  EXPECT_TRUE(p->saveNote().contains("B2 does not serve 09")) << p->saveNote().toStdString();
+  EXPECT_TRUE(hasCheck("Values do not fit: B2 does not serve 09"));
+}
+
+TEST_F(Planner, WithTooManyCombinationsTheBackendJudgesTheValues) {  // 10 section 8: at most 2000 are given
+  change = [](PlannerContent& c) {
+    PlanScenario& s = c.scenarios.front();
+    s.combinations.resize(1);  // only EAGLE, 09, A3 in the list
+    s.tooMany = true;
+  };
+  int fitAsked = 0;
+  b.fits = [&fitAsked, inner = b.fits](const std::string& sc, PlanValues v, auto done) {
+    ++fitAsked;
+    inner(sc, v, done);
+  };
+  p->setBackend(b);
+  login();
+  EXPECT_EQ(stateOf("p1"), "Ready");  // FALCON 27 B2 is not in the cut list, but fits: not marked
+  open("p1");
+  QStringList runways;
+  for (const QVariant& v : p->runways()) {
+    runways << v.toMap()["id"].toString();
+    EXPECT_TRUE(v.toMap()["note"].toString().isEmpty());
+  }
+  EXPECT_EQ(runways, (QStringList{"09", "27"}));  // from the pools, not from the cut list
+  EXPECT_FALSE(p->plan()["runwayBad"].toBool());
+  p->setRunway("09");
+  EXPECT_FALSE(p->canSave());
+  EXPECT_EQ(p->saveNote(), "Checking the values...");
+  EXPECT_TRUE(hasCheck("Values: checking"));
+  drain();
+  EXPECT_TRUE(p->saveNote().contains("B2 does not serve 09"));
+  p->setTaxiway("A3");  // FALCON 09 A3 fits
+  drain();
+  EXPECT_TRUE(p->canSave()) << p->saveNote().toStdString();
+  EXPECT_GE(fitAsked, 2);
+}
+
+TEST_F(Planner, TheBackendsReasonStopsAPlanInTheList) {
+  change = [](PlannerContent& c) { c.plans.front().valuesError = "B2 does not serve 27"; };
+  login();
+  EXPECT_EQ(stateOf("p1"), "Cannot start: B2 does not serve 27");
+}
+
+TEST_F(Planner, AFailedVoiceBankCheckSaysWhy) {
+  b.coverage = [](const std::string&, auto done) { done({PlanCoverage::State::Failed, 0, 0, "the manifest cannot be read"}); };
+  p->setBackend(b);
+  login();
+  open("p1");
+  drain();
+  EXPECT_TRUE(hasCheck("Voice bank: check failed: the manifest cannot be read"));
 }
