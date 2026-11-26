@@ -14,6 +14,7 @@
 #include "app/StatusFeed.h"
 #include "app/SttController.h"
 #include "app/EngineHeaders.h"
+#include "app/PlannerService.h"
 
 struct LiveExerciseConfig {
   std::string data, voices;  // folders
@@ -25,6 +26,7 @@ struct LiveExerciseConfig {
   std::function<std::unique_ptr<atc::IEventLog>()> makeLog;  // empty: JSON Lines in `logs`
   atc::VoiceBank::MayUse mayUse;             // the speaker's answer today (D-133); called on the check's thread
   atc::ExerciseCheck::Folder phraseology;    // the folder in use (D-318); empty: data/phraseology
+  std::function<QVariantMap(const atc::PlanSelection&)> planCard;  // the Planner's keys for the Dashboard card
   std::function<atc::CheckResult(const std::string&)> check;  // tests: the result at once; empty: ExerciseCheck
 };
 
@@ -58,11 +60,17 @@ class LiveExercise : public QObject {
   // over; nothing of this can change during an exercise.
   void recheck();
   bool active() const;  // the Start dialog or an exercise
+  // D-334: the Planner. A chosen plan runs its scenario with its exact values; none: the scenario of ui.json, values
+  // by seed. GUI thread.
+  void setPlanner(atc::PlannerService* p) { planner_ = p; }
+  void usePlan(std::optional<atc::PlanSelection> p);
 
  private:
   template <class F> void ui(F f) { QMetaObject::invokeMethod(this, std::move(f), Qt::QueuedConnection); }
   void checked(const atc::CheckResult& r);
   void newSeed();
+  void showPlan();
+  const std::string& scenarioFile() const { return plan_ ? plan_->scenarioFile : cfg_.scenarioFile; }
   void prepare();
   void start(bool assessed);
   void leave();
@@ -81,6 +89,9 @@ class LiveExercise : public QObject {
   atc::PreparedExercise ready_;
   std::uint64_t seed_ = 1;
   bool starting_ = false, assessed_ = false, recheck_ = false;
+  atc::PlannerService* planner_ = nullptr;
+  std::optional<atc::PlanSelection> plan_;
+  std::string session_;  // of the latest start
   QDateTime startedAt_;
   std::unique_ptr<atc::ExerciseCheck> check_;  // last: joins its thread before the rest goes
 };

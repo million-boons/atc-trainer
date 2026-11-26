@@ -1,6 +1,7 @@
 #include "runtime/ExerciseRuntime.h"
 
 #include <algorithm>
+#include <tuple>
 #include <utility>
 
 #include "audio/UtteranceChecks.h"
@@ -30,6 +31,9 @@ std::string ExerciseRuntime::start(PreparedExercise ready, ExerciseOptions opt, 
   if (!ready) return "no checked scenario";
   if (!log) return "no event log";
   if (auto why = modeError(*ready.exercise, opt.mode); !why.empty()) return why;
+  if (std::string why; opt.values && !fitsParams(ready.exercise->scenario, ready.exercise->airfield, *opt.values, why))
+    return "the plan's values do not fit: " + why;  // before the model is locked
+  if (opt.replyDelay && (opt.replyDelay->first < 0 || opt.replyDelay->second < opt.replyDelay->first)) return "the reply delay is not valid";
   if (running() || starting_.exchange(true)) return "an exercise is already running";
   const auto refuse = [this](std::string why) {
     starting_ = false;
@@ -57,11 +61,24 @@ std::string ExerciseRuntime::start(PreparedExercise ready, ExerciseOptions opt, 
   h.traineeId = opt.traineeId;
   h.modelId = model.modelId;
   h.modelConfig = model.modelConfig;
+  EngineConfig engine = cfg_.engine;
+  if (opt.replyDelay) std::tie(engine.replyDelayMin, engine.replyDelayMax) = *opt.replyDelay;
+  ParamValues values;
+  if (opt.values) values = *opt.values;
+  else generateParams(ready.exercise->scenario, ready.exercise->airfield, opt.seed, values);
+  h.values = values;
+  h.replyFromMs = int(engine.replyDelayMin / ms(1));
+  h.replyToMs = int(engine.replyDelayMax / ms(1));
+  h.radio = std::string(toString(opt.radio));
+  h.planId = opt.plan.id;
+  h.planName = opt.plan.name;
+  h.planPreset = opt.plan.preset;
+  h.planRun = opt.plan.run;
   std::string error;
   if (!r->log->begin(h, error)) return refuseLocked("event log: " + error);
   r->modelId = model.modelId;
   r->modelConfig = model.modelConfig;
-  r->engine = std::make_unique<LoggedEngine>(SequenceEngine(ready.exercise, opt.seed, cfg_.engine), *r->log);
+  r->engine = std::make_unique<LoggedEngine>(SequenceEngine(ready.exercise, opt.seed, engine, values), *r->log);
   r->takes.seed(opt.seed ^ 0xD1B54A32D192ED03ull);
   r->ready = std::move(ready);
   r->opt = std::move(opt);

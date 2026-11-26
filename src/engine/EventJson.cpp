@@ -94,7 +94,7 @@ std::string line(const json& v) { return v.dump(-1, ' ', false, json::error_hand
 }  // namespace
 
 std::string headerJson(const EventLogHeader& h) {
-  return line({{"log", "atc-exercise"},
+  json j{{"log", "atc-exercise"},
                {"version", h.version},
                {"session", h.sessionId},
                {"scenario", h.scenarioId},
@@ -104,7 +104,12 @@ std::string headerJson(const EventLogHeader& h) {
                {"mode", str(toString(h.mode))},
                {"trainee", h.traineeId},
                {"modelId", h.modelId},
-               {"modelConfig", h.modelConfig}});
+               {"modelConfig", h.modelConfig},
+               {"values", h.values},
+               {"replyDelayMs", {h.replyFromMs, h.replyToMs}},
+               {"radio", h.radio}};
+  if (!h.planId.empty()) j["plan"] = {{"id", h.planId}, {"name", h.planName}, {"preset", h.planPreset}, {"run", h.planRun}};
+  return line(j);
 }
 
 std::string eventJson(const EngineEvent& e) {

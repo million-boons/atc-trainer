@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <functional>
 #include <random>
 
@@ -58,6 +59,51 @@ std::uint64_t combinationCount(const Scenario& s, const Airfield& a) {
     return true;
   });
   return n;
+}
+
+std::vector<ParamValues> combinations(const Scenario& s, const Airfield& a, std::size_t max, bool& tooMany) {
+  std::vector<ParamValues> out;
+  tooMany = false;
+  enumerate(s, a, [&](const ParamValues& v) {
+    if (out.size() == max) {
+      tooMany = true;
+      return false;
+    }
+    out.push_back(v);
+    return true;
+  });
+  return out;
+}
+
+bool fitsParams(const Scenario& s, const Airfield& a, const ParamValues& v, std::string& why) {
+  for (const auto& [name, value] : v)
+    if (!s.generators.count(name)) {
+      why = name + " is not a value of " + s.id;
+      return false;
+    }
+  for (const bool dependent : {false, true})
+    for (const auto& [name, g] : s.generators) {
+      if (g.mustServe.empty() == dependent) continue;
+      const auto it = v.find(name);
+      if (it == v.end() || it->second.empty()) {
+        why = "no " + name;
+        return false;
+      }
+      const auto c = candidates(s, a, g, v);
+      if (std::find(c.begin(), c.end(), it->second) != c.end()) continue;
+      ParamGenerator any = g;
+      any.mustServe.clear();
+      const auto all = candidates(s, a, any, v);
+      const auto other = v.find(g.mustServe);
+      if (std::find(all.begin(), all.end(), it->second) == all.end() || other == v.end())
+        why = it->second + " is not one of the " + g.pool + " of " + a.id;
+      else if (g.pool == "taxiways")
+        why = it->second + " does not serve " + other->second;
+      else
+        why = it->second + " does not fit " + other->second;
+      return false;
+    }
+  return true;
 }
 
 bool generateParams(const Scenario& s, const Airfield& a, std::uint64_t seed, ParamValues& out) {

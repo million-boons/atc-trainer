@@ -46,6 +46,13 @@ struct ExerciseOptions {
   std::string model;         // the configured exercise model; another loaded one is refused (D-414)
   bool pttFallback = false;  // a missing PTT only warns (D-116)
   RadioIntensity radio = RadioIntensity::Light;
+  // D-334, a plan: its exact values (checked again here, never corrected), reply delay, and what is logged of it.
+  std::optional<ParamValues> values;
+  std::optional<std::pair<Ns, Ns>> replyDelay;
+  struct Plan {
+    std::string id, name, preset;
+    int run = 0;
+  } plan;
 };
 
 struct RuntimeConfig {

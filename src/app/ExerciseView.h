@@ -24,11 +24,14 @@ class ExerciseView {
     QString model{};       // shown name
     QString trainee{};     // ID; empty: guest
     bool consent = false;  // of the trainee on record
+    std::optional<atc::ParamValues> values{};  // a plan's exact values (D-334); otherwise the seed's
+    std::optional<ExercisePlan> plan{};        // shown in the Start dialog
   };
   explicit ExerciseView(ExerciseController* c) : c_(c) {}
 
   // The scenario card and the Start dialog show the values of this seed.
   static QVariantMap card(const atc::Exercise& e, std::uint64_t seed);
+  static QVariantMap card(const atc::Exercise& e, const atc::ParamValues& values);  // D-334
 
   void prepare(Setup s);                    // Start dialog
   void refused(const QString& why);         // back in the Start dialog, with the reason

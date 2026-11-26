@@ -630,6 +630,38 @@ TEST(ExerciseRuntime, OnlyTheAnswerToTheNewerTransmissionIsSpoken) {
   EXPECT_EQ(r.outcomes().back(), Outcome::Correct);
 }
 
+// D-334: a plan's values are the ones run and logged; values that do not fit are refused before the model is locked.
+TEST(ExerciseRuntime, APlansValuesRunAndAreLogged) {
+  Rig r;
+  bool tooMany = false;
+  const auto all = combinations(r.ready.exercise->scenario, r.ready.exercise->airfield, 10, tooMany);
+  ParamValues seeds;
+  generateParams(r.ready.exercise->scenario, r.ready.exercise->airfield, r.opt.seed, seeds);
+  ParamValues other = all[0] == seeds ? all[1] : all[0];
+  ParamValues wrong = other;
+  wrong["taxiway"] = wrong["runway"] == "09" ? "B2" : "A3";
+  r.opt.values = wrong;
+  const int locks = r.model.locks;
+  EXPECT_NE(r.start().find("does not serve"), std::string::npos);
+  EXPECT_EQ(r.model.locks, locks);
+  r.opt.values = other;
+  r.opt.replyDelay = std::pair{ms(300), ms(400)};
+  r.opt.plan = {"p1", "Departure, runway", "custom", 3};
+  ASSERT_EQ(r.start(), "");
+  EXPECT_EQ(r.log->header.values, other);
+  EXPECT_EQ(r.log->header.replyFromMs, 300);
+  EXPECT_EQ(r.log->header.replyToMs, 400);
+  EXPECT_EQ(r.log->header.planRun, 3);
+  const json h = json::parse(headerJson(r.log->header));
+  EXPECT_EQ(h["version"], 2);
+  EXPECT_EQ(h["values"]["runway"], other["runway"]);
+  EXPECT_EQ(h["plan"]["name"], "Departure, runway");
+  r.hearPilot();
+  const auto said = r.logged<out::PilotRequested>().front().utterance.text;
+  for (const auto& c : r.ready.exercise->airfield.callsigns)
+    if (c.id == other["callsign"]) EXPECT_NE(said.find(c.id), std::string::npos) << said;
+}
+
 TEST(ExerciseRuntime, StartIsRefusedWithAReason) {
   Rig r;
   r.model.allow = false;

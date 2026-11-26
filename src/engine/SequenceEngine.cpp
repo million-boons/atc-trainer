@@ -21,10 +21,11 @@ std::string fillSlots(const std::string& text, const ParamValues& values) {
   return r;
 }
 
-SequenceEngine::SequenceEngine(std::shared_ptr<const Exercise> exercise, std::uint64_t seed, EngineConfig cfg)
+SequenceEngine::SequenceEngine(std::shared_ptr<const Exercise> exercise, std::uint64_t seed, EngineConfig cfg, std::optional<ParamValues> values)
     : exercise_(std::move(exercise)), cfg_(cfg), rng_(seed ^ 0x9E3779B97F4A7C15ull) {
   // loadExercise has checked that a combination exists.
-  generateParams(exercise_->scenario, exercise_->airfield, seed, ctx_.params);
+  if (values) ctx_.params = std::move(*values);
+  else generateParams(exercise_->scenario, exercise_->airfield, seed, ctx_.params);
 }
 
 SequenceEngine::Outputs SequenceEngine::handle(Ns t, const EngineInput& input) {

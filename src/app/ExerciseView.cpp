@@ -51,6 +51,10 @@ QString median(QList<double> v) {
 QVariantMap ExerciseView::card(const Exercise& e, std::uint64_t seed) {
   ParamValues p;
   generateParams(e.scenario, e.airfield, seed, p);
+  return card(e, p);
+}
+
+QVariantMap ExerciseView::card(const Exercise& e, const ParamValues& p) {
   QStringList names;
   for (const auto& s : e.scenario.steps)
     if (!s.final) names << q(s.label);
@@ -80,10 +84,10 @@ QString ExerciseView::label(const std::string& id) const {
 }
 
 ExerciseContext ExerciseView::context() const {
-  const QVariantMap v = card(*s_.exercise, s_.seed);
+  const QVariantMap v = s_.values ? card(*s_.exercise, *s_.values) : card(*s_.exercise, s_.seed);
   return {.scenario = v["name"].toString(), .callsign = v["callsign"].toString(), .runway = v["runway"].toString(),
           .taxiway = v["taxiway"].toString(), .type = v["type"].toString(), .rule = v["rule"].toString(),
-          .model = s_.model, .trainee = s_.trainee, .placeholder = s_.exercise->placeholder};
+          .model = s_.model, .trainee = s_.trainee, .placeholder = s_.exercise->placeholder, .plan = s_.plan};
 }
 
 // D-125; after system faults in a row D-317.
