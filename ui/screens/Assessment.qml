@@ -270,7 +270,7 @@ Item {
                     Label { visible: s.e.atc === true; width: parent.width; height: Theme.px(20); text: s.e.audioNote || ""; color: Theme.textSecondary; font.pixelSize: Theme.caption }
                 }
                 Rectangle { id: rl; anchors { top: ec.bottom; topMargin: Theme.s4 } width: parent.width; height: Theme.line; color: Theme.divider }
-                Label { id: rt; anchors.top: rl.bottom; width: parent.width; height: Theme.px(26); text: qsTr("RECLASSIFIED (the original is kept)"); color: Theme.textSecondary; font { pixelSize: Theme.caption; weight: Font.DemiBold } }
+                Label { id: rt; anchors.top: rl.bottom; width: parent.width; height: Theme.px(26); text: s.history.reviews.length > 0 ? qsTr("RECLASSIFIED (the original is kept)") : s.e.atc === true ? qsTr("Not reclassified") : ""; color: Theme.textSecondary; font { pixelSize: Theme.caption; weight: Font.DemiBold } }
                 ListView {
                     anchors { top: rt.bottom; bottom: rb.top }
                     width: parent.width
