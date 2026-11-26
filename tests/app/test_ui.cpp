@@ -944,7 +944,7 @@ TEST_F(Ui, AMisfitIsMarkedInWords) {
   QQuickItem* note = find("does not fit", false);
   ASSERT_TRUE(note);
   EXPECT_FALSE(scrolledOut(note));  // seen without scrolling, in the smaller size
-  EXPECT_TRUE(allText().contains("The values do not fit together."));
+  EXPECT_TRUE(allText().contains("The values do not fit together: B2 does not serve 09."));  // the backend's reason
   ASSERT_TRUE(find("Save", true));
   EXPECT_FALSE(find("Save", true)->isEnabled());
   // D-152: the card keeps the saved values and says so; the misfit 09 is never on it

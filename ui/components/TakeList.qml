@@ -2,7 +2,8 @@ import QtQuick
 import QtQuick.Templates as T
 import Atc
 
-// Takes of the selected clip, one line each: number, speaker, state as a word and an icon, length and level.
+// Takes of the selected clip, one line each: number, speaker, state as a word and an icon, length. The level is not on
+// the line (it would cut the speaker at 1280x800); a take that is too quiet or clips says so in its warnings.
 // Only whole rows are shown (the list is as high as the rows that fit); more takes scroll, with a bar at the right.
 Item {
     id: box

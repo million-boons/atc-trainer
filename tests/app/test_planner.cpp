@@ -695,6 +695,8 @@ int main(int argc, char** argv) {
 // ---- the interface agreed in 10-planner-backend.md section 8 and PB-6 (2026-11-26)
 
 TEST_F(Planner, APersonalPlanIsPutAwayWhenItsPersonLogsOut) {  // PB-6
+  p->enter();  // the Dashboard reads the plans
+  drain();
   ASSERT_TRUE(a->loginTrainee("S01"));
   p->choose("p1");  // S01's own plan
   drain();
@@ -710,6 +712,8 @@ TEST_F(Planner, APersonalPlanIsPutAwayWhenItsPersonLogsOut) {  // PB-6
 }
 
 TEST_F(Planner, AnotherPersonLoggingInPutsAPersonalPlanAwayToo) {  // PB-6
+  p->enter();  // the Dashboard reads the plans
+  drain();
   ASSERT_TRUE(a->loginTrainee("S01"));
   p->choose("p1");
   drain();
@@ -736,6 +740,8 @@ TEST_F(Planner, APlanThatTheInstructorPutWaitsForItsPerson) {  // PB-6: "at that
 }
 
 TEST_F(Planner, AnAnyonePlanStaysAtLogout) {  // PB-6
+  p->enter();  // the Dashboard reads the plans
+  drain();
   ASSERT_TRUE(a->loginTrainee("S01"));
   p->choose("p2");
   drain();
