@@ -19,6 +19,7 @@ struct History : testing::Test {
   HistoryBackend b = mockHistory(kNow);
   std::vector<std::string> asked;
   int played = 0, stopped = 0, reclassified = 0, removed = 0;
+  std::string lastVerdict;
 
   void SetUp() override {
     for (const char* id : {"S01", "S02"}) {
@@ -40,6 +41,10 @@ struct History : testing::Test {
     const auto count = [](auto& f, int& n) { f = [inner = f, &n](auto&&... x) { ++n; return inner(std::forward<decltype(x)>(x)...); }; };
     count(b.play, played);
     count(b.stopPlay, stopped);
+    b.reclassify = [this, inner = b.reclassify](const std::string& id, int no, const std::string& verdict, const std::string& note, HistoryBackend::Done done) {
+      lastVerdict = verdict;
+      inner(id, no, verdict, note, std::move(done));
+    };
     count(b.reclassify, reclassified);
     count(b.remove, removed);
     h->setBackend(b);
@@ -256,6 +261,7 @@ TEST_F(History, ReclassifyIsTheInstructorsAndKeepsTheOriginal) {
   EXPECT_EQ(reclassified, 1);
   ASSERT_EQ(h->reviews().size(), 1);
   EXPECT_EQ(h->reviews()[0].toMap()["verdict"].toString(), "Speech recognition error");
+  EXPECT_EQ(lastVerdict, "stt");  // the backend gets the key, as HistoryService wants it
   EXPECT_EQ(h->entry()["outcome"].toString(), "INCORRECT runway");  // unchanged
   EXPECT_TRUE(h->entries()[4].toMap()["outcome"].toString().contains("(reclassified)"));
   h->selectEntry(0);  // a pilot's call is not judged

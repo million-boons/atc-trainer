@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-// What the full Settings screen needs from outside (04 section 5f, 07). PROPOSED: b2 has not accepted it yet.
+// What the full Settings screen needs from outside (04 section 5f, 07). Built by runtime (SetupService, D-335).
 // Texts: empty, or the reason of a refusal. Callbacks may come on any thread, after the call has returned.
 // A value stored by the user wins over the starting value; restore() removes it. The backend checks role, range and
 // "no exercise" again.

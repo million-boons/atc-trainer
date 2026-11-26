@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-// What Scenario Selection needs from outside (04 section 5d, 07). PROPOSED: b2 has not accepted it yet.
+// What Scenario Selection needs from outside (04 section 5d, 07). Built by runtime (ScenarioService, D-335).
 // Texts: empty, or the reason of a refusal. Callbacks may come on any thread, after the call has returned.
 
 struct ScenarioStepInfo {

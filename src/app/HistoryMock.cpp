@@ -108,6 +108,7 @@ HistoryBackend mockHistory(std::int64_t now) {
   b.reclassify = [all, find](const std::string& id, int no, const std::string& verdict, const std::string& note, HistoryBackend::Done done) {
     const auto at = find(id);
     if (at == all->end() || no < 0 || no >= int(at->entries.size())) return done("the entry is gone");
+    if (verdict != "trainee" && verdict != "stt" && verdict != "none") return done("unknown class");  // as the live backend
     auto& e = at->entries[std::size_t(no)];
     if (e.reviews.empty()) ++at->row.reclassified;
     e.reviews.push_back({verdict, note, "instructor", "mock time"});

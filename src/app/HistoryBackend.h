@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-// What Assessment and Debrief needs from outside (04 section 5e, 07). PROPOSED: b2 has not accepted it yet.
+// What Assessment and Debrief needs from outside (04 section 5e, 07). Built by runtime (HistoryService, D-335).
 // Texts: empty, or the reason of a refusal. Callbacks may come on any thread, after the call has returned.
 // Everything is rebuilt from the event logs; nothing here is typed, except the instructor's notes.
 
@@ -50,7 +50,8 @@ struct HistoryBackend {
   // person empty: all trainees (instructor). The backend checks the role again and leaves guests out.
   std::function<void(const std::string& person, std::function<void(std::vector<HistoryRow>, const std::string& why)>)> list;
   std::function<void(const std::string& id, std::function<void(HistoryDetail, const std::string& why)>)> open;
-  std::function<void(const std::string& id, int entry, const std::string& verdict, const std::string& note, Done)> reclassify;  // instructor
+  // instructor; verdict: "trainee", "stt" or "none" (the screen shows words for them)
+  std::function<void(const std::string& id, int entry, const std::string& verdict, const std::string& note, Done)> reclassify;
   std::function<void(const std::string& id, Done)> remove;   // instructor; logged first (H-3)
   std::function<void(const std::string& id, int entry, bool keyedOnly, Done)> play;
   std::function<void()> stopPlay;
