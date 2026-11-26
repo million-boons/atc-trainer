@@ -164,8 +164,8 @@ void SetupController::choose(const QString& key, const QString& id) {
 
 void SetupController::restore(const QString& page) {
   if (!may(false) || !b_.restore) return;
-  b_.restore(page.toStdString(), answer([this] {
-                applyNow_ = true;
+  b_.restore(page.toStdString(), answer([this, general = page == QLatin1String("general")] {
+                applyNow_ = general;  // theme and motion are there
                 reload();
               }, tr("The starting values are back.")));
 }
