@@ -48,6 +48,18 @@ QString median(QList<double> v) {
 }
 }  // namespace
 
+// The heading of a result. ProgramClosed: the program was closed during the exercise (D-333).
+QString ExerciseView::endTitle(const std::optional<out::EndReason>& end) {
+  if (!end) return tr("LOG INCOMPLETE");
+  switch (*end) {
+    case out::EndReason::Completed: return tr("COMPLETED");
+    case out::EndReason::InstructorStop: return tr("STOPPED BY INSTRUCTOR");
+    case out::EndReason::TimeLimit: return tr("TIME LIMIT");
+    case out::EndReason::ProgramClosed: return tr("PROGRAM CLOSED");
+  }
+  return tr("TIME LIMIT");
+}
+
 QVariantMap ExerciseView::card(const Exercise& e, std::uint64_t seed) {
   ParamValues p;
   generateParams(e.scenario, e.airfield, seed, p);
@@ -414,17 +426,8 @@ void ExerciseView::ended(const ExerciseResult& r, QDateTime at) {
                          row(tr("Fallback PTT used"), r.fallbackPttUsed() ? tr("yes, %1").arg(r.ptt.fallback) : tr("no"))};
   const QVariantList speech{row(tr("Speech model"), s_.model), row(tr("Release to text, median"), median(delays_)),
                             row(tr("Faults during exercise"), n(r.pilotFaults + faults_))};
-  QString title;
-  int level = L::Caution;
-  if (!r.end) {
-    title = tr("LOG INCOMPLETE");
-    level = L::Fault;
-  } else if (*r.end == out::EndReason::Completed) {
-    title = tr("COMPLETED");
-    level = L::Ok;
-  } else {
-    title = *r.end == out::EndReason::InstructorStop ? tr("STOPPED BY INSTRUCTOR") : tr("TIME LIMIT");
-  }
+  const QString title = endTitle(r.end);
+  const int level = !r.end ? L::Fault : *r.end == out::EndReason::Completed ? L::Ok : L::Caution;
   const QVariantMap ctx = c_->context();
   result_ = {{"title", title}, {"level", level},
              {"sub", tr("%1   %2   %3   %4 to %5").arg(c_->who(), ctx["scenario"].toString(), ctx["callsign"].toString(), QLocale::c().toString(at_, "d MMM HH:mm"), at.toString("HH:mm"))},

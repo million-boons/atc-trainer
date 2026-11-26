@@ -26,9 +26,18 @@ QString endText(HistoryRow::End e) {
 }
 int endLevel(HistoryRow::End e) { return e == HistoryRow::End::Completed ? L::Ok : e == HistoryRow::End::Stopped ? L::Caution : L::Fault; }
 // What the instructor may say about an entry. The engine's verdict stays beside it.
-const char* const kVerdicts[] = {QT_TRANSLATE_NOOP("HistoryController", "Trainee error"), QT_TRANSLATE_NOOP("HistoryController", "Speech recognition error"),
-                                 QT_TRANSLATE_NOOP("HistoryController", "Not an error")};
+// The backend stores the key; the screen shows the words.
+struct Verdict { const char* key; const char* words; };
+const Verdict kVerdicts[] = {{"trainee", QT_TRANSLATE_NOOP("HistoryController", "Trainee error")},
+                             {"stt", QT_TRANSLATE_NOOP("HistoryController", "Speech recognition error")},
+                             {"none", QT_TRANSLATE_NOOP("HistoryController", "Not an error")}};
 }  // namespace
+
+QString HistoryController::verdictWords(const std::string& key) {
+  for (const Verdict& v : kVerdicts)
+    if (key == v.key) return tr(v.words);
+  return QString::fromStdString(key);  // unknown: as stored
+}
 
 HistoryController::HistoryController(AccessController* access, std::function<std::int64_t()> nowMs, QObject* parent)
     : QObject(parent), nowMs_(nowMs ? std::move(nowMs) : [] { return std::int64_t(QDateTime::currentMSecsSinceEpoch()); }) {
@@ -312,7 +321,7 @@ QVariantList HistoryController::reviews() const {
   QVariantList l;
   if (!detail_ || entry_ < 0 || entry_ >= int(detail_->entries.size())) return l;
   for (const HistoryReview& r : detail_->entries[std::size_t(entry_)].reviews)
-    l.append(QVariantMap{{"verdict", q(r.verdict)}, {"note", q(r.note)}, {"by", tr("%1, %2").arg(q(r.role), q(r.at))}});
+    l.append(QVariantMap{{"verdict", verdictWords(r.verdict)}, {"note", q(r.note)}, {"by", tr("%1, %2").arg(q(r.role), q(r.at))}});
   return l;
 }
 
@@ -340,10 +349,10 @@ void HistoryController::stopPlay() {
 void HistoryController::reclassify(const QString& verdict, const QString& note) {
   if (!instructor()) return void(say(L::Caution, tr("Only the instructor may reclassify.")));
   if (busy() || !b_.reclassify || !entry()["mayReclassify"].toBool()) return;
-  const bool ok = std::any_of(std::begin(kVerdicts), std::end(kVerdicts), [&](const char* v) { return tr(v) == verdict; });
-  if (!ok) return void(say(L::Caution, tr("Choose a class.")));
+  const auto v = std::find_if(std::begin(kVerdicts), std::end(kVerdicts), [&](const Verdict& x) { return tr(x.words) == verdict; });
+  if (v == std::end(kVerdicts)) return void(say(L::Caution, tr("Choose a class.")));
   const std::string id = detail_->row.id;
-  b_.reclassify(id, entry_, verdict.toStdString(), note.trimmed().left(kNote).toStdString(), answer([this, id] {
+  b_.reclassify(id, entry_, v->key, note.trimmed().left(kNote).toStdString(), answer([this, id] {
                   if (detail_ && detail_->row.id == id) load(id);
                   emit reclassified();
                 }, tr("Stored beside the original.")));

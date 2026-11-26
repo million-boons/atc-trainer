@@ -94,5 +94,6 @@ class SetupController : public QObject {
   bool loaded_ = false, learning_ = false, trainerBusy_ = false, wasInstructor_ = false;
   int waiting_ = 0, messageLevel_ = 0;
   unsigned loadNo_ = 0, learnNo_ = 0;
+  bool applyNow_ = false;  // after a restore: theme and motion take effect at once, as when chosen
   SetupBackend b_;  // last
 };

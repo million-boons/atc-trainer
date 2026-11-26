@@ -250,3 +250,24 @@ int main(int argc, char** argv) {
   QCoreApplication app(argc, argv);
   return RUN_ALL_TESTS();
 }
+
+TEST_F(Setup, RestoringGeneralAppliesTheStartingThemeAtOnce) {  // as choosing it does
+  QStringList themes;
+  QList<bool> motions;
+  QObject::connect(s.get(), &SetupController::themeChosen, [&](const QString& m) { themes << m; });
+  QObject::connect(s.get(), &SetupController::motionChosen, [&](bool r) { motions << r; });
+  instructor();
+  s->choose("theme", "night");
+  drain();
+  s->choose("motion", "reduce");
+  drain();
+  ASSERT_EQ(themes, QStringList{"night"});
+  s->restore("general");
+  drain();
+  EXPECT_EQ(s->theme(), "dark");
+  EXPECT_EQ(themes, (QStringList{"night", "dark"}));
+  EXPECT_EQ(motions, (QList<bool>{true, false}));
+  s->restore("ptt");  // another page: nothing applied again
+  drain();
+  EXPECT_EQ(themes.size(), 2);
+}

@@ -50,6 +50,7 @@ class HistoryController : public QObject {
   Q_PROPERTY(QString message READ message NOTIFY messageChanged)
  public:
   static constexpr int kTrend = 20, kNote = 200;
+  static QString verdictWords(const std::string& key);  // "trainee", "stt", "none" as the screen says them
   explicit HistoryController(AccessController* access = nullptr, std::function<std::int64_t()> nowMs = {}, QObject* parent = nullptr);
   void setAccess(AccessController* a);
   void setBackend(HistoryBackend b) { b_ = std::move(b); }

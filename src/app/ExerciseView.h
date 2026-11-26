@@ -32,6 +32,7 @@ class ExerciseView {
   // The scenario card and the Start dialog show the values of this seed.
   static QVariantMap card(const atc::Exercise& e, std::uint64_t seed);
   static QVariantMap card(const atc::Exercise& e, const atc::ParamValues& values);  // D-334
+  static QString endTitle(const std::optional<atc::out::EndReason>& end);  // heading of a result
 
   void prepare(Setup s);                    // Start dialog
   void refused(const QString& why);         // back in the Start dialog, with the reason

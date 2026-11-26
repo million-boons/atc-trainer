@@ -92,6 +92,10 @@ void SetupController::reload() {
       if (loaded_) content_ = c;
       else say(L::Fault, q(why));
       emit changed();
+      if (loaded_ && std::exchange(applyNow_, false)) {
+        if (const QString t = value("theme"); !t.isEmpty()) emit themeChosen(t);
+        if (choiceOf(QStringLiteral("motion"))) emit motionChosen(value("motion") == QLatin1String("reduce"));
+      }
     });
   });
 }
@@ -160,7 +164,10 @@ void SetupController::choose(const QString& key, const QString& id) {
 
 void SetupController::restore(const QString& page) {
   if (!may(false) || !b_.restore) return;
-  b_.restore(page.toStdString(), answer([this] { reload(); }, tr("The starting values are back.")));
+  b_.restore(page.toStdString(), answer([this, general = page == QLatin1String("general")] {
+                applyNow_ = general;  // theme and motion are there
+                reload();
+              }, tr("The starting values are back.")));
 }
 
 // ---- learning a pedal
