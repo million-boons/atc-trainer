@@ -5,8 +5,8 @@
   "micTargetLowDbfs": -20,
   "micTargetHighDbfs": -6,
   "pilotCutNoticeMs": 2000,
-  "pttDevice": "/dev/input/by-id/usb-LITEON_Dell_Wireless_Device-if01-event-mouse",
-  "pttName": "mouse stand-in",
+  "pttDevice": "/dev/input/by-id/usb-Microchip_Technology_Inc._Preon-event-mouse",
+  "pttName": "foot pedal (Preon)",
   "pttGrab": false,
   "micSource": "",
   "instructorIdleMinutes": 10,
@@ -16,5 +16,10 @@
   "sideTone": true,
   "sideToneMs": 20,
   "sideToneHz": 1000,
-  "sideToneDbfs": -18
+  "sideToneDbfs": -18,
+  "pttVidPid": "04d8:0055",
+  "pttCode": 273,
+  "pttStandIn": false,
+  "pttStandInDevice": "/dev/input/by-id/usb-LITEON_Dell_Wireless_Device-if01-event-mouse",
+  "pttStandInName": "mouse stand-in"
 }

@@ -6,11 +6,10 @@ SUBSYSTEM!="input", GOTO="atc_ptt_end"
 KERNEL!="event*", GOTO="atc_ptt_end"
 ENV{ID_INPUT_KEYBOARD}=="1", GOTO="atc_ptt_end"
 
-# Current pedal (FAILS hold-to-talk, D-02/P-13). Replace the numbers when the new pedal arrives.
-# LIBINPUT_IGNORE_DEVICE stops a mouse-type pedal from clicking the desktop.
-ATTRS{idVendor}=="04d8", ATTRS{idProduct}=="0055", TAG+="uaccess", SYMLINK+="input/atc-pedal", ENV{LIBINPUT_IGNORE_DEVICE}="1"
-
-# Stand-in mouse for development only; remove on the panel. Stays a normal mouse.
-ATTRS{idVendor}=="04ca", ATTRS{idProduct}=="00bd", ENV{ID_INPUT_MOUSE}=="1", TAG+="uaccess", SYMLINK+="input/atc-ptt-mouse"
+# The foot pedal, and nothing else (G1-P, 2026-11-27): Microchip "Preon", 04d8:0055, mouse-type, BTN_RIGHT held while
+# pressed. Only a mouse-type device of these numbers matches. uaccess lets the user at the screen read it; the app opens
+# it read-only. LIBINPUT_IGNORE_DEVICE stops the pedal from right-clicking on the desktop.
+ATTRS{idVendor}=="04d8", ATTRS{idProduct}=="0055", ENV{ID_INPUT_MOUSE}=="1", TAG+="uaccess", SYMLINK+="input/atc-pedal", ENV{LIBINPUT_IGNORE_DEVICE}="1"
+# The mouse stand-in has no rule any more: as a fallback it needs setfacl after each replug, as before.
 
 LABEL="atc_ptt_end"

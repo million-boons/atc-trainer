@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
   const QCommandLineOption grab("grab", "Save a screenshot and quit.", "file.png");
   const QCommandLineOption modelsOpt("models", "Speech model list.", "file", at(paths.config + "/stt_models.json"));
   const QCommandLineOption root("root", "Program files (holds config/, data/ and models) instead of the installed ones.", "dir");
-  const QCommandLineOption pttOpt("ptt-device", "PTT input device (overrides the settings file); \"none\" for no device.", "path");
+  const QCommandLineOption pttOpt("ptt-device", "PTT input device (overrides the settings file); \"none\" for no device; \"stand-in\" for the mouse of pttStandInDevice.", "path");
   const QCommandLineOption pulseOpt("pulse-server", "PulseAudio server.", "address");
   cli.addOptions({pttOpt, pulseOpt, modelsOpt, root, mock, config, size, theme, state, grab});
   cli.process(app);
@@ -192,6 +192,13 @@ int main(int argc, char** argv) {
     lc.devices.pttDevice = ptt.toStdString();
     lc.devices.pttGrab = cfg["pttGrab"].toBool(false);
     lc.devices.pttVidPid = cfg["pttVidPid"].toString().toStdString();
+    const bool standIn = ptt == "stand-in";  // the fallback: the desk mouse, shown as STAND-IN (G1-P)
+    if (standIn) {
+      ptt = cfg["pttStandInDevice"].toString();
+      lc.devices.pttDevice = ptt.toStdString();
+      lc.devices.pttVidPid.clear();  // another device than the pedal
+      lc.pttName = cfg["pttStandInName"].toString("mouse stand-in");
+    }
     lc.devices.pttCode = cfg["pttCode"].toInt(lc.devices.pttCode);
     lc.devices.micSource = cfg["micSource"].toString().toStdString();
     lc.devices.pulseServer = cli.value(pulseOpt).toStdString();
@@ -204,7 +211,7 @@ int main(int argc, char** argv) {
     lc.radio.tx.queueSettle = msOf("txQueueSettleMs", lc.radio.tx.queueSettle);
     lc.radio.ptt.debounce = msOf("pttDebounceMs", lc.radio.ptt.debounce);
     lc.status.pttName = lc.pttName;
-    lc.status.pttStandIn = cfg["pttStandIn"].toBool(!lc.devices.pttGrab);  // an exclusive device is the pedal
+    lc.status.pttStandIn = standIn || cfg["pttStandIn"].toBool(!lc.devices.pttGrab);  // an exclusive device is the pedal
     lc.status.pttMissingBlocks = cfg["pttMissingBlocks"].toBool(true);
     lc.status.storagePath = at(paths.writable);
     lc.status.storageWarnMb = cfg["recordingsWarnFreeMb"].toInt(1000);
