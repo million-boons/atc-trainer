@@ -1065,3 +1065,52 @@ TEST(EventJson, ReadbackCheckIsWritten) {
   EXPECT_EQ(j["result"], "missed");
   EXPECT_EQ(j["step"], "LINE_UP");
 }
+
+// The shipped circuit end to end: every step correct, every incomplete readback challenged (D-431).
+TEST(ShippedCircuit, CompletesWithEveryShortReadbackChallenged) {
+  Paths paths;
+  std::string error;
+  ASSERT_TRUE(resolvePaths(systemPathInputs(), paths, error)) << error;
+  auto ex = std::make_shared<Exercise>();
+  std::vector<LoadError> errors;
+  ASSERT_TRUE(loadExercise(scenarioSources(paths.data, paths.data + "/scenarios/CIRCUIT-RAJALI.json"), *ex, errors))
+      << (errors.empty() ? "" : toString(errors[0]));
+  int shortOnes = 0;
+  for (std::uint64_t seed = 1; seed <= 30; ++seed) {
+    MemoryLog log;
+    Simulator sim(SequenceEngine(ex, seed), log);
+    const auto lastReply = [&] {
+      std::string id;
+      for (const auto& e : log.events)
+        if (const auto* o = std::get_if<EngineOutput>(&e.body))
+          if (const auto* p = std::get_if<out::PilotRequested>(o)) id = p->utterance.replyId;
+      return id;
+    };
+    sim.start();
+    sim.wait(ms(6000));
+    const ParamValues& v = sim.engine().context().params;
+    const std::map<std::string, std::string> rw{{"callsign", v.at("callsign")}, {"runway", v.at("runway")}};
+    const std::vector<std::pair<std::string, std::map<std::string, std::string>>> calls{
+        {"RADIO_CHECK_REPLY", {{"callsign", v.at("callsign")}, {"readability", "5"}}},
+        {"TAXI_TO_HOLDING_POINT", rw}, {"HOLD_SHORT", rw}, {"LINE_UP_AND_WAIT", rw}, {"TAKEOFF_CLEARANCE", rw},
+        {"JOIN_CIRCUIT", rw}, {"REPORT_FINAL", rw}, {"LANDING_CLEARANCE", rw},
+        {"CONTACT_FREQUENCY", {{"callsign", v.at("callsign")}, {"frequency", v.at("frequency")}}}};
+    for (const auto& [intent, fields] : calls) {
+      sim.transmit(Simulator::instruction(intent, fields));
+      sim.waitForPilot();
+      if (lastReply().ends_with("_SHORT")) {
+        ++shortOnes;
+        sim.transmit(Simulator::instruction("READBACK_CHALLENGE", {{"callsign", v.at("callsign")}}));
+        sim.waitForPilot();
+        EXPECT_FALSE(lastReply().ends_with("_SHORT"));
+      }
+    }
+    sim.wait(ms(5000));
+    EXPECT_EQ(sim.reason(), out::EndReason::Completed) << seed;
+    for (const auto& s : buildResult(ex->scenario, log.events).steps) {
+      EXPECT_TRUE(s.completed) << s.id;
+      EXPECT_EQ(s.readbackMissed, 0) << s.id;
+    }
+  }
+  EXPECT_GT(shortOnes, 0);  // 4 steps at 0.25 over 30 seeds
+}

@@ -505,3 +505,23 @@ TEST_F(Circuit, AValueTheTraineeChoosesNeedsARange) {
   step(1)["expects"][0]["check"]["readability"]["range"] = {5, 1};
   expectError(kFile, "/steps/1/expects/0/check/readability/range", "from at most to");
 }
+
+// The shipped circuit (D-430, D-431). Needs stt's circuit intents (stt db77be4) in data/phraseology.
+TEST(ShippedCircuit, Loads) {
+  const std::string d = shippedData();
+  Exercise e;
+  std::vector<LoadError> errors;
+  ASSERT_TRUE(loadExercise(scenarioSources(d, d + "/scenarios/CIRCUIT-RAJALI.json"), e, errors)) << (errors.empty() ? "" : toString(errors[0]));
+  EXPECT_EQ(e.scenario.steps.size(), 10u);
+  EXPECT_EQ(e.scenario.initialStep, "RADIO_CHECK");
+  ASSERT_TRUE(e.scenario.readbackCheck);
+  EXPECT_EQ(e.scenario.readbackCheck->challenge.intent, "READBACK_CHALLENGE");
+  EXPECT_EQ(e.scenario.step("TAKEOFF")->responses.at(Outcome::Correct).incompleteReply, "CIRCUIT_READBACK_TAKEOFF_SHORT");
+  EXPECT_FALSE(e.replies.at("CIRCUIT_READBACK_TAKEOFF_SHORT").completeReadback);
+  EXPECT_TRUE(e.replies.at("CIRCUIT_READBACK_TAKEOFF").completeReadback);
+  EXPECT_EQ(e.scenario.step("RADIO_CHECK")->expects[0].ranges.at("readability"), (std::pair<int, int>{1, 5}));
+  EXPECT_TRUE(e.placeholder);
+  ParamValues v;
+  ASSERT_TRUE(generateParams(e.scenario, e.airfield, 1, v));
+  EXPECT_EQ(v, (ParamValues{{"callsign", "FALCON-12"}, {"frequency", "121.7"}, {"runway", "05"}}));
+}

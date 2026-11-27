@@ -556,7 +556,7 @@ void loadScenario(const Node& n, const ScenarioSources& src, Exercise& e, std::m
   if (!s.id.empty() && !chars(s.id, kIdChars)) n.child("id").fail("capital letters, digits, - and _ only");
   s.name = n.text("name");
   s.category = n.text("category");
-  static const std::set<std::string> categories{"departure", "arrival", "ground", "landing", "go-around", "emergency", "rcf", "abnormal"};
+  static const std::set<std::string> categories{"departure", "arrival", "ground", "landing", "go-around", "emergency", "rcf", "abnormal", "circuit"};
   if (!s.category.empty() && !categories.count(s.category)) n.child("category").fail("unknown category " + s.category);
   s.placeholder = placeholderOf(n, "placeholder", {"sopRef", "validated_by", "validated_at"});
   if (n.has("validation") && n.child("validation").j.is_object()) {
