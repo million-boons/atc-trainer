@@ -74,6 +74,7 @@ std::string ExerciseRuntime::start(PreparedExercise ready, ExerciseOptions opt, 
   h.planName = opt.plan.name;
   h.planPreset = opt.plan.preset;
   h.planRun = opt.plan.run;
+  h.pttStandIn = opt.pttStandIn;
   std::string error;
   if (!r->log->begin(h, error)) return refuseLocked("event log: " + error);
   r->modelId = model.modelId;

@@ -169,6 +169,7 @@ void LiveExercise::start(bool assessed) {
   o.model = cfg_.model;
   o.pttFallback = !cfg_.pttMissingBlocks || (settings_ && settings_->pttFallback());
   o.radio = cfg_.radio;
+  o.pttStandIn = cfg_.pttStandIn;
   if (plan_) {  // D-334: exactly what the card and the dialog show
     const PlanDifficulty& d = plan_->plan.difficulty;
     o.values = plan_->values;

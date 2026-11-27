@@ -48,6 +48,7 @@ struct ExerciseOptions {
   RadioIntensity radio = RadioIntensity::Light;
   // D-334, a plan: its exact values (checked again here, never corrected), reply delay, and what is logged of it.
   std::optional<ParamValues> values;
+  bool pttStandIn = false;  // D-435: the run used the mouse stand-in, not the pedal; marked in the header
   std::optional<std::pair<Ns, Ns>> replyDelay;
   struct Plan {
     std::string id, name, preset;

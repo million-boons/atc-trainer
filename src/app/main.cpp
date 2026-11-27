@@ -233,6 +233,7 @@ int main(int argc, char** argv) {
       ec.scenarioFile = paths.data + "/scenarios/" + cfg["scenario"].toString("DEPARTURE-01").toStdString() + ".json";
       ec.model = cfg["exerciseModel"].toString(at(ec.model)).toStdString();
       ec.pttMissingBlocks = lc.status.pttMissingBlocks;
+      ec.pttStandIn = lc.status.pttStandIn;  // D-435
       ec.mayUse = [consent](const std::string& id) { return consent->mayUse(id); };
       ec.phraseology = [phraseology] { return phraseology->dir(); };
       // Exercise audio (11, D-341): kept only under the Lab's rules; the consent is asked again before each file.

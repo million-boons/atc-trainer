@@ -650,6 +650,7 @@ TEST(ExerciseRuntime, APlansValuesRunAndAreLogged) {
   r.opt.values = other;
   r.opt.replyDelay = std::pair{ms(300), ms(400)};
   r.opt.plan = {"p1", "Departure, runway", "custom", 3};
+  r.opt.pttStandIn = true;  // D-435
   ASSERT_EQ(r.start(), "");
   EXPECT_EQ(r.log->header.values, other);
   EXPECT_EQ(r.log->header.replyFromMs, 300);
@@ -659,6 +660,7 @@ TEST(ExerciseRuntime, APlansValuesRunAndAreLogged) {
   EXPECT_EQ(h["version"], 2);
   EXPECT_EQ(h["values"]["runway"], other["runway"]);
   EXPECT_EQ(h["plan"]["name"], "Departure, runway");
+  EXPECT_EQ(h["pttStandIn"], true);
   r.hearPilot();
   const auto said = r.logged<out::PilotRequested>().front().utterance.text;
   for (const auto& c : r.ready.exercise->airfield.callsigns)

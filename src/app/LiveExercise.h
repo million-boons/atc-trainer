@@ -23,6 +23,7 @@ struct LiveExerciseConfig {
   std::string scenarioFile;
   std::string model = "whisper-tiny-genprompt";  // D-414
   atc::RadioIntensity radio = atc::RadioIntensity::Light;
+  bool pttStandIn = false;       // D-435: the PTT device is the mouse stand-in (--ptt-device stand-in)
   bool pttMissingBlocks = true;  // configuration; the instructor's option comes from SettingsController
   std::function<std::unique_ptr<atc::IEventLog>()> makeLog;  // empty: JSON Lines in `logs`
   atc::VoiceBank::MayUse mayUse;             // the speaker's answer today (D-133); called on the check's thread
