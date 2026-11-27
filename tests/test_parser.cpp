@@ -6,6 +6,9 @@
 
 #include "core/PathResolver.h"
 #include "parser/Parser.h"
+
+#include <map>
+#include <nlohmann/json.hpp>
 using namespace atc;
 using C = RecognitionClass;
 
@@ -113,7 +116,7 @@ TEST(Parser, EveryRunwayIsReadAsSaid) {  // bias rule: no value is preferred
   }
 }
 TEST(Parser, WrongDigitCountIsNeverCutToFit) {
-  for (const char* s : {"eagle four two line up runway zero nine", "eagle four two one one line up runway zero nine",
+  for (const char* s : {"eagle four line up runway zero nine", "eagle four two one one line up runway zero nine",
                         "eagle four two one line up runway nine", "eagle four two one line up runway zero nine nine",
                         "eagle four two one taxi via alpha three three runway zero nine", "eagle four two one taxi via alpha runway zero nine"}) {
     const auto p = parse(s);
@@ -143,7 +146,7 @@ TEST(Parser, PartialNamesWhatIsMissing) {
 }
 TEST(Parser, EveryWordMustBeExplained) {
   for (const char* s : {"eagle four two one cancel runway zero nine cleared for takeoff", "eagle four two one runway zero nine not cleared for takeoff",
-                        "eagle four two one line up and wait runway zero nine", "eagle four two one run with your zero nine line up",
+                        "eagle four two one line up and hold runway zero nine", "eagle four two one run with your zero nine line up",
                         "tiger four two one line up runway zero nine", "four two one line up runway zero nine",
                         "eagle four two one line up runway zero nine correction runway two seven",
                         "eagle four two one taxi via alpha three hole short runway zero nine",
@@ -212,7 +215,7 @@ TEST(Parser, RulesAreChecked) {
   EXPECT_NE(loadChanged("\"cues\": [\"line up\"]", "\"cues\": []").find("no cues"), std::string::npos);
   EXPECT_NE(loadChanged("\"hold_short\": [", "\"runway\": [").find("parse/flags/runway"), std::string::npos);
   EXPECT_NE(loadChanged("\"required\": [\"callsign\", \"runway\"]", "\"required\": [\"callsign\", \"gate\"]").find("unknown slot gate"), std::string::npos);
-  EXPECT_NE(loadChanged("\"required\": [\"callsign\", \"runway\"]", "\"required\": [\"altitude\"]").find("pools only"), std::string::npos);
+  EXPECT_NE(loadChanged("\"required\": [\"callsign\", \"runway\"]", "\"required\": [\"altitude\"]").find("end with a value"), std::string::npos);
   EXPECT_NE(loadChanged("\"runway\": [1, 36]", "\"runway\": [36, 1]").find("needs [low, high]"), std::string::npos);
   EXPECT_NE(loadChanged("   \"runway\": [\"runway\", \"run with\"],\n", "").find("needs a marker"), std::string::npos);
   EXPECT_NE(loadChanged("\"parse\": {\n  \"comment\"", "\"parsed\": {\n  \"comment\"").find("parse: missing"), std::string::npos);
@@ -236,4 +239,99 @@ TEST(Parser, RunWithMarksTheRunwayAndNothingElse) {
   const auto c = parse("eagle four two one taxi via alpha three run with zero nine runway two seven");
   EXPECT_EQ(c.cls, C::Ambiguous);  // two runway values: never one picked
   EXPECT_EQ(parse("falcon three one eight run with three six").cls, C::Unrecognized);  // no instruction cue
+}
+
+// Circuit - Rajali (D-203, engine's brief; wording PLACEHOLDER, the user's script, D-430, D-431).
+namespace {
+struct Line {
+  const char* said;
+  const char* intent;
+  std::vector<std::pair<std::string, std::string>> values;
+};
+const Line kCircuit[] = {
+    {"Falcon One Two, Rajali Tower, read you five.", "RADIO_CHECK_REPLY", {{"callsign", "FALCON-12"}, {"readability", "5"}}},
+    {"Falcon one two, read you three", "RADIO_CHECK_REPLY", {{"callsign", "FALCON-12"}, {"readability", "3"}}},
+    {"Falcon One Two, taxi to holding point runway zero five.", "TAXI_TO_HOLDING_POINT", {{"callsign", "FALCON-12"}, {"runway", "05"}}},
+    {"Falcon One Two, hold short runway zero five.", "HOLD_SHORT", {{"callsign", "FALCON-12"}, {"runway", "05"}, {"hold_short", "-"}}},
+    {"Falcon One Two, runway zero five, line up and wait.", "LINE_UP_AND_WAIT", {{"callsign", "FALCON-12"}, {"runway", "05"}}},
+    {"Falcon One Two, runway zero five, cleared for takeoff.", "TAKEOFF_CLEARANCE", {{"callsign", "FALCON-12"}, {"runway", "05"}}},
+    {"Falcon One Two, join the circuit, runway zero five.", "JOIN_CIRCUIT", {{"callsign", "FALCON-12"}, {"runway", "05"}}},
+    {"Falcon One Two, report final runway zero five.", "REPORT_FINAL", {{"callsign", "FALCON-12"}, {"runway", "05"}}},
+    {"Falcon One Two, runway zero five, cleared to land.", "LANDING_CLEARANCE", {{"callsign", "FALCON-12"}, {"runway", "05"}}},
+    {"Falcon One Two, contact ground one two one decimal seven.", "CONTACT_FREQUENCY", {{"callsign", "FALCON-12"}, {"frequency", "121.7"}}},
+    {"Falcon One Two, read back runway.", "READBACK_CHALLENGE", {{"callsign", "FALCON-12"}, {"runway", "-"}}},
+    {"Falcon One Two, confirm runway zero five.", "READBACK_CHALLENGE", {{"callsign", "FALCON-12"}, {"runway", "05"}}},
+    {"Falcon One Two, readback incomplete, confirm cleared for takeoff runway zero five.", "READBACK_CHALLENGE", {{"runway", "05"}}},
+    {"Falcon One Two, read back incomplete, confirm cleared to land runway zero five.", "READBACK_CHALLENGE", {{"runway", "05"}}},
+    {"Falcon 12, readback incomplete, confirm cleared for take off runway 05", "READBACK_CHALLENGE", {{"callsign", "FALCON-12"}, {"runway", "05"}}},
+    {"Eagle 421, line up runway 09", "LINE_UP", {{"runway", "09"}}},  // the departure's, until engine moves it
+    {"Eagle 421, taxi via A3, hold short runway 09", "TAXI_INSTRUCTION", {{"hold_short", "yes"}, {"taxiway", "A3"}}},
+};
+}  // namespace
+TEST(Parser, EveryCircuitLineOfTheScriptParsesCompletely) {
+  for (const auto& l : kCircuit) {
+    const auto p = parse(l.said);
+    EXPECT_EQ(p.cls, C::Recognized) << l.said << (p.reasons.empty() ? "" : ": " + p.reasons[0]);
+    EXPECT_EQ(p.intent, l.intent) << l.said;
+    for (const auto& [k, v] : l.values) EXPECT_EQ(value(p, k), v) << l.said << " " << k;
+  }
+}
+TEST(Parser, EveryExampleOfAParsedIntentParsesAsItself) {
+  std::ifstream f(rulesFile());
+  const auto j = nlohmann::json::parse(f);
+  const std::map<std::string, std::string> fill{{"{callsign}", "cobra seven"}, {"{runway}", "two three right"}, {"{taxiway}", "kilo four"},
+                                                {"{readability}", "two"}, {"{frequency}", "one three zero decimal niner"}};
+  int n = 0;
+  for (const auto& i : j["intents"]) {
+    if (!i.contains("parse")) continue;
+    for (std::string e : i["examples"]) {
+      for (const auto& [k, v] : fill)
+        for (auto at = e.find(k); at != std::string::npos; at = e.find(k)) e.replace(at, k.size(), v);
+      const auto p = parse(e);
+      EXPECT_EQ(p.cls, C::Recognized) << e << (p.reasons.empty() ? "" : ": " + p.reasons[0]);
+      EXPECT_EQ(p.intent, i["id"].get<std::string>()) << e;
+      ++n;
+    }
+  }
+  EXPECT_GE(n, 16);
+}
+TEST(Parser, CircuitValuesAreTakenAsSaidOrNotAtAll) {
+  for (const char* s : {"falcon one two read you zero", "falcon one two read you six", "falcon one two read you five by five",
+                        "falcon one two read you", "falcon one two contact ground one two one seven",
+                        "falcon one two contact ground one two one decimal", "falcon one two contact ground one two one decimal seven five",
+                        "falcon one two contact ground one two decimal seven"}) {
+    const auto p = parse(s);
+    EXPECT_NE(p.cls, C::Recognized) << s;
+  }
+  for (int d = 1; d <= 5; ++d) {  // bias rule: every readability, not only the expected one
+    const char* w[] = {"", "one", "two", "three", "four", "five"};
+    EXPECT_EQ(value(parse(std::string("hawk five five read you ") + w[d]), "readability"), std::to_string(d));
+  }
+  EXPECT_EQ(value(parse("falcon one two contact ground one one eight decimal zero"), "frequency"), "118.0");
+  EXPECT_EQ(value(parse("falcon one two contact ground 136.9"), "frequency"), "136.9");
+}
+TEST(Parser, LongestCueAndFlagRules) {
+  // The flag only belongs to an intent that has it: with the holding point it is a second instruction.
+  auto p = parse("falcon one two taxi to holding point runway zero five hold short runway zero five");
+  EXPECT_EQ(p.cls, C::Ambiguous);
+  EXPECT_TRUE(because(p, "several instructions"));
+  // A challenge has its own wording; "confirm" with a clearance is not one of them.
+  p = parse("falcon one two confirm cleared for takeoff runway zero five");
+  EXPECT_EQ(p.cls, C::Ambiguous);
+  p = parse("falcon one two line up and wait");
+  EXPECT_EQ(p.cls, C::Partial);
+  EXPECT_EQ(p.intent, "LINE_UP_AND_WAIT");
+}
+TEST(Parser, TwoAndThreeDigitCallsigns) {
+  // D-430: two-digit callsigns. A three-digit callsign heard with a digit lost now reads as a
+  // two-digit one; the scenario's callsign check, not the parser, catches it (no expected value here).
+  EXPECT_EQ(value(parse("eagle four two line up runway zero nine"), "callsign"), "EAGLE-42");
+  EXPECT_EQ(value(parse("eagle four two one line up runway zero nine"), "callsign"), "EAGLE-421");
+  EXPECT_EQ(value(parse("eagle four line up runway zero nine"), "callsign"), "?");
+  EXPECT_EQ(value(parse("eagle four two one one line up runway zero nine"), "callsign"), "?");
+}
+TEST(Parser, FixedWordsInSlotFormsAreChecked) {
+  EXPECT_NE(loadChanged("\"{digit} {digit} {digit} decimal {digit}\"", "\"{digit} {digit} {digit} {digit} decimal\"").find("end with a value"), std::string::npos);
+  EXPECT_NE(loadChanged("\"{digit} {digit} {digit} decimal {digit}\"", "\"decimal {digit} {digit}\"").find("fixed word"), std::string::npos);
+  EXPECT_NE(loadChanged("\"{digit} {digit} {digit} decimal {digit}\"", "\"{digit} {digyt}\"").find("unknown pool {digyt}"), std::string::npos);
 }

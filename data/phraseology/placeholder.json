@@ -170,7 +170,8 @@
  },
  "slots": {
   "callsign": [
-   "{callsignName} {digit} {digit} {digit}"
+   "{callsignName} {digit} {digit} {digit}",
+   "{callsignName} {digit} {digit}"
   ],
   "runway": [
    "{digit} {digit}",
@@ -191,23 +192,29 @@
   ],
   "frequency": [
    "{digit} {digit} {digit} decimal {digit}"
+  ],
+  "readability": [
+   "{digit}"
   ]
  },
  "promptWords": {
-  "comment": "PLACEHOLDER. Words only for the Whisper prompt, for the coming circuit scenario (user, 2026-11-27, D-128 follow-up). Not approved phraseology: no sentence, script or parser rule uses them. Frequencies use the digit pool and the frequency slot (with decimal), so no frequency value is named here (D-48).",
-  "words": ["Rajali", "Arakkonam", "read you", "circuit", "final", "ground", "decimal"]
+  "comment": "PLACEHOLDER. Words only for the Whisper prompt (user, 2026-11-27, D-128 follow-up). Since D-203 the circuit intents carry read you, circuit, final, ground and decimal, so only the names stay here. Not approved phraseology: no sentence, script or parser rule uses them. Frequencies use the digit pool and the frequency slot (with decimal), so no frequency value is named here (D-48).",
+  "words": ["Rajali", "Arakkonam"]
  },
  "parse": {
-  "comment": "PLACEHOLDER. How the parser finds values (02 section 4). Slots without a marker start with a pool name (callsign). Every word must be explained: there are no filler words. Runway marker \"run with\": how Whisper writes \"runway\" for speaker s1 (D-201), to re-check with the dev speakers.",
+  "comment": "PLACEHOLDER. How the parser finds values (02 section 4). Slots without a marker start with a pool name (callsign). Every word must be explained: there are no filler words. Runway marker \"run with\": how Whisper writes \"runway\" for speaker s1 (D-201), to re-check with the dev speakers. Circuit intents (D-203): the longest cue wins (\"taxi to holding point\" over \"taxi\", \"line up and wait\" over \"line up\"); \"hold short\" said with another instruction that has the flag is that instruction's flag; \"rajali tower\" is accepted in the radio check reply, not required (C-3 open). \"readback\" and \"read back\", \"takeoff\" and \"take off\" are written forms of the same words.",
   "markers": {
    "runway": ["runway", "run with"],
-   "taxiway": ["via", "taxiway"]
+   "taxiway": ["via", "taxiway"],
+   "readability": ["read you"],
+   "frequency": ["contact ground"]
   },
   "flags": {
    "hold_short": ["hold short"]
   },
   "ranges": {
-   "runway": [1, 36]
+   "runway": [1, 36],
+   "readability": [1, 5]
   }
  },
  "intents": [
@@ -259,6 +266,11 @@
    "examples": [
     "{callsign} runway {runway} cleared to land"
    ],
+   "parse": {
+    "cues": ["cleared to land"],
+    "required": ["callsign", "runway"],
+    "optional": []
+   },
    "validation": {
     "status": "draft"
    }
@@ -290,6 +302,121 @@
    "examples": [
     "{callsign} contact tower {frequency}"
    ],
+   "validation": {
+    "status": "draft"
+   }
+  },
+  {
+   "id": "RADIO_CHECK_REPLY",
+   "examples": [
+    "{callsign} rajali tower read you {readability}"
+   ],
+   "parse": {
+    "cues": ["rajali tower read you", "read you"],
+    "required": ["callsign", "readability"],
+    "optional": []
+   },
+   "validation": {
+    "status": "draft"
+   }
+  },
+  {
+   "id": "TAXI_TO_HOLDING_POINT",
+   "examples": [
+    "{callsign} taxi to holding point runway {runway}"
+   ],
+   "parse": {
+    "cues": ["taxi to holding point"],
+    "required": ["callsign", "runway"],
+    "optional": []
+   },
+   "validation": {
+    "status": "draft"
+   }
+  },
+  {
+   "id": "HOLD_SHORT",
+   "examples": [
+    "{callsign} hold short runway {runway}"
+   ],
+   "parse": {
+    "cues": ["hold short"],
+    "required": ["callsign", "runway"],
+    "optional": []
+   },
+   "validation": {
+    "status": "draft"
+   }
+  },
+  {
+   "id": "LINE_UP_AND_WAIT",
+   "examples": [
+    "{callsign} runway {runway} line up and wait"
+   ],
+   "parse": {
+    "cues": ["line up and wait"],
+    "required": ["callsign", "runway"],
+    "optional": []
+   },
+   "validation": {
+    "status": "draft"
+   }
+  },
+  {
+   "id": "JOIN_CIRCUIT",
+   "examples": [
+    "{callsign} join the circuit runway {runway}"
+   ],
+   "parse": {
+    "cues": ["join the circuit"],
+    "required": ["callsign", "runway"],
+    "optional": []
+   },
+   "validation": {
+    "status": "draft"
+   }
+  },
+  {
+   "id": "REPORT_FINAL",
+   "examples": [
+    "{callsign} report final runway {runway}"
+   ],
+   "parse": {
+    "cues": ["report final"],
+    "required": ["callsign", "runway"],
+    "optional": []
+   },
+   "validation": {
+    "status": "draft"
+   }
+  },
+  {
+   "id": "CONTACT_FREQUENCY",
+   "examples": [
+    "{callsign} contact ground {frequency}"
+   ],
+   "parse": {
+    "cues": ["contact ground"],
+    "required": ["callsign", "frequency"],
+    "optional": []
+   },
+   "validation": {
+    "status": "draft"
+   }
+  },
+  {
+   "id": "READBACK_CHALLENGE",
+   "examples": [
+    "{callsign} read back runway",
+    "{callsign} confirm runway {runway}",
+    "{callsign} readback incomplete confirm cleared for takeoff runway {runway}",
+    "{callsign} readback incomplete confirm cleared to land runway {runway}"
+   ],
+   "parse": {
+    "cues": ["read back runway", "readback runway", "confirm", "readback incomplete confirm cleared for takeoff", "read back incomplete confirm cleared for takeoff", "readback incomplete confirm cleared for take off", "read back incomplete confirm cleared for take off", "readback incomplete confirm cleared to land", "read back incomplete confirm cleared to land"],
+    "required": ["callsign"],
+    "optional": ["runway"]
+   },
    "validation": {
     "status": "draft"
    }
