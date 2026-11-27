@@ -49,7 +49,7 @@ HistoryDetail detail(const HistoryRow& r) {
   a.cls = "RECOGNIZED";
   a.delay = "2.0 s";
   a.audio = true;
-  HistoryEntry b = said(Kind::Atc, "10:42:10", "eagle four two one line up runway two seven", "INCORRECT runway", 2);
+  HistoryEntry b = said(Kind::Atc, "10:42:10", "eagle four two one runway two seven line up and wait", "INCORRECT runway", 2);
   b.step = "Line up";
   b.heard = b.text;
   b.parsed = "RWY 27";
@@ -58,7 +58,7 @@ HistoryDetail detail(const HistoryRow& r) {
   b.delay = "2.1 s";
   b.error = true;
   b.audio = true;
-  HistoryEntry c = said(Kind::Atc, "10:42:31", "eagle four two one line up runway 0.9", "AMBIGUOUS", 2);
+  HistoryEntry c = said(Kind::Atc, "10:42:31", "eagle four two one runway 0.9 line up and wait", "AMBIGUOUS", 2);
   c.step = "Line up";
   c.heard = c.text;
   c.parsed = "RWY \"0.9\" ?";
