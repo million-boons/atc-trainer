@@ -22,7 +22,7 @@ By b2, 2026-11-27 (D-340 queue). **No code before approval.** Binding: D-101, D-
 
 ## 3. Use
 
-- Assessment (5e): `HistoryEntry.audio` true when the file exists **and** the consent is still yes (**EA-2**); play the whole transmission or the keyed part only, through the radio's local playback (refused while the radio is in use, D-21 of the Lab).
+- Assessment (5e): `HistoryEntry.audio` true when the file exists **and** the consent is still yes (**EA-2**); play the whole transmission or the keyed part only, through the radio's local playback (refused while the radio is in use, as the Lab's playback).
 - Deleting a result (instructor) deletes its audio, after the line in `deletions.log`.
 - No automatic deletion (D-102).
 
