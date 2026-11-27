@@ -102,6 +102,15 @@ bool isRunway(const std::string& s) {
   return n >= 1 && n <= 36 && (s.size() == 2 || s[2] == 'L' || s[2] == 'R' || s[2] == 'C');
 }
 
+// Three digits, a point, one to three digits: 121.7, 118.275.
+bool isFrequency(const std::string& s) {
+  const auto dot = s.find('.');
+  if (dot != 3 || s.size() < 5 || s.size() > 7) return false;
+  for (std::size_t i = 0; i < s.size(); ++i)
+    if (i != dot && (s[i] < '0' || s[i] > '9')) return false;
+  return true;
+}
+
 std::optional<json> read(const std::string& file, Report& r) {
   std::ifstream f(file, std::ios::binary);
   if (!f) {
@@ -148,7 +157,7 @@ void loadAirfield(const std::string& file, const std::string& id, Airfield& a, R
   const auto j = read(file, r);
   if (!j) return;
   const Node n{*j, file, "", r};
-  if (!n.object({"schemaVersion", "id", "validation", "runways", "taxiways", "aircraftTypes", "callsigns"}, {"comment"})) return;
+  if (!n.object({"schemaVersion", "id", "validation", "runways", "taxiways", "aircraftTypes", "callsigns"}, {"comment", "units"})) return;
   n.version();
   a.id = n.text("id");
   if (!a.id.empty() && a.id != id) n.child("id").fail("must be " + id + ", as the file name");
@@ -181,7 +190,7 @@ void loadAirfield(const std::string& file, const std::string& id, Airfield& a, R
   });
   seen.clear();
   std::set<std::string> types;
-  n.each("aircraftTypes", false, [&](const Node& x) {
+  n.each("aircraftTypes", true, [&](const Node& x) {  // empty: no generator may use the pool (checked by combinations)
     if (!x.object({"id"}, {"categories"})) return;
     Airfield::AircraftType t;
     t.id = x.text("id");
@@ -199,6 +208,23 @@ void loadAirfield(const std::string& file, const std::string& id, Airfield& a, R
     once(x, c.id);
     if (x.has("types")) c.types = known(x.child("types"), x.texts("types", true), types, "aircraft type");
     a.callsigns.push_back(std::move(c));
+  });
+  seen.clear();
+  n.each("units", true, [&](const Node& x) {  // D-430
+    if (!x.object({"id", "spoken", "frequencies"})) return;
+    Airfield::Unit u;
+    u.id = x.text("id");
+    u.spoken = x.text("spoken");
+    if (!u.id.empty() && !chars(u.id, kIdChars)) x.child("id").fail("capital letters, digits, - and _ only");
+    once(x, u.id);
+    std::set<std::string> freqs;
+    x.each("frequencies", true, [&](const Node& f) {
+      const std::string v = f.j.is_string() ? f.j.get<std::string>() : "";
+      if (!isFrequency(v)) return f.fail("must be a frequency such as 121.7");
+      if (!freqs.insert(v).second) return f.fail(v + " is listed twice");
+      u.frequencies.push_back(v);
+    });
+    a.units.push_back(std::move(u));
   });
 }
 
@@ -278,7 +304,7 @@ void loadReplies(const std::string& dir, const std::map<std::string, IntentInfo>
 struct Use { std::string reply; Node at; };
 
 void loadResponse(const Node& n, StepResponse& out, std::vector<Use>& uses) {
-  if (!n.object({"action"}, {"reply", "withField"})) return;
+  if (!n.object({"action"}, {"reply", "withField", "incompleteReply", "alternates"})) return;
   const std::string action = n.text("action");
   if (action == "say") {
     out.say = true;
@@ -295,8 +321,13 @@ void loadResponse(const Node& n, StepResponse& out, std::vector<Use>& uses) {
         uses.push_back({id, w.child(field)});
       }
     }
+    out.incompleteReply = n.text("incompleteReply");
+    if (!out.incompleteReply.empty()) uses.push_back({out.incompleteReply, n.child("incompleteReply")});
+    out.alternates = n.texts("alternates", false);
+    for (std::size_t i = 0; i < out.alternates.size(); ++i) uses.push_back({out.alternates[i], n.child("alternates").item(i)});
   } else if (action == "silent") {
-    if (n.has("withField")) n.child("withField").fail("silent has no reply");
+    for (const char* k : {"withField", "incompleteReply", "alternates"})
+      if (n.has(k)) n.child(k).fail("silent has no reply");
     if (n.has("reply")) n.child("reply").fail("silent has no reply");
   } else if (!action.empty()) {
     n.child("action").fail("must be say or silent");
@@ -310,7 +341,7 @@ std::optional<Outcome> outcomeAt(const Node& n, const std::string& name) {
 }
 
 void loadExpectation(const Node& n, const Exercise& e, const Scenario& s, Expectation& x) {
-  if (!n.object({"intent", "required", "mustMatch"}, {"optional"})) return;
+  if (!n.object({"intent", "required", "mustMatch"}, {"optional", "check"})) return;
   x.intent = n.text("intent");
   x.required = n.texts("required", false);
   x.optional = n.texts("optional", true);
@@ -332,22 +363,44 @@ void loadExpectation(const Node& n, const Exercise& e, const Scenario& s, Expect
       }
     }
   }
+  if (n.has("check")) {  // D-430: a value the trainee chooses, in a range
+    const Node c = n.child("check");
+    if (!c.j.is_object()) {
+      c.fail("must be an object");
+    } else {
+      for (const auto& [field, v] : c.j.items()) {
+        const Node f = c.child(field);
+        if (!f.object({"range"})) continue;
+        const json& r = f.child("range").j;
+        if (!r.is_array() || r.size() != 2 || !r[0].is_number_integer() || !r[1].is_number_integer() || r[0].get<int>() > r[1].get<int>()) {
+          f.child("range").fail("must be [from, to], whole numbers, from at most to");
+          continue;
+        }
+        if (x.mustMatch.count(field)) f.fail(field + " has a mustMatch already");
+        x.ranges[field] = {r[0].get<int>(), r[1].get<int>()};
+      }
+    }
+  }
   if (x.intent.empty()) return;
   const auto it = e.intents.find(x.intent);
   if (it == e.intents.end()) return n.child("intent").fail("unknown intent " + x.intent);
   for (const auto& f : x.required) {
     if (!it->second.slots.count(f)) n.child("required").fail(x.intent + " has no slot " + f);
     // Without it any value would be accepted, e.g. the wrong runway.
-    if (n.has("mustMatch") && n.child("mustMatch").j.is_object() && !n.child("mustMatch").j.contains(f))
-      n.fail("required field " + f + " needs a mustMatch");
+    if (n.has("mustMatch") && n.child("mustMatch").j.is_object() && !n.child("mustMatch").j.contains(f) && !x.ranges.count(f))
+      n.fail("required field " + f + " needs a mustMatch or a check");
   }
   for (const auto& f : x.optional) {
     if (!it->second.optional.count(f)) n.child("optional").fail(x.intent + " has no optional field " + f);
     if (std::find(x.required.begin(), x.required.end(), f) != x.required.end()) n.child("optional").fail(f + " is already required");
   }
+  // An optional field may have one too (D-430): then it is checked only when it is given.
   for (const auto& [f, p] : x.mustMatch)
-    if (std::find(x.required.begin(), x.required.end(), f) == x.required.end())
-      n.child("mustMatch").fail(f + " is not a required field");
+    if (std::find(x.required.begin(), x.required.end(), f) == x.required.end() &&
+        std::find(x.optional.begin(), x.optional.end(), f) == x.optional.end())
+      n.child("mustMatch").fail(f + " is neither a required nor an optional field");
+  for (const auto& [f, r] : x.ranges)
+    if (std::find(x.required.begin(), x.required.end(), f) == x.required.end()) n.child("check").fail(f + " is not a required field");
   if (n.has("required") && std::find(x.required.begin(), x.required.end(), "callsign") == x.required.end())
     n.child("required").fail("must contain callsign");
 }
@@ -427,9 +480,12 @@ void loadStep(const Node& n, const Exercise& e, const Scenario& s, const std::se
   for (const auto& f : optional)
     if (correct == st.responses.end() || !correct->second.withField.count(f))
       n.child("responses").fail("optional " + f + " needs CORRECT/withField/" + f);
-  for (const auto& [o, r] : st.responses)
+  for (const auto& [o, r] : st.responses) {
     for (const auto& [f, id] : r.withField)
       if (o != Outcome::Correct || !optional.count(f)) n.child("responses").fail("withField " + f + " is only for CORRECT and an optional field");
+    if (o != Outcome::Correct && (!r.incompleteReply.empty() || !r.alternates.empty()))
+      n.child("responses").fail("incompleteReply and alternates are only for CORRECT");
+  }
   if (!ons.count(Outcome::Correct)) n.fail("no transition on CORRECT");
   for (const auto& [o, name] : kOutcomeNames) {
     // No safety rules yet, so UNSAFE cannot occur; TIMEOUT only with a timeout.
@@ -446,10 +502,14 @@ void loadGenerators(const Node& n, Scenario& s) {
   for (const auto& [name, v] : g.j.items()) {
     const Node x = g.child(name);
     if (!chars(name, kSlotChars)) x.fail("parameter names use letters only");
-    if (!x.object({"pool"}, {"mustServe"})) continue;
-    ParamGenerator pg{x.text("pool"), x.text("mustServe")};
-    if (pg.pool != "runways" && pg.pool != "taxiways" && pg.pool != "aircraftTypes" && pg.pool != "callsigns" && !pg.pool.empty())
-      x.child("pool").fail("must be runways, taxiways, aircraftTypes or callsigns");
+    if (!x.object({"pool"}, {"mustServe", "unit"})) continue;
+    ParamGenerator pg{x.text("pool"), x.text("mustServe"), x.text("unit")};
+    if (pg.pool != "runways" && pg.pool != "taxiways" && pg.pool != "aircraftTypes" && pg.pool != "callsigns" &&
+        pg.pool != "frequencies" && !pg.pool.empty())
+      x.child("pool").fail("must be runways, taxiways, aircraftTypes, callsigns or frequencies");
+    if (pg.pool == "frequencies" && pg.unit.empty()) x.fail("frequencies needs a unit");
+    if (pg.pool == "frequencies" && !pg.mustServe.empty()) x.child("mustServe").fail("a frequency serves nothing; it belongs to its unit");
+    if (pg.pool != "frequencies" && x.has("unit")) x.child("unit").fail("only for pool frequencies");
     s.generators[name] = pg;
   }
   for (const auto& [name, pg] : s.generators) {
@@ -489,7 +549,7 @@ void loadScenario(const Node& n, const ScenarioSources& src, Exercise& e, std::m
   Scenario& s = e.scenario;
   if (!n.object({"schemaVersion", "id", "name", "category", "validation", "airfield", "initialState", "generators", "initialStep",
                  "steps", "pttRules", "completion"},
-                {"objectives", "difficulty", "unexpectedEvents", "comment"}))
+                {"objectives", "difficulty", "unexpectedEvents", "comment", "readbackCheck"}))
     return;
   n.version();
   s.id = n.text("id");
@@ -522,6 +582,18 @@ void loadScenario(const Node& n, const ScenarioSources& src, Exercise& e, std::m
       loadAirfield((fs::path(src.airfieldDir) / (s.airfield + ".json")).string(), s.airfield, e.airfield, r);
   }
   loadGenerators(n, s);
+  for (const auto& [name, g] : s.generators)  // D-430
+    if (g.pool == "frequencies" && !g.unit.empty() &&
+        std::none_of(e.airfield.units.begin(), e.airfield.units.end(), [&](const Airfield::Unit& u) { return u.id == g.unit; }))
+      n.child("generators").child(name).child("unit").fail("no unit " + g.unit + " in airfield " + s.airfield);
+  if (n.has("readbackCheck") && n.child("readbackCheck").object({"incompleteRate", "challenge"})) {
+    const Node rc = n.child("readbackCheck");
+    ReadbackCheck c;
+    c.incompleteRate = rc.number("incompleteRate", 0, 0, false);
+    if (c.incompleteRate > 1) rc.child("incompleteRate").fail("must be from 0 to 1");
+    loadExpectation(rc.child("challenge"), e, s, c.challenge);
+    s.readbackCheck = std::move(c);
+  }
 
   std::vector<std::string> finals;
   if (n.has("completion") && n.child("completion").object({"finalSteps"}, {"maxDurationSeconds"})) {
@@ -575,6 +647,23 @@ void loadScenario(const Node& n, const ScenarioSources& src, Exercise& e, std::m
     const Node at = n.child("steps").item(i).child("responses").child("CORRECT");
     if (!c->second.reply.empty()) said.emplace_back(c->second.reply, at.child("reply"));
     for (const auto& [f, id] : c->second.withField) said.emplace_back(id, at.child("withField").child(f));
+    if (!c->second.incompleteReply.empty()) said.emplace_back(c->second.incompleteReply, at.child("incompleteReply"));
+    for (std::size_t k = 0; k < c->second.alternates.size(); ++k) said.emplace_back(c->second.alternates[k], at.child("alternates").item(k));
+    // D-430: an incomplete readback must be challenged, so it needs the check, a complete readback to
+    // give when challenged, and a next step in which the trainee can still speak.
+    if (const std::string& inc = c->second.incompleteReply; !inc.empty()) {
+      const auto full = replies.find(c->second.reply), part = replies.find(inc);
+      if (!s.readbackCheck) at.child("incompleteReply").fail("needs readbackCheck in the scenario");
+      if (full != replies.end() && !full->second.completeReadback)
+        at.child("reply").fail(c->second.reply + " leaves a value out; with an incompleteReply the reply must be complete");
+      if (part != replies.end() && part->second.completeReadback)
+        at.child("incompleteReply").fail(inc + " says every required value: it is not incomplete");
+      if (!c->second.withField.empty() || !c->second.alternates.empty())
+        at.fail("incompleteReply goes with neither withField nor alternates");
+      for (const auto& t : st.transitions)
+        if (t.on == Outcome::Correct && s.step(t.to) && s.step(t.to)->final)
+          at.child("incompleteReply").fail("the next step is final: the exercise would end before a challenge");
+    }
     for (const auto& [id, where] : said) {
       const auto it = replies.find(id);
       if (it == replies.end()) continue;  // reported above

@@ -27,6 +27,15 @@ const char* name(out::EndReason r) {
   return r == out::EndReason::Completed ? "completed" : r == out::EndReason::InstructorStop ? "instructor_stop"
          : r == out::EndReason::ProgramClosed ? "program_closed" : "time_limit";
 }
+const char* name(out::ReadbackResult r) {
+  switch (r) {
+    case out::ReadbackResult::Caught: return "caught";
+    case out::ReadbackResult::Missed: return "missed";
+    case out::ReadbackResult::Unnecessary: return "unnecessary";
+    case out::ReadbackResult::Open: return "open";
+  }
+  return "";
+}
 std::string str(std::string_view s) { return std::string(s); }
 
 json j(const in::Started&) { return json::object(); }
@@ -82,6 +91,9 @@ json j(const out::PilotRequested& x) {
           {"owed", u.owed}};
 }
 json j(const out::AtcBeforePilot& x) { return json{{"tx", x.tx}}; }
+json j(const out::ReadbackCheck& x) {
+  return {{"step", x.step}, {"tx", x.tx}, {"utterance", x.utterance}, {"result", name(x.result)}};
+}
 json j(const out::NoReply& x) { return json{{"tx", x.tx}}; }
 json j(const out::TimerSet& x) { return {{"timer", name(x.timer)}, {"generation", x.generation}, {"delay", x.delay}}; }
 json j(const out::TimerCancelled& x) { return json{{"timer", name(x.timer)}}; }

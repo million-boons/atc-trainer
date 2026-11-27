@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "comment": "PLACEHOLDER - validate against approved SOP. Lists approved by the user on 2026-11-27 (D-430): callsign Falcon 12, runway 05, ground 121.7. Tower frequency not given yet.",
+  "id": "RAJALI",
+  "validation": {
+    "status": "placeholder"
+  },
+  "runways": ["05"],
+  "taxiways": [],
+  "aircraftTypes": [],
+  "callsigns": [
+    { "id": "FALCON-12", "spoken": "falcon one two" }
+  ],
+  "units": [
+    { "id": "TOWER", "spoken": "rajali tower", "frequencies": [] },
+    { "id": "GROUND", "spoken": "rajali ground", "frequencies": ["121.7"] }
+  ]
+}

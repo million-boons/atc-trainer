@@ -153,6 +153,7 @@ TEST(ClipList, ValuesAreSaidFromTheData) {
   EXPECT_EQ(spokenValue(a, f, "runways", "27L", error), "two seven left");
   EXPECT_EQ(spokenValue(a, f, "taxiways", "A3", error), "alpha three");
   EXPECT_EQ(spokenValue(a, f, "taxiways", "L", error), "lima");
+  EXPECT_EQ(spokenValue(a, f, "frequencies", "121.7", error), "one two one decimal seven");  // D-430
   EXPECT_EQ(spokenValue(a, f, "callsigns", "EAGLE-421", error), "eagle four two one");
   EXPECT_TRUE(error.empty());
   EXPECT_EQ(spokenValue(a, f, "callsigns", "HAWK-999", error), "");

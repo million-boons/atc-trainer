@@ -69,6 +69,10 @@ std::string spokenValue(const Airfield& a, const SpokenForms& f, const std::stri
   for (std::size_t i = 0; i < value.size(); ++i) {
     const char c = value[i];
     if (c == '-' || c == ' ') continue;
+    if (c == '.' && pool == "frequencies") {  // D-430: 121.7 is "one two one decimal seven"
+      r += (r.empty() ? "" : " ") + std::string("decimal");
+      continue;
+    }
     const std::string key(1, static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
     const bool side = pool == "runways" && i > 0 && i + 1 == value.size() && std::isalpha(static_cast<unsigned char>(c));
     const auto& forms = side ? f.sides : std::isdigit(static_cast<unsigned char>(c)) ? f.digits : f.letters;

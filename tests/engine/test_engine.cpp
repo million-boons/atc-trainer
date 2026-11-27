@@ -878,3 +878,190 @@ TEST_F(Engine, ClosingTheProgramEndsTheExercise) {
   EXPECT_EQ(e.status(), SequenceEngine::Status::Ended);
   EXPECT_TRUE(e.handle(ms(6000), in::ProgramClosed{}).empty());
 }
+
+// D-430: incomplete readbacks, challenges, variants and values in a range, on the departure with the
+// line-up readback made incomplete. Test data only: the circuit scenario has its own wording.
+namespace {
+struct Readback : Engine {
+  void with(double rate, bool alternate = false) {
+    auto e = std::make_shared<Exercise>(*departure());
+    PilotReply part;
+    part.id = "TEST_LINING_UP";
+    part.text = "lining up, {callsign}";
+    part.slots = {"callsign"};
+    part.readbackOf = "LINE_UP";
+    e->replies[part.id] = part;
+    StepResponse& c = e->scenario.steps[1].responses.at(Outcome::Correct);
+    if (alternate)
+      c.alternates = {part.id};
+    else
+      c.incompleteReply = part.id;
+    ReadbackCheck rc;
+    rc.incompleteRate = rate;
+    rc.challenge.intent = "TEST_CHALLENGE";
+    rc.challenge.required = {"callsign"};
+    rc.challenge.optional = {"runway"};
+    rc.challenge.mustMatch = {{"callsign", "callsign"}, {"runway", "runway"}};
+    e->scenario.readbackCheck = rc;
+    ex = e;
+  }
+  ParsedInstruction challenge(const std::string& runway = {}) const {
+    std::map<std::string, std::string> f{{"callsign", param("callsign")}};
+    if (!runway.empty()) f["runway"] = runway;
+    return Simulator::instruction("TEST_CHALLENGE", f);
+  }
+  void toLineUp(std::uint64_t seed = 7) {
+    make(seed);
+    sim->start();
+    sim->wait(ms(6000));
+    sim->transmit(taxi());
+    sim->wait(ms(8000));
+    sim->transmit(lineUp());
+    sim->waitForPilot();
+  }
+  std::vector<out::ReadbackResult> checks() const {
+    std::vector<out::ReadbackResult> v;
+    for (const auto& c : outputs<out::ReadbackCheck>()) v.push_back(c.result);
+    return v;
+  }
+  StepResult lineUpResult() const {
+    for (const auto& s : buildResult(ex->scenario, log.events).steps)
+      if (s.id == "LINE_UP") return s;
+    return {};
+  }
+};
+}  // namespace
+
+TEST_F(Readback, ChallengedInTheNextTransmissionGetsTheFullReadback) {
+  with(1);
+  toLineUp();
+  EXPECT_EQ(lastPilot(), "lining up, " + param("callsign"));
+  EXPECT_EQ(step(), "TAKEOFF");
+  const std::size_t judged = outputs<out::Judged>().size();
+  sim->transmit(challenge());
+  EXPECT_EQ(checks(), std::vector<out::ReadbackResult>{out::ReadbackResult::Caught});
+  EXPECT_EQ(lastPilot(), "line up runway " + param("runway") + ", " + param("callsign"));
+  EXPECT_EQ(outputs<out::Judged>().size(), judged);  // no attempt of the step
+  EXPECT_EQ(step(), "TAKEOFF");
+  sim->transmit(takeoff());
+  sim->wait(ms(5000));
+  EXPECT_EQ(sim->reason(), out::EndReason::Completed);
+  EXPECT_EQ(lineUpResult().readbackCaught, 1);
+  EXPECT_EQ(lineUpResult().readbackMissed, 0);
+}
+
+TEST_F(Readback, NextInstructionWithoutAChallengeIsMissedAndStillJudged) {
+  with(1);
+  toLineUp();
+  sim->transmit(takeoff());
+  EXPECT_EQ(checks(), std::vector<out::ReadbackResult>{out::ReadbackResult::Missed});
+  EXPECT_EQ(lastJudged().outcome, Outcome::Correct);
+  sim->wait(ms(5000));
+  EXPECT_EQ(sim->reason(), out::EndReason::Completed);
+  EXPECT_EQ(lineUpResult().readbackMissed, 1);
+}
+
+TEST_F(Readback, SayAgainDoesNotUseUpTheChance) {
+  with(1);
+  toLineUp();
+  ParsedInstruction unclear;
+  unclear.cls = RecognitionClass::Unrecognized;
+  sim->transmit(unclear);
+  EXPECT_TRUE(checks().empty());
+  sim->transmit(challenge(param("runway")));
+  EXPECT_EQ(checks(), std::vector<out::ReadbackResult>{out::ReadbackResult::Caught});
+}
+
+TEST_F(Readback, AChallengeWithAWrongValueIsAWrongValueAndKeepsItDue) {
+  with(1);
+  toLineUp();
+  sim->transmit(challenge(otherRunway()));
+  EXPECT_EQ(lastJudged().outcome, Outcome::Incorrect);
+  EXPECT_FALSE(lastJudged().advanced);
+  EXPECT_EQ(step(), "TAKEOFF");
+  EXPECT_TRUE(checks().empty());
+  sim->transmit(challenge());
+  EXPECT_EQ(checks(), std::vector<out::ReadbackResult>{out::ReadbackResult::Caught});
+}
+
+TEST_F(Readback, AChallengeAfterACompleteReadbackIsUnnecessary) {
+  with(0);
+  toLineUp();
+  EXPECT_EQ(lastPilot(), "line up runway " + param("runway") + ", " + param("callsign"));
+  sim->transmit(challenge());
+  EXPECT_EQ(checks(), std::vector<out::ReadbackResult>{out::ReadbackResult::Unnecessary});
+  EXPECT_EQ(lastPilot(), "line up runway " + param("runway") + ", " + param("callsign"));
+  EXPECT_EQ(lineUpResult().unnecessaryChallenges, 1);
+  EXPECT_EQ(lineUpResult().readbackMissed, 0);
+}
+
+TEST_F(Readback, StoppedWhileDueIsOpenNotMissed) {
+  with(1);
+  toLineUp();
+  sim->stop();
+  EXPECT_EQ(checks(), std::vector<out::ReadbackResult>{out::ReadbackResult::Open});
+  EXPECT_EQ(lineUpResult().readbackOpen, 1);
+  EXPECT_EQ(lineUpResult().readbackMissed, 0);
+}
+
+// The rate is a share over seeds, and the same seed always gives the same choice.
+TEST_F(Readback, IncompleteReadbacksComeAtTheirRate) {
+  with(0.25);
+  int incomplete = 0;
+  const int n = 400;
+  for (int seed = 1; seed <= n; ++seed) {
+    toLineUp(static_cast<std::uint64_t>(seed));
+    incomplete += lastPilot().starts_with("lining up");
+  }
+  EXPECT_GT(incomplete, n * 12 / 100);  // 0.25 within about 6 standard deviations
+  EXPECT_LT(incomplete, n * 38 / 100);
+  toLineUp(3);
+  const std::string first = lastPilot();
+  toLineUp(3);
+  EXPECT_EQ(lastPilot(), first);
+}
+
+TEST_F(Readback, AlternatesAreBothSaidAndNeedNoChallenge) {
+  with(0, true);
+  std::set<std::string> said;
+  for (int seed = 1; seed <= 40; ++seed) {
+    toLineUp(static_cast<std::uint64_t>(seed));
+    said.insert(lastPilot().substr(0, 9));
+    sim->transmit(takeoff());
+    EXPECT_TRUE(checks().empty());
+  }
+  EXPECT_EQ(said, (std::set<std::string>{"lining up", "line up r"}));
+}
+
+TEST_F(Readback, AValueInARangeIsChosenByTheTrainee) {
+  auto e = std::make_shared<Exercise>(*departure());
+  Expectation& x = e->scenario.steps[1].expects[0];
+  x.required.push_back("readability");
+  x.ranges["readability"] = {1, 5};
+  ex = e;
+  const auto at = [&](const std::string& v) {
+    make();
+    sim->start();
+    sim->wait(ms(6000));
+    sim->transmit(taxi());
+    sim->wait(ms(8000));
+    ParsedInstruction p = lineUp();
+    if (!v.empty()) p.fields["readability"] = {v, v, false, -1};
+    sim->transmit(p);
+    return lastJudged().outcome;
+  };
+  EXPECT_EQ(at("1"), Outcome::Correct);
+  EXPECT_EQ(at("5"), Outcome::Correct);
+  EXPECT_EQ(at("0"), Outcome::Incorrect);
+  EXPECT_EQ(at("6"), Outcome::Incorrect);
+  EXPECT_EQ(at("five"), Outcome::Incorrect);
+  EXPECT_EQ(at(""), Outcome::MissingInfo);
+}
+
+TEST(EventJson, ReadbackCheckIsWritten) {
+  const EngineEvent e{4, 9, EngineOutput(out::ReadbackCheck{"LINE_UP", 3, 2, out::ReadbackResult::Missed})};
+  const json j = json::parse(eventJson(e));
+  EXPECT_EQ(j["event"], "readback_check");
+  EXPECT_EQ(j["result"], "missed");
+  EXPECT_EQ(j["step"], "LINE_UP");
+}

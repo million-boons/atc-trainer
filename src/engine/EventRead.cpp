@@ -151,6 +151,13 @@ bool event(const json& j, EngineEvent& e) {
     u.owed = flag(j, "owed");
     e.body = EngineOutput(out::PilotRequested{u});
   } else if (n == "atc_before_pilot") e.body = EngineOutput(out::AtcBeforePilot{num<std::uint64_t>(j, "tx")});
+  else if (n == "readback_check") {  // D-430
+    const std::string r = text(j, "result");
+    if (r != "caught" && r != "missed" && r != "unnecessary" && r != "open") return false;
+    e.body = EngineOutput(out::ReadbackCheck{text(j, "step"), num<std::uint64_t>(j, "tx"), num<std::uint64_t>(j, "utterance"),
+                                             r == "caught" ? out::ReadbackResult::Caught : r == "missed" ? out::ReadbackResult::Missed
+                                             : r == "unnecessary" ? out::ReadbackResult::Unnecessary : out::ReadbackResult::Open});
+  }
   else if (n == "no_reply") e.body = EngineOutput(out::NoReply{num<std::uint64_t>(j, "tx")});
   else if (n == "timer_set") e.body = EngineOutput(out::TimerSet{timer(text(j, "timer")), num<std::uint64_t>(j, "generation"), num<Ns>(j, "delay")});
   else if (n == "timer_cancelled") e.body = EngineOutput(out::TimerCancelled{timer(text(j, "timer"))});

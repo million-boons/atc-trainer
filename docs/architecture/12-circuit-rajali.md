@@ -1,6 +1,6 @@
 # 12. Scenario "Circuit – Rajali" (design, not built)
 
-Status: **DRAFT for the user, 2026-11-27.** Source: the user's script of 2026-11-27 and answers (all wording **PLACEHOLDER – validate against approved SOP**; no SOP reference yet). Owner: engine, with parts for stt and runtime (§7). Questions C-1 to C-9 are in §8, each with a recommendation.
+Status: **2026-11-27: C-2 answered and the engine part built (D-431, not compiled yet); C-1, C-3, C-4, C-7, C-9 open.** First version: DRAFT for the user, 2026-11-27. Source: the user's script of 2026-11-27 and answers (all wording **PLACEHOLDER – validate against approved SOP**; no SOP reference yet). Owner: engine, with parts for stt and runtime (§7). Questions C-1 to C-9 are in §8, each with a recommendation.
 
 ## 1. What the user decided
 
@@ -59,7 +59,7 @@ Five short variants (steps 1, 2, 3, 6 and 9) also leave a value out, but the use
 | ID | Change | Size |
 |---|---|---|
 | E-1 | **Reply variants.** The CORRECT response gets `incompleteReply` beside `reply`. The scenario's `incompleteReadbackRate` (0 to 1) decides, by the seeded RNG, which one the pilot says; the Planner can set the rate per plan, like the reply delay. Same seed, same choice. Plain alternates, if C-1 wants them: `alternates` chosen equally. | 2–3 h |
-| E-2 | **Readback-incomplete check.** When the pilot says an incomplete readback (D-429 works out "incomplete" from the text), a challenge is due. The next ATC transmission is judged first against it. A challenge (intent C-2) → the pilot says the full readback; recorded as **caught**. Any other instruction → **missed challenge** (trainee error on the step it belongs to), and that instruction is then judged as usual. An exercise that ends while one is due also counts it as missed. Log: new output `readback_check` {step, reply, result}. Result: per step `readbackCheck` (none, caught, missed) and a count; 04's readback row (H-4, hidden) is shown again for this. | 4–6 h |
+| E-2 | **Readback-incomplete check (built, D-431).** When the pilot says an incomplete readback, a challenge is due. A challenge (scenario `readbackCheck.challenge`, judged like a step that expects it, whatever step is current) → the pilot says the full readback: **caught**. Any other instruction that was understood → **missed** ("incomplete readback not challenged", trainee error on the step it belongs to), and that instruction is then judged as usual; unclear speech ("say again") does not use the chance up. A challenge after a complete readback → **unnecessary** (warning only); the pilot says the latest readback again. An exercise stopped while one is due → **open** (not counted). A failed challenge (wrong callsign or value) is judged in the current step but takes none of its branches. Log: output `readback_check` {step, tx, utterance, result}. Result: per step `readbackCaught`, `readbackMissed`, `unnecessaryChallenges`, `readbackOpen`. The loader refuses an incomplete readback whose next step is final, since the exercise would end first. | 4–6 h |
 | E-3 | **A value in a range** instead of a generated one: `check: {readability: {range: [1, 5]}}` beside `mustMatch`. A whole number outside it, or not a number → INCORRECT. | 1–2 h |
 | E-4 | **Units and frequencies.** `units` in the airfield, generator pool `frequencies` with `unit: GROUND`, so `mustMatch: {frequency: "{groundFrequency}"}` works as for runways. Frequency text "121.7", one decimal, checked by the loader. | 2 h |
 | E-5 | `LINE_UP` → `LINE_UP_AND_WAIT` in DEPARTURE-01 too (as "replaces"; C-6): intent, example, the readback "Lining up runway {runway} and waiting, {callsign}" from this script, and its clips. | 1 h |
@@ -86,8 +86,8 @@ New clips: about 16 fixed phrases × their positions, FALCON-12 @initial and @fi
 
 | # | Question | Recommended |
 |---|---|---|
-| C-1 | The second variants of steps 1, 2, 3, 6 and 9 also leave a value out ("Loud and clear", "taxiing to the holding point", "holding short of the runway", "as instructed", "Over to ground, good day"). Incomplete readbacks to be challenged too, or accepted alternates? | Hold short (3) and the frequency (9) are incomplete like the three you named; 1, 2 and 6 are accepted alternates chosen 50/50 |
-| C-2 | What does the trainee say to challenge an incomplete readback? It is a new ATC intent, and its wording is yours. | You give the line; until then E-2 cannot be finished |
+| C-1 | The second variants of steps 1, 2, 3, 6 and 9 also leave a value out ("Loud and clear", "taxiing to the holding point", "holding short of the runway", "as instructed", "Over to ground, good day"). Incomplete readbacks to be challenged too, or accepted alternates? | Hold short (3) incomplete like the three you named; 1, 2, 6 and 9 accepted alternates chosen 50/50 (9 cannot be challenged: the exercise ends after it) |
+| C-2 | **Answered (D-431):** "{callsign}, read back runway"; "{callsign}, confirm runway {runway}"; "{callsign}, readback incomplete, confirm cleared for takeoff / cleared to land runway {runway}". The pilot answers with the full readback. | – |
 | C-3 | "Rajali Tower" in the ATC lines: must the trainee say it? | Accepted if said, not required (O-5: Whisper mishears it). Static text in the pilot's lines. |
 | C-4 | "reading you five by five": always five, whatever ATC said? | Yes, the pilot's own reading, fixed text |
 | C-5 | More values for the lists: callsigns besides Falcon 12, the tower frequency, other runways? | Only Falcon 12, 05 and 121.7 until you give more. With one value each, every run has the same values. |
