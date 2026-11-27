@@ -43,6 +43,8 @@ std::vector<std::string> poolValues(const Airfield& a, const std::string& pool) 
     for (const auto& x : a.aircraftTypes) v.push_back(x.id);
   if (pool == "callsigns")
     for (const auto& x : a.callsigns) v.push_back(x.id);
+  if (pool == "frequencies")  // every unit's: a few clips more than one scenario needs
+    for (const auto& u : a.units) v.insert(v.end(), u.frequencies.begin(), u.frequencies.end());
   return v;
 }
 
@@ -123,6 +125,7 @@ std::string valueClipId(const std::string& pool, const std::string& value, ClipP
   if (pool == "taxiways") name = "TAXIWAY";
   if (pool == "aircraftTypes") name = "AIRCRAFT_TYPE";
   if (pool == "callsigns") name = "CALLSIGN";
+  if (pool == "frequencies") name = "FREQUENCY";
   return name + "_" + slug(value) + at(p);
 }
 

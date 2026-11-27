@@ -213,6 +213,7 @@
  "intents": [
   {
    "id": "TAXI_INSTRUCTION",
+   "shortName": "Taxi",
    "examples": [
     "{callsign} taxi via {taxiway} runway {runway}",
     "{callsign} taxi via {taxiway} hold short runway {runway}"
@@ -228,6 +229,7 @@
   },
   {
    "id": "LINE_UP",
+   "shortName": "Line up",
    "examples": [
     "{callsign} line up runway {runway}"
    ],
@@ -242,6 +244,7 @@
   },
   {
    "id": "TAKEOFF_CLEARANCE",
+   "shortName": "Takeoff",
    "examples": [
     "{callsign} runway {runway} cleared for takeoff"
    ],

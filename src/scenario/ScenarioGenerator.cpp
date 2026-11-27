@@ -26,6 +26,9 @@ std::vector<std::string> candidates(const Scenario& s, const Airfield& a, const 
   } else if (g.pool == "callsigns") {
     for (const auto& c : a.callsigns)
       if (served(c.types, true)) out.push_back(c.id);
+  } else if (g.pool == "frequencies") {  // D-430: those of its unit
+    for (const auto& u : a.units)
+      if (u.id == g.unit) out = u.frequencies;
   }
   return out;
 }

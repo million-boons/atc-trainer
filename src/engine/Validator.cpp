@@ -97,10 +97,19 @@ Verdict validate(const ScenarioStep& step, const ScenarioContext& ctx, const Par
       unlisted.push_back(name);
   if (!unlisted.empty()) return {Outcome::Unexpected, unlisted, false};
 
-  // 7. Values.
+  // 7. Values. An optional field is checked when it is given; a range is a whole number in it (D-430).
   std::vector<std::string> wrong;
-  for (const auto& [field, param] : x->mustMatch)
-    if (valueOf(p, field) != expected(ctx, *x, field)) wrong.push_back(field);
+  for (const auto& [field, param] : x->mustMatch) {
+    const std::string v = valueOf(p, field);
+    const bool optional = std::find(x->optional.begin(), x->optional.end(), field) != x->optional.end();
+    if (v.empty() && optional) continue;
+    if (v != expected(ctx, *x, field)) wrong.push_back(field);
+  }
+  for (const auto& [field, range] : x->ranges) {
+    const std::string v = valueOf(p, field);
+    const bool whole = !v.empty() && v.size() <= 6 && v.find_first_not_of("0123456789") == std::string::npos;
+    if (!whole || std::stoi(v) < range.first || std::stoi(v) > range.second) wrong.push_back(field);
+  }
   if (!wrong.empty()) return {Outcome::Incorrect, wrong, false};
   return {Outcome::Correct, {}, false};
 }

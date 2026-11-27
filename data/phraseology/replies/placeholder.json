@@ -21,6 +21,7 @@
     },
     {
       "id": "READBACK_TAXI",
+      "readbackOf": "TAXI_INSTRUCTION",
       "text": "taxi via {taxiway} runway {runway}, {callsign}",
       "validation": {
         "status": "draft"
@@ -28,6 +29,7 @@
     },
     {
       "id": "READBACK_TAXI_HOLD_SHORT",
+      "readbackOf": "TAXI_INSTRUCTION",
       "text": "taxi via {taxiway} hold short runway {runway}, {callsign}",
       "validation": {
         "status": "draft"
@@ -35,6 +37,7 @@
     },
     {
       "id": "READBACK_LINE_UP",
+      "readbackOf": "LINE_UP",
       "text": "line up runway {runway}, {callsign}",
       "validation": {
         "status": "draft"
@@ -42,6 +45,7 @@
     },
     {
       "id": "READBACK_TAKEOFF",
+      "readbackOf": "TAKEOFF_CLEARANCE",
       "text": "runway {runway} cleared for takeoff, {callsign}",
       "validation": {
         "status": "draft"
