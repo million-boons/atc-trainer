@@ -115,6 +115,8 @@ class ExerciseRuntime {
     std::mt19937_64 takes;
     std::map<in::Timer, Due> timers;
     std::map<std::uint64_t, std::vector<std::int16_t>> sounds;  // by utterance, until it was heard
+    std::map<std::uint64_t, Ns> released;          // by transmission (D-342)
+    std::map<std::uint64_t, std::uint64_t> answers;  // utterance -> the transmission it answers
     bool fallback = false;
     bool lostReported = false;
     std::string modelId, modelConfig;                           // locked

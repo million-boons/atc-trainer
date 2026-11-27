@@ -118,7 +118,7 @@ bool event(const json& j, EngineEvent& e) {
     x.releaseToText = num<Ns>(j, "releaseToText");
     x.sttFault = text(j, "sttFault");
     e.body = EngineInput(x);
-  } else if (n == "pilot_started") e.body = EngineInput(in::PilotStarted{num<std::uint64_t>(j, "utterance")});
+  } else if (n == "pilot_started") e.body = EngineInput(in::PilotStarted{num<std::uint64_t>(j, "utterance"), num<Ns>(j, "sinceRelease")});
   else if (n == "pilot_ended") e.body = EngineInput(in::PilotEnded{num<std::uint64_t>(j, "utterance"), pilotEnd(text(j, "end"))});
   else if (n == "timer_fired") e.body = EngineInput(in::TimerFired{timer(text(j, "timer")), num<std::uint64_t>(j, "generation")});
   else if (n == "ptt_presence") e.body = EngineInput(in::PttPresence{flag(j, "present")});

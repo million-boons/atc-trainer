@@ -162,6 +162,10 @@ void ExerciseRuntime::say(const PilotUtterance& u) {
   Reply r;
   r.text = u.text;
   r.delay = u.delay;
+  // D-342: the configured delay is the whole response time from the release; recognition time is not added on top.
+  if (u.tx)
+    if (const auto it = run_->released.find(u.tx); it != run_->released.end()) r.delay = std::max<Ns>(0, u.delay - (core_->now() - it->second));
+  if (u.tx) run_->answers[u.id] = u.tx;
   r.expected = speechLength(pcm.size());
   r.id = u.id;
   r.first = u.first;
@@ -291,6 +295,7 @@ RadioCore::Events ExerciseRuntime::wrap(RadioCore::Events lab) {
     in::TxClosed c;
     c.tx = t.id;
     c.release = t.release;
+    run_->released[t.id] = t.release;
     c.end = t.end;
     c.report = checkUtterance(t.audio, t.preRoll, {.rate = core_->rate()});
     apply(now, c);
@@ -312,7 +317,12 @@ RadioCore::Events ExerciseRuntime::wrap(RadioCore::Events lab) {
     return l->pilotSound ? l->pilotSound(r) : PilotSound{};
   };
   e.pilotStarted = [this, l](const Reply& r) {
-    if (running()) apply(core_->now(), in::PilotStarted{r.id});
+    if (running()) {
+      Ns since = 0;
+      if (const auto a = run_->answers.find(r.id); a != run_->answers.end())
+        if (const auto rel = run_->released.find(a->second); rel != run_->released.end()) since = core_->now() - rel->second;
+      apply(core_->now(), in::PilotStarted{r.id, since});
+    }
     if (l->pilotStarted) l->pilotStarted(r);
   };
   e.pilotEnded = [this, l](const Reply& r, bool heardToEnd) {

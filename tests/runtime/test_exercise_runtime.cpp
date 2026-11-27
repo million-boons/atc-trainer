@@ -679,6 +679,34 @@ TEST(ExerciseRuntime, TheAudioOfEachTransmissionIsHandedOver) {
   EXPECT_GT(r.audio[0].second, 16000u);  // pre-roll, 1.5 s, tail
 }
 
+// D-342: the reply delay is the whole response time from the release; a slow recogniser does not add to it.
+TEST(ExerciseRuntime, RecognitionTimeIsNotAddedToTheReplyDelay) {
+  Rig r;
+  ASSERT_EQ(r.start(), "");
+  r.hearPilot();
+  const auto pilotStarts = [&] { return r.logged<in::PilotStarted>(); };
+  // A slow result: 2.5 s after the release, more than any configured delay (0.5 to 1.5 s).
+  const auto tx = r.transmit();  // includes 0.4 s after the release
+  r.pass(2100);
+  const std::size_t before = pilotStarts().size();
+  r.text(tx, r.taxi());
+  r.pass(60);
+  ASSERT_EQ(pilotStarts().size(), before + 1);  // at once, no further delay
+  const Ns since = pilotStarts().back().sinceRelease;
+  EXPECT_GE(since, ms(2500));
+  EXPECT_LT(since, ms(2700));
+  r.hearPilot();
+  // A quick result: the pilot still waits for the configured delay, counted from the release.
+  const auto tx2 = r.transmit();
+  r.text(tx2, r.lineUp());
+  r.hearPilot();
+  const Ns since2 = pilotStarts().back().sinceRelease;
+  EXPECT_GE(since2, ms(500));
+  EXPECT_LT(since2, ms(1600));
+  const json j = json::parse(eventJson(EngineEvent{1, 0, EngineInput(pilotStarts().back())}));
+  EXPECT_EQ(j["sinceRelease"].get<Ns>(), since2);  // in the log
+}
+
 TEST(ExerciseRuntime, StartIsRefusedWithAReason) {
   Rig r;
   r.model.allow = false;

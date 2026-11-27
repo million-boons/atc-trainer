@@ -51,6 +51,7 @@ struct Recognised {  // in transmission order
 struct PilotStarted {
   static constexpr std::string_view kName = "pilot_started";
   std::uint64_t utterance = 0;
+  Ns sinceRelease = 0;  // D-342: from the release of the transmission it answers; 0 for the pilot's own calls
 };
 enum class PilotEnd { Completed, Interrupted, PressCameFirst, TimedOut, Superseded };  // Superseded: never spoken (D-333)
 struct PilotEnded {
