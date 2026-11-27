@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ATC Trainer SOP</title>
+<style>
+  :root { --ink:#111; --muted:#444; --rule:#999; --soft:#f2f2f2; --mark:#fff3c4; }
+  * { box-sizing: border-box; }
+  html { background:#fff; }
+  body { margin:0 auto; max-width:190mm; padding:12mm 10mm; color:var(--ink); background:#fff;
+         font:10.5pt/1.45 "DejaVu Sans", "Liberation Sans", Arial, Helvetica, sans-serif; }
+  h1 { font-size:20pt; margin:0 0 4mm; }
+  h2 { font-size:14pt; margin:0 0 3mm; padding-bottom:1mm; border-bottom:2px solid var(--ink); }
+  h3 { font-size:11.5pt; margin:5mm 0 2mm; }
+  p, ul, ol { margin:0 0 2.5mm; }
+  li { margin-bottom:1mm; }
+  code, pre, .mono { font-family:"DejaVu Sans Mono", "Liberation Mono", "Courier New", monospace; font-size:9.5pt; }
+  pre { background:var(--soft); border:1px solid var(--rule); padding:2.5mm 3mm; white-space:pre-wrap; word-break:break-all; margin:0 0 3mm; }
+  table { width:100%; border-collapse:collapse; margin:0 0 4mm; page-break-inside:auto; }
+  tr { page-break-inside:avoid; }
+  thead { display:table-header-group; }
+  th, td { border:1px solid var(--rule); padding:1.5mm 2mm; vertical-align:top; text-align:left; }
+  th { background:var(--soft); font-size:9.5pt; }
+  td.n { width:9mm; font-weight:bold; }
+  td.pf { width:20mm; white-space:nowrap; font-size:9.5pt; }
+  td.rm { width:30mm; }
+  .box { display:inline-block; width:3.2mm; height:3.2mm; border:1px solid var(--ink); vertical-align:-0.4mm; margin-right:1mm; }
+  .tc { background:var(--mark); font-weight:bold; padding:0 1mm; border:1px dashed var(--ink); }
+  .note { border-left:3px solid var(--ink); padding:1.5mm 3mm; margin:0 0 3mm; background:var(--soft); }
+  .warn { border:2px solid var(--ink); padding:2mm 3mm; margin:0 0 3mm; font-weight:bold; }
+  .meta td:first-child { width:45mm; font-weight:bold; background:var(--soft); }
+  section { padding-top:2mm; }
+  section + section { page-break-before:always; break-before:page; }
+  .sign td { height:14mm; }
+  .small { font-size:9pt; color:var(--muted); }
+  @page { size:A4; margin:15mm 14mm; }
+  @media print { body { max-width:none; padding:0; } a { color:inherit; text-decoration:none; } }
+  @media (max-width:600px) { body { padding:16px; } td.pf, td.rm { width:auto; } table { font-size:9pt; } }
+</style>
+</head>
+<body>
+
+<!-- ======================================================================= 1 -->
+<section id="s1">
+<h1>Military ATC Training Simulator<br>Standard Operating Procedure: operation and manual testing</h1>
+
+<table class="meta">
+  <tr><td>Document</td><td>ATC-Trainer-SOP, version 0.1 DRAFT</td></tr>
+  <tr><td>Date</td><td>2026-11-27</td></tr>
+  <tr><td>Applies to build</td><td>branch <code>main</code>, commit <code>15472d0</code> (full build 0 warnings, 792 of 792 tests), launched from <code>.worktrees/runtime/build/bin</code></td></tr>
+  <tr><td>Machine</td><td>Training panel: i3, 4 GB, Ubuntu 22.04, 1280×800 touch display, offline</td></tr>
+  <tr><td>Written from</td><td>CHECKLIST-3C-2026-11-25, CHECKLIST-STUDIO-PLANNER, user guide (trainee and instructor), 04-ui.md, decisions.md, and the program's code at that commit</td></tr>
+  <tr><td>Status</td><td>Draft for the user's review. Nothing in this document has been approved by the unit.</td></tr>
+</table>
+
+<h3>1.1 Purpose</h3>
+<p>This SOP describes how to prepare, start, operate, test and shut down the offline voice ATC trainer, and how to record the results of a manual test on paper.</p>
+
+<h3>1.2 Scope</h3>
+<ul>
+  <li>Operation by the <b>instructor</b> and the <b>trainee</b> on the training panel.</li>
+  <li>Manual acceptance tests of every screen that the build has: Dashboard, exercise, Exercise Planner, Phraseology Studio, Scenario Selection, Assessment, Settings.</li>
+  <li>Not in scope: installing or building the software, speech recognition accuracy testing, recording real voices.</li>
+</ul>
+
+<h3>1.3 Conventions</h3>
+<ul>
+  <li><b>Bold</b> words are words on the screen or buttons.</li>
+  <li><span class="tc">TO CONFIRM</span> marks a point that is not proven by the documents or the code. Check it on the panel and correct this document.</li>
+  <li>A failed test line is a <b>finding</b>, not a stop, unless the line says so. Write the step number with every finding.</li>
+  <li>All exercise wording is <b>PLACEHOLDER</b> until the unit approves it. Practice only; Assessed is not available while a scenario's text is PLACEHOLDER.</li>
+</ul>
+
+<h3>1.4 Contents</h3>
+<ol>
+  <li>Purpose, scope, version</li>
+  <li>Equipment and pre-checks</li>
+  <li>Start-up and shutdown</li>
+  <li>Roles and login</li>
+  <li>Instructor tasks</li>
+  <li>Trainee tasks</li>
+  <li>Manual test procedures (T1 to T10)</li>
+  <li>Troubleshooting</li>
+  <li>Known limits</li>
+  <li>Test record sheet</li>
+</ol>
+</section>
+
+<!-- ======================================================================= 2 -->
+<section id="s2">
+<h2>2. Equipment and pre-checks</h2>
+
+<h3>2.1 Equipment</h3>
+<table>
+  <thead><tr><th>Item</th><th>Use</th><th>State in this build</th></tr></thead>
+  <tbody>
+  <tr><td>Training panel</td><td>Runs the trainer, 1280×800 touch display</td><td>Primary layout 1280×800; 1920×1080 also supported</td></tr>
+  <tr><td>Logitech H540 USB headset</td><td>Microphone and earphones for the exercise</td><td>Sound input <b>and</b> output must both be the H540</td></tr>
+  <tr><td>PTT, mouse stand-in</td><td>Right mouse button of the Dell wireless mouse (LITEON dongle) = push to talk</td><td>Accepted as stand-in (D-309). Status shows <b>PTT STAND-IN</b></td></tr>
+  <tr><td>PTT, foot pedal</td><td>USB foot pedal = push to talk</td><td><b>Pending</b>: learning a pedal in Settings answers "not built yet"</td></tr>
+  <tr><td>Fallback PTT</td><td><b>Screen PTT</b> button, and the Space key</td><td>Available; its use is written in the result ("Fallback PTT used: yes")</td></tr>
+  <tr><td>Keyboard</td><td>Typing trainee IDs and names</td><td>Needed: there is no on-screen keyboard. The instructor PIN has an on-screen keypad</td></tr>
+  </tbody>
+</table>
+
+<h3>2.2 Pre-checks (before every session)</h3>
+<table>
+  <thead><tr><th>#</th><th>Check</th><th>How</th><th>Done</th></tr></thead>
+  <tbody>
+  <tr><td class="n">E1</td><td>No other program runs; <b>no Claude sessions and no builds</b> run</td><td>Close their terminals. Check with<br><code>pgrep -af "claude --resume"</code><br><code>pgrep -af "cmake|ctest|make "</code><br>Both must show nothing (the first command may list the shell that runs it; ignore that line)</td><td class="pf"><span class="box"></span></td></tr>
+  <tr><td class="n">E2</td><td>Network off</td><td>The trainer must work offline. Switch Wi-Fi and cable off</td><td class="pf"><span class="box"></span></td></tr>
+  <tr><td class="n">E3</td><td>H540 connected and chosen</td><td>Ubuntu <b>Settings &gt; Sound</b>: Output device = H540, Input device = H540. Output volume up, input not muted</td><td class="pf"><span class="box"></span></td></tr>
+  <tr><td class="n">E4</td><td>H540 automatic gain (AGC) off</td><td>See 2.3</td><td class="pf"><span class="box"></span></td></tr>
+  <tr><td class="n">E5</td><td>Mouse access for the PTT stand-in</td><td>Only if it was lost (after replugging the dongle or a reboot):<br><code>sudo setfacl -m u:user:r /dev/input/by-id/usb-LITEON_Dell_Wireless_Device-if01-event-mouse</code></td><td class="pf"><span class="box"></span></td></tr>
+  <tr><td class="n">E6</td><td>Instructor PIN is set</td><td>If none is set (Settings &gt; Instructor shows it), see 4.3. Never write the PIN in a file</td><td class="pf"><span class="box"></span></td></tr>
+  <tr><td class="n">E7</td><td>Voice bank file</td><td><code>~/.config/atc-trainer/paths.conf</code> names the bank, e.g. <code>voices=/home/user/.local/share/atc-trainer/voices/en_US-norman-medium</code>. Do not delete or move that folder</td><td class="pf"><span class="box"></span></td></tr>
+  </tbody>
+</table>
+
+<h3>2.3 H540 automatic gain control (AGC) off</h3>
+<p>The H540's AGC must be off and its capture level kept (D-37, D-51). On 2026-11-24 it read off with capture 70 %, but nothing on the panel enforced it then. The installer <code>deploy/setup_panel.sh</code> makes it persistent; whether it is installed on the panel: <span class="tc">TO CONFIRM</span> (check with <code>./deploy/setup_panel.sh --verify</code>, no sudo).</p>
+<p>Manual check:</p>
+<pre>cat /proc/asound/cards                       # find the H540's card number N (a USB-Audio line)
+amixer -c N controls | grep -i gain          # name of the AGC control
+amixer -c N cget name='Auto Gain Control'    # must read "off"
+amixer -c N cset name='Auto Gain Control' off   # only if it reads "on"</pre>
+<p class="small">The control name "Auto Gain Control" is the one the installer's test uses; the real H540 name is <span class="tc">TO CONFIRM</span> (use the name the second command prints).</p>
+</section>
+
+<!-- ======================================================================= 3 -->
+<section id="s3">
+<h2>3. Start-up and shutdown</h2>
+
+<h3>3.1 Start-up</h3>
+<ol>
+  <li>Complete the pre-checks of section 2.</li>
+  <li>Open a terminal <b>on the panel's own desktop</b> (see 8.5 for SSH).</li>
+  <li>Start the program, <b>without <code>--root</code></b> (with it the voice bank of <code>paths.conf</code> is not read, D-308):
+<pre>cd /home/user/projects/atc-trainer/.worktrees/runtime
+./build/bin/atc_trainer --size 1280x800</pre>
+  For the large layout: <code>--size 1920x1080</code>.</li>
+  <li>The Dashboard opens. Nobody is logged in. The status bar shows the chips <b>Mic</b>, <b>Speaker</b>, <b>PTT</b>, <b>STT</b>, <b>VOICE BANK</b>, the scenario, and the clock (UTC and local).</li>
+  <li>Wait for <b>VOICE BANK</b> to go from <b>CHECKING</b> to <b>COVERAGE OK</b> by itself.</li>
+  <li>Readiness (each tile states READY, WARNS or BLOCKS START):
+    <ul>
+      <li>Microphone: <b>Test</b> (5 s level). Speak normally; peaks around −12 dBFS, band −20 to −6 dBFS.</li>
+      <li>Speaker: <b>Test tone</b>, listen to the end, then <b>I heard it</b>. This is the only way to OK.</li>
+      <li>PTT: <b>Test</b>, hold 2 s.</li>
+      <li>Speech model: <b>Load exercise model</b> (Whisper tiny + generated prompt). Wait for <b>READY</b>.</li>
+    </ul>
+  </li>
+  <li><b>START EXERCISE</b> is enabled when no tile blocks. The footer names the tiles that block.</li>
+</ol>
+
+<h3>3.2 Shutdown</h3>
+<ol>
+  <li>End or stop any running exercise first (<b>STOP</b> asks for confirmation; an Assessed exercise needs the instructor PIN).</li>
+  <li>Log out (<b>Log out</b> in the status bar).</li>
+  <li>Close the program window. A dedicated Quit button: <span class="tc">TO CONFIRM</span> (none found in the screens).</li>
+  <li>If the window is closed <b>during</b> an exercise, the exercise ends and its log says so ("program closed", D-333); see test T10.</li>
+  <li>After a restart no plan is chosen (PB-5); saved plans, results and records stay.</li>
+</ol>
+
+<h3>3.3 Where data is kept (this machine only)</h3>
+<table>
+  <thead><tr><th>What</th><th>Where</th></tr></thead>
+  <tbody>
+  <tr><td>Exercise logs (text only, no audio)</td><td><code>~/.local/state/atc-trainer/exercises/&lt;session&gt;.jsonl</code>; instructor reviews beside them in <code>&lt;session&gt;.review.jsonl</code></td></tr>
+  <tr><td>Settings chosen on the Settings screen</td><td><code>setup.json</code> in the program's writable folder; most apply at the next program start</td></tr>
+  <tr><td>Voice bank of the exercise</td><td>The folder named in <code>paths.conf</code></td></tr>
+  <tr><td>Studio bank (own takes)</td><td><code>&lt;writable&gt;/voices/studio-1</code>; never used by an exercise unless <code>paths.conf</code> names it</td></tr>
+  </tbody>
+</table>
+<p class="small">The exact writable folder: <span class="tc">TO CONFIRM</span> (Settings &gt; About lists the folders).</p>
+</section>
+
+<!-- ======================================================================= 4 -->
+<section id="s4">
+<h2>4. Roles and login</h2>
+<table>
+  <thead><tr><th>Role</th><th>How to log in</th><th>May do</th></tr></thead>
+  <tbody>
+  <tr><td><b>Guest</b></td><td>Nobody logged in (state at start)</td><td>Practise; choose plans for Anyone. Results are in nobody's history. Change theme, motion, clock</td></tr>
+  <tr><td><b>Trainee</b></td><td><b>Log in</b> &gt; choose the trainee ID. <b>No PIN</b></td><td>Own plans and Anyone plans; own results only; theme, motion, clock</td></tr>
+  <tr><td><b>Instructor</b></td><td><b>Log in &gt; Instructor</b>, PIN on the on-screen keypad</td><td>Everything: records, consent, plans, Studio, all results, Settings, deleting</td></tr>
+  </tbody>
+</table>
+
+<h3>4.1 Rules</h3>
+<ul>
+  <li>After <b>5 wrong PIN entries</b> the keypad says "Wait 60 s".</li>
+  <li>The instructor is logged out after <b>10 minutes</b> without input (Settings &gt; Instructor, 1 to 60 min), <b>never during a transmission</b>.</li>
+  <li>Logging in or out never stops a transmission and never blocks PTT; it is refused only while a transmission is open.</li>
+  <li>A trainee's plan on the Dashboard is put away when that trainee logs out, or when someone else logs in. A plan for Anyone stays.</li>
+</ul>
+
+<h3>4.2 Log out</h3>
+<p><b>Log out</b> in the status bar. Always log out at the end of a session.</p>
+
+<h3>4.3 Set or change the instructor PIN</h3>
+<ul>
+  <li>First time, in a terminal on the panel: <code>cd /home/user/projects/atc-trainer/.worktrees/runtime &amp;&amp; ./build/bin/set_instructor_pin</code></li>
+  <li>Later: <b>Settings &gt; Instructor &gt; Change PIN...</b> (old PIN, new PIN; 6 to 12 digits).</li>
+  <li>Never write the PIN in a file, a log or this document.</li>
+</ul>
+</section>
+
+<!-- ======================================================================= 5 -->
+<section id="s5">
+<h2>5. Instructor tasks</h2>
+
+<h3>5.1 Trainee records</h3>
+<ul>
+  <li><b>Settings &gt; Trainee records</b>: each trainee has an ID (e.g. S01) and a name, on this machine only. A physical keyboard is needed for IDs and names.</li>
+</ul>
+
+<h3>5.2 Consent</h3>
+<div class="warn">The consent texts are DRAFTS. Until the unit approves them (ST-5, D-134) nobody is asked for consent and NO REAL VOICE IS RECORDED. Recording tests use test tones and synthetic clips only.</div>
+<ul>
+  <li>Two separate answers per trainee: <b>consent to be recorded</b>, and <b>pilot voice</b> (the trainee's voice used as a pilot that others hear).</li>
+  <li>Without consent nothing of that trainee is stored. Exercise audio is never stored in this build (D-314).</li>
+  <li>When a consent text changes, the trainee is asked again at the next login; the answer is stored only after the instructor confirms with the PIN.</li>
+  <li>Withdrawn pilot-voice consent: the takes leave the voice bank at once; the Studio lists them as "Consent withdrawn".</li>
+</ul>
+
+<h3>5.3 Exercise plans (Training &gt; Exercises)</h3>
+<ul>
+  <li><b>New</b>: name, scenario, trainee or Anyone, Practice or Assessed, Fixed or Random values, briefing (max 200 characters), difficulty preset, reply delays (0.3 to 5.0 s), radio effect. Then <b>Save</b>.</li>
+  <li>The card <b>On the Dashboard</b> shows the <b>saved</b> plan. While editing it says <b>Unsaved changes</b>; a plan never saved says <b>Not saved yet</b>. The checks read <b>CHECKS OF THE EDIT</b> while editing.</li>
+  <li><b>Assessed</b> needs a trainee and a Validated scenario (not possible with PLACEHOLDER text).</li>
+  <li><b>Put on the Dashboard</b> selects the plan. <b>Presets...</b> changes Easy, Normal, Hard; saved plans keep their values and offer "Use new preset values".</li>
+</ul>
+
+<h3>5.4 Phraseology Studio (Training &gt; Phrases)</h3>
+<ul>
+  <li>Choose a phrase; the strip under the text shows static parts ("S", solid) and slots ("D", dashed, mono) with a dot per clip: grey missing, amber recorded, green accepted.</li>
+  <li>A changed text becomes <b>Draft</b>. <b>Save</b> it first, then <b>Validated</b> (needs the SOP reference; refused while the file is PLACEHOLDER).</li>
+  <li>Listen: <b>Raw</b>, <b>Trimmed</b>, <b>Radio</b>, <b>Sentence</b>.</li>
+  <li><b>Test tones only</b> until the consent texts are approved: no speech into <b>RECORD</b>.</li>
+  <li>"Save wording" writes the phraseology file in the data folder in use. For tests, use <b>Undo</b>.</li>
+</ul>
+
+<h3>5.5 Settings</h3>
+<ul>
+  <li>Pages: General, Audio, PTT, Speech, Voice bank, Recordings, Trainee records, Instructor, About.</li>
+  <li>Theme, motion and clock apply <b>now</b> and may be changed by anyone. Everything else is instructor only and applies at the <b>next start of the program</b>.</li>
+  <li><b>Voice bank</b>: choose the bank in use or a Studio bank (a Studio bank without accepted clips is off).</li>
+  <li>Device lists, pedal learning and the test sentence answer "not built" / "not available" in this build.</li>
+  <li><b>Restore starting values</b> per page.</li>
+</ul>
+
+<h3>5.6 Deleting results</h3>
+<ul>
+  <li>Only the instructor deletes; every deletion is logged first; nothing is deleted automatically.</li>
+  <li><b>Assessment &gt; Delete result</b>: one exercise log. Guest results: deleted together, as a count, from Settings (<span class="tc">TO CONFIRM</span> page).</li>
+  <li>Stored Lab recordings: Settings &gt; Recordings, play or delete.</li>
+</ul>
+</section>
+
+<!-- ======================================================================= 6 -->
+<section id="s6">
+<h2>6. Trainee tasks</h2>
+
+<h3>6.1 Choose the exercise</h3>
+<ul>
+  <li>Log in with your ID (or practise as guest). On the <b>Dashboard</b> tap <b>Choose plan</b>: you see your plans and plans for Anyone. Or <b>Choose scenario</b> / nav rail <b>Scenarios</b>.</li>
+  <li>Read the scenario card: <b>callsign, type, runway, taxiway</b>, briefing.</li>
+</ul>
+
+<h3>6.2 Dashboard readiness</h3>
+<ul>
+  <li>Start only when the footer does not say "Not ready to start". Microphone <b>NOT TESTED</b> and Speaker <b>NOT CHECKED</b> only warn; run their tests anyway.</li>
+  <li><b>START EXERCISE</b> opens the Start dialog with the same values, the mode and the model ("locked at Start").</li>
+</ul>
+
+<h3>6.3 PTT technique</h3>
+<ul>
+  <li><b>Press and hold</b> PTT, <b>then</b> speak, <b>release</b> after the last word. PTT: right mouse button (stand-in), or <b>Screen PTT</b>, or Space.</li>
+  <li><b>TX</b> (amber) = you transmit. <b>RX</b> (cyan) = the pilot speaks.</li>
+  <li>A short tap is not a transmission (Settings &gt; PTT, "Short tap below", starting value 250 ms).</li>
+  <li>Pressing while the pilot speaks cuts him off (<b>PILOT CUT</b>) in the departure scenario (rule "interrupt").</li>
+  <li>Do not release in the middle of a sentence ("Released early").</li>
+</ul>
+
+<h3>6.4 Speaking rules</h3>
+<ul>
+  <li>Callsign first, then one instruction: <i>"Eagle four two one, taxi via alpha three runway zero nine."</i></li>
+  <li>Digits one by one: "four two one", "zero nine", "two seven". "Niner" is accepted as nine, likewise "tree", "fife", "fower", "alfa".</li>
+  <li>Phonetic alphabet for letters: A3 = "alpha three", B2 = "bravo two".</li>
+  <li>Standard phraseology, even pace, normal loudness. Wait for the readback; correct it if wrong; repeat clearly after "say again".</li>
+  <li>No answer at all: check the callsign. The pilot answers only to his own callsign.</li>
+</ul>
+
+<h3>6.5 Practice and Assessed</h3>
+<ul>
+  <li><b>Practice</b>: the verdict of each instruction is shown at once.</li>
+  <li><b>Assessed</b>: the verdict is hidden until the result. Not available while the text is PLACEHOLDER; a plan fixes the mode.</li>
+</ul>
+
+<h3>6.6 Reading the Result</h3>
+<ul>
+  <li>Heading: <b>COMPLETED</b>, <b>STOPPED BY INSTRUCTOR</b>, <b>TIME LIMIT</b>, <b>PROGRAM CLOSED</b> or <b>LOG INCOMPLETE</b>.</li>
+  <li>Steps done, attempts, missed steps, response time (median), PTT notes (spoke before keying, released early, short taps, keyed over the pilot), fallback PTT used, speech model.</li>
+  <li><b>Suspected STT errors</b> are listed apart and are never counted against the trainee. There is no pass mark.</li>
+  <li><b>Run again</b>: same plan; random values are drawn and shown before the start.</li>
+</ul>
+</section>
+
+<!-- ======================================================================= 7 -->
+<section id="s7">
+<h2>7. Manual test procedures</h2>
+<p>Tick <span class="box"></span>P (pass) or <span class="box"></span>F (fail) on paper and write remarks. Use the Dashboard's values for the words; example with EAGLE-421, runway 09, taxiway A3:</p>
+<table>
+  <thead><tr><th>Step</th><th>Say</th><th>Pilot answers</th></tr></thead>
+  <tbody>
+  <tr><td>Taxi</td><td>"Eagle four two one, taxi via alpha three runway zero nine"</td><td>readback</td></tr>
+  <tr><td>Line up</td><td>"Eagle four two one, line up runway zero nine"</td><td>readback</td></tr>
+  <tr><td>Takeoff</td><td>"Eagle four two one, runway zero nine cleared for takeoff"</td><td>readback</td></tr>
+  </tbody>
+</table>
+<p class="small">With runway 27: taxiway B2 ("bravo two"), runway "two seven"; FALCON-732 is "falcon seven three two".</p>
+
+<h3>T1. G1 hardware and readiness</h3>
+<table>
+  <thead><tr><th>Step</th><th>Action</th><th>Expected result</th><th>Pass/Fail</th><th>Remarks</th></tr></thead>
+  <tbody>
+  <tr><td class="n">1.1</td><td>Start the program (3.1)</td><td>Dashboard; VOICE BANK goes from CHECKING to <b>COVERAGE OK</b> by itself; scenario card shows callsign, type, runway, taxiway, PLACEHOLDER</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">1.2</td><td>Nothing loaded yet</td><td>START EXERCISE disabled; "Cannot start" names the speech model</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">1.3</td><td>Microphone <b>Test</b>, speak 5 s</td><td>Level moves; peaks about −12 dBFS; Mic <b>OK</b>; "Mic open – not transmitting" while idle</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">1.4</td><td>Speaker <b>Test tone</b>, then <b>I heard it</b></td><td>Tone audible in the H540; Speaker <b>OK</b></td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">1.5</td><td>PTT <b>Test</b>, hold right button 2 s</td><td>Measured hold time shown; PTT <b>STAND-IN</b> (warns only); nothing transmitted</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">1.6</td><td><b>Load exercise model</b></td><td>STT goes to <b>READY</b>; START EXERCISE enabled</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">1.7</td><td>Hold PTT on the Dashboard, speak</td><td><b>TX</b> shown in the radio bar while held</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">1.8</td><td>Pull the mouse dongle (not in an exercise); replug; run the <code>setfacl</code> line</td><td>PTT <b>MISSING</b>, "PTT device lost"; after replug and <code>setfacl</code> PTT works again</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  </tbody>
+</table>
+
+<h3>T2. Departure exercise, normal run (do it three times)</h3>
+<table>
+  <thead><tr><th>Step</th><th>Action</th><th>Expected result</th><th>Pass/Fail</th><th>Remarks</th></tr></thead>
+  <tbody>
+  <tr><td class="n">2.1</td><td><b>START EXERCISE</b></td><td>Start dialog: Practice selected, <b>Assessed not available</b> with its reason, model "locked at Start"; values as on the Dashboard</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">2.2</td><td>Cancel, then START EXERCISE again</td><td>Dashboard, then the dialog again</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">2.3</td><td>Not logged in / trainee with or without consent</td><td>"Exercise audio not saved", with the reason; nothing stored in any case</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">2.4</td><td>Start</td><td>The pilot calls first ("request taxi"), light radio effect; <b>RX</b> shown</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">2.5</td><td>Hold PTT, taxi instruction, release</td><td>TX while held; text and chips; readback; step 1 Done</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">2.6</td><td>Line up, then takeoff</td><td>Pilot calls "ready for departure" before line up; both steps Done</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">2.7</td><td>After the last readback</td><td>"Exercise complete"; Result <b>COMPLETED</b>, 3 of 3, attempts, response time, PTT, suspected STT apart, no pass mark</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">2.8</td><td>Run again</td><td>New values, shown in the Start dialog; the exercise runs with them</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">2.9</td><td>Taxi with "... hold short runway zero nine"</td><td>Step done; readback includes "hold short"</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">2.10</td><td>Third run with <b>Screen PTT</b>, fourth with <b>Space</b></td><td>The same as 2.4 to 2.7</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">2.11</td><td>Note per run: "say again" count; release to text (median, Result)</td><td>Values written in Remarks</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  </tbody>
+</table>
+
+<h3>T3. Departure exercise, mistake tests</h3>
+<table>
+  <thead><tr><th>Step</th><th>Action</th><th>Expected result</th><th>Pass/Fail</th><th>Remarks</th></tr></thead>
+  <tbody>
+  <tr><td class="n">3.1</td><td>Right callsign, wrong runway</td><td>Step not advanced; not read back as correct; shown as said, never corrected</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">3.2</td><td>Takeoff clearance during step Taxi</td><td>Not advanced</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">3.3</td><td>The other callsign</td><td><b>Silence</b>; "No reply from the pilot"</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">3.4</td><td>Mumble</td><td>"say again"; three times in a step: instructor notice</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">3.5</td><td>Tap PTT about 0.15 s</td><td>No transmission, no reply</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">3.6</td><td>Release in the middle of a sentence</td><td>"Released early" in the result; not advanced or say again</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">3.7</td><td>Start and press within 1 s, speak over the moment of the call</td><td>PTT works; pilot calls right after release; "ATC called before pilot"; no attempt counted</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">3.8</td><td>Pull the mouse dongle during the exercise</td><td>Paused, dialog; <b>Use Screen PTT</b> continues; result "Fallback PTT used: yes". Afterwards <code>setfacl</code> again</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">3.9</td><td><b>STOP</b> while the pilot speaks</td><td>Silent at once; result <b>STOPPED BY INSTRUCTOR</b></td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">3.10</td><td>Dashboard, Lab, Settings during an exercise</td><td>Not reachable; they say why</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  </tbody>
+</table>
+
+<h3>T4. Half-duplex and key-over</h3>
+<table>
+  <thead><tr><th>Step</th><th>Action</th><th>Expected result</th><th>Pass/Fail</th><th>Remarks</th></tr></thead>
+  <tbody>
+  <tr><td class="n">4.1</td><td>Press while the pilot speaks, then give an instruction</td><td>Pilot silent <b>before</b> TX opens (by ear); <b>PILOT CUT</b>; the new instruction is answered first</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">4.2</td><td>Cut a <b>readback</b></td><td>The cut readback follows after your instruction is answered; a cut "say again" or call does not</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">4.3</td><td>Cut the pilot with a short tap only</td><td>The reply is repeated</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">4.4</td><td>Result after 4.1</td><td>"Keyed over the pilot" counted under PTT</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  </tbody>
+</table>
+
+<h3>T5. Missed responses</h3>
+<table>
+  <thead><tr><th>Step</th><th>Action</th><th>Expected result</th><th>Pass/Fail</th><th>Remarks</th></tr></thead>
+  <tbody>
+  <tr><td class="n">5.1</td><td>After the pilot's call, say nothing for 30 s</td><td>The pilot calls again</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">5.2</td><td>Keep silent</td><td>At most two calls again; then <b>Continue / End</b></td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">5.3</td><td><b>Continue</b></td><td>He calls again, same step</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">5.4</td><td>Finish; open the Result</td><td>Missed responses counted; NOTE "No ATC call for 30 s" in the Assessment timeline</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  </tbody>
+</table>
+
+<h3>T6. Exercise Planner (Training &gt; Exercises)</h3>
+<table>
+  <thead><tr><th>Step</th><th>Action</th><th>Expected result</th><th>Pass/Fail</th><th>Remarks</th></tr></thead>
+  <tbody>
+  <tr><td class="n">6.1</td><td>Not logged in: Training &gt; Exercises</td><td>"Instructor only. Log in to plan exercises."</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">6.2</td><td>Instructor: <b>New</b>, Departure 01, trainee S01, Practice, Fixed</td><td>Card <b>Not saved yet</b>, no values; <b>CHECKS OF THE EDIT</b>; after <b>Save</b> the card shows the saved values and name</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">6.3</td><td>Change runway to one that does not fit the taxiway</td><td>"does not fit", Save off with the reason; card still shows the saved values and <b>Unsaved changes</b></td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">6.4</td><td><b>Undo</b>; <b>Put on the Dashboard</b>; open the Dashboard</td><td>Card: plan name, values, briefing; Start dialog: plan, run number, mode fixed by the plan</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">6.5</td><td>Run it; Result</td><td>Result names the plan and run number; the plan's run count +1 (also if stopped early)</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">6.6</td><td>Random plan for Anyone; on the Dashboard twice</td><td>Values drawn and shown before Start; never the previous combination of that person</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">6.7</td><td>Assessed plan on a PLACEHOLDER scenario</td><td>Not possible: "Assessed: scenario not Validated"</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">6.8</td><td>Trainee S01: Dashboard, <b>Choose plan</b></td><td>Only S01's and Anyone plans; nothing editable</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">6.9</td><td>S01's plan on the Dashboard; S01 logs out</td><td>The plan is put away; an Anyone plan would stay</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">6.10</td><td><b>Presets...</b>: change Normal, save; open an older plan</td><td>It keeps its values; "Use new preset values" offered</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">6.11</td><td>Reply delays 0.3 to 5.0 s, radio heavy: run it</td><td>Pilot answers within the delays; heavy effect audible</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">6.12</td><td>Quit and start the program again</td><td>No plan chosen; saved plans still there</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  </tbody>
+</table>
+
+<h3>T7. Phraseology Studio (Training &gt; Phrases) &mdash; no real voice</h3>
+<table>
+  <thead><tr><th>Step</th><th>Action</th><th>Expected result</th><th>Pass/Fail</th><th>Remarks</th></tr></thead>
+  <tbody>
+  <tr><td class="n">7.1</td><td>Not logged in: Training &gt; Phrases</td><td>"Instructor only. Log in to see or change phrases."</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">7.2</td><td>Instructor: choose READBACK_TAXI</td><td>Text with <code>{slot}</code>; strip: S solid, D dashed mono, dots; "Used by: DEPARTURE-01"</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">7.3</td><td>Choose an ATC phrase</td><td>Strip without dots and without recorder: "ATC examples are not recorded."</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">7.4</td><td>Press PTT and Space with no session</td><td>Nothing recorded, no RECORDING sign, no TX</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">7.5</td><td>Add a word to the text; press <b>Validated</b></td><td>Draft; refused: "Save the changed text first. Then set it to Validated."</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">7.6</td><td>Type <code>{nonsense}</code>; then <b>Undo</b></td><td>Warning names the unknown slot, Save off; Undo restores the saved text</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">7.7</td><td>Choose a dynamic chip (runway); <b>Raw</b>, <b>Trimmed</b>, <b>Radio</b>, <b>Sentence</b></td><td>Each plays; "Say this:" with target words bold; take list "Take 1 synthetic", one line each: number, speaker, state, length</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">7.8</td><td>Listen: runway 09 ("zero niner") and 27, "hold short runway", two callsigns</td><td>Clear (write anything unclear)</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">7.9</td><td><b>Start session...</b></td><td>"Who records?" lists every record with the reason if it may not record; without consent none can be chosen; <b>Cancel</b> changes nothing</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">7.10</td><td>Optional, test record with consent only: <b>RECORD</b> a <b>test tone</b> (<code>speaker-test -t sine -f 1000 -l 1</code>), <b>STOP</b>, then Reject and Delete</td><td>RECORDING sign; level moves; waveform with trim; take ends by itself at 20 s; deletion logged. Delete the test record afterwards</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">7.11</td><td>Log out</td><td>Studio content goes away at once</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  </tbody>
+</table>
+
+<h3>T8. Scenario Selection (nav rail Scenarios)</h3>
+<table>
+  <thead><tr><th>Step</th><th>Action</th><th>Expected result</th><th>Pass/Fail</th><th>Remarks</th></tr></thead>
+  <tbody>
+  <tr><td class="n">8.1</td><td>Open <b>Scenarios</b></td><td>List with category filters (All, Dep, Arr, Gnd, Ldg, GA, Emg, RCF, Abn), search, difficulty; this build's data has <b>Departure 01</b> only</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">8.2</td><td>Choose Departure 01</td><td>Detail: category, difficulty, airfield, SOP reference, objectives, 3 steps with intent, wait and calls, "Half-duplex: interrupt"; pool sizes; PLACEHOLDER</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">8.3</td><td>Wait for the coverage line</td><td>"Voice bank: coverage checked, N clips"; "Assessed: not available, text is PLACEHOLDER"</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">8.4</td><td>With a plan on the Dashboard: <b>Select scenario</b></td><td>Dashboard shows the scenario with drawn values; the plan is no longer on the Dashboard</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">8.5</td><td>During an exercise: nav rail Scenarios</td><td>Not reachable; it says why</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  </tbody>
+</table>
+
+<h3>T9. Assessment</h3>
+<table>
+  <thead><tr><th>Step</th><th>Action</th><th>Expected result</th><th>Pass/Fail</th><th>Remarks</th></tr></thead>
+  <tbody>
+  <tr><td class="n">9.1</td><td>Guest: Assessment</td><td>"Log in to see results. Guest results are in no history."</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">9.2</td><td>Trainee S01: Assessment</td><td>Only S01's results; guest results never listed</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">9.3</td><td>Instructor: filters (trainee, Practice/Assessed/All, scenario, days)</td><td>List follows; columns date, trainee, scenario (plan and run), mode, end, steps, errors, missed, response, STT, PTT</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">9.4</td><td><b>Open debrief</b> of a T2 run</td><td>Scorecards (facts), suspected STT errors apart, timeline with All / Errors / PTT / STT; values match the Result</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">9.5</td><td>Choose an ATC entry; <b>Reclassify...</b>, "Speech recognition error", note, <b>Store</b></td><td>"Stored beside the original."; original outcome unchanged, marked "(reclassified)"; heading "RECLASSIFIED (the original is kept)"</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">9.6</td><td>Choose a PILOT entry</td><td>Reclassify not offered; no review heading</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">9.7</td><td>Play an entry's audio</td><td>"exercise audio is not stored"</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">9.8</td><td><b>Delete result</b> of a test run</td><td>Confirm; gone from the list; "Deleted. The deletion is in the log."</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  </tbody>
+</table>
+
+<h3>T10. Settings and program-closed log</h3>
+<table>
+  <thead><tr><th>Step</th><th>Action</th><th>Expected result</th><th>Pass/Fail</th><th>Remarks</th></tr></thead>
+  <tbody>
+  <tr><td class="n">10.1</td><td>Guest: Settings &gt; General, Theme Night</td><td>Applies at once; "Stored. Applies: now."</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">10.2</td><td>Guest: change a PTT value</td><td>"Only the instructor may change this."</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">10.3</td><td>Instructor: General &gt; <b>Restore starting values</b></td><td>"The starting values are back."; theme and motion back at once</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">10.4</td><td>PTT page: change Tail; restart the program</td><td>"Applies: next start of the program"; after restart the value shows "set by user" and is in use</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">10.5</td><td>Audio / PTT device lists; pedal learning; test sentence</td><td>"not built yet" / "not available in this build"</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">10.6</td><td>Voice bank page</td><td>Bank in use "in use now"; Studio bank without accepted clip is off ("no accepted clip yet")</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">10.7</td><td>Instructor page: Change PIN with a wrong old PIN</td><td>"the old PIN is wrong"; PIN unchanged</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">10.8</td><td>Start an exercise; close the program window during it</td><td>Program ends; the log's last lines record "program_closed"</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">10.9</td><td>Start again; Assessment, that run (logged-in trainee only)</td><td>End "stopped"; timeline ends with NOTE "Program closed"</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  </tbody>
+</table>
+<p class="small">10.8: check the log with <code>tail -3 ~/.local/state/atc-trainer/exercises/&lt;newest&gt;.jsonl</code>.</p>
+</section>
+
+<!-- ======================================================================= 8 -->
+<section id="s8">
+<h2>8. Troubleshooting</h2>
+<table>
+  <thead><tr><th>Symptom</th><th>Likely cause</th><th>Action</th></tr></thead>
+  <tbody>
+  <tr><td><b>PTT MISSING</b> (blocks Start)</td><td>Dongle unplugged, or read access lost after replug/reboot</td><td>Replug the dongle, then<br><code>sudo setfacl -m u:user:r /dev/input/by-id/usb-LITEON_Dell_Wireless_Device-if01-event-mouse</code><br>During an exercise: <b>Use Screen PTT</b> continues; the result records it</td></tr>
+  <tr><td>PTT <b>NO HOLD</b></td><td>PTT test hold not detected</td><td>Repeat the PTT test, hold 2 s steadily</td></tr>
+  <tr><td>Mic <b>NO SIGNAL</b></td><td>Microphone open but delivering nothing for 1 s</td><td>Check the H540 is the input in Ubuntu Sound settings; replug; run Mic Test again</td></tr>
+  <tr><td>Mic <b>MUTED</b> / <b>LOST</b></td><td>Input muted, or headset unplugged</td><td>Unmute (Sound settings or headset mute); replug; Mic Test</td></tr>
+  <tr><td>Mic <b>LEVEL</b> (warns)</td><td>Peaks outside −20 to −6 dBFS</td><td>Boom microphone 2 cm from the mouth corner; check AGC off (2.3); adjust input volume; Mic Test</td></tr>
+  <tr><td>Mic <b>NOT TESTED</b> (warns)</td><td>No 5 s test yet, or the microphone changed</td><td>Mic Test</td></tr>
+  <tr><td>VOICE BANK <b>NOT LOADED</b></td><td>Started with <code>--root</code>, or <code>paths.conf</code> missing/wrong, or bank folder moved</td><td>Quit; start again exactly as in 3.1 (no <code>--root</code>); check <code>~/.config/atc-trainer/paths.conf</code> and that the named folder holds <code>manifest.json</code></td></tr>
+  <tr><td>VOICE BANK <b>MISSING CLIPS (n)</b> / <b>FAILED</b></td><td>Clips missing for the scenario, or a clip differs from the wording</td><td><b>List</b> on the tile names them; instructor: Studio <b>Next missing</b>. Do not run the exercise</td></tr>
+  <tr><td>STT <b>OTHER MODEL</b></td><td>A different model loaded in the Speech Lab</td><td>Dashboard <b>Load exercise model</b></td></tr>
+  <tr><td>Slow recognition / text late</td><td>CPU busy (other programs, builds), long transmissions</td><td>Close everything else (E1); keep transmissions short. A transmission without text after 10 s is shown as a system fault. Record "release to text" (T2.11)</td></tr>
+  <tr><td>Program will not start over SSH ("could not connect to display")</td><td>The program needs the panel's graphical session and its sound server</td><td>Start it from a terminal on the panel's desktop. Starting over SSH with <code>DISPLAY=:0</code>: <span class="tc">TO CONFIRM</span> (sound may also need the desktop session)</td></tr>
+  <tr><td>Two sessions of the same kind / things change while testing</td><td>Duplicate Claude sessions or builds still running</td><td><code>for p in $(pgrep -f "claude --resume"); do echo "$p $(readlink /proc/$p/cwd)"; done</code>; close the older duplicate (or all, before testing). Never test while a build runs</td></tr>
+  <tr><td>Instructor logged out unexpectedly</td><td>10 min without input</td><td>Log in again; change the time in Settings &gt; Instructor</td></tr>
+  <tr><td>PIN keypad "Wait 60 s"</td><td>5 wrong entries</td><td>Wait 60 s</td></tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ======================================================================= 9 -->
+<section id="s9">
+<h2>9. Known limits (this build)</h2>
+<ul>
+  <li><b>Placeholder wording.</b> All scenario and phraseology text is PLACEHOLDER until validated against the approved SOP. Assessed mode is therefore not available; Practice only. There is no pass mark.</li>
+  <li><b>Pilot voice.</b> The pilot clips are synthetic (Piper, voice en_US-norman-medium), made offline on the panel. The pilot says "niner". The user's listening check of the new clips (runway 09, hold short, spot check) is open (D-329).</li>
+  <li><b>Pedal pending.</b> The foot pedal is not yet set up; the right mouse button is the stand-in (D-309). Pedal learning in Settings is not built.</li>
+  <li><b>Recognition speed and accuracy.</b> Frequent "say again" is expected: the best measured result is 25 of 40 instructions fully correct, for one speaker. Release-to-text time on the panel is still to be measured (T2.11). This SOP's tests are not a speech accuracy test.</li>
+  <li><b>No exercise audio.</b> Exercise audio is never stored (D-314); Assessment cannot play it.</li>
+  <li><b>No real voice recording</b> until the unit approves the consent texts (ST-5).</li>
+  <li><b>Settings.</b> Most changes apply at the next program start; device lists and the test sentence are not built.</li>
+  <li><b>Scenarios.</b> The data has one scenario, Departure 01.</li>
+  <li><b>Not measured on the panel:</b> frame time, memory, start-up time.</li>
+</ul>
+</section>
+
+<!-- ======================================================================= 10 -->
+<section id="s10">
+<h2>10. Test record sheet</h2>
+<table class="meta">
+  <tr><td>Tester (name, role)</td><td></td></tr>
+  <tr><td>Date and time</td><td></td></tr>
+  <tr><td>Build (commit)</td><td><code>15472d0</code> &nbsp; other: ____________</td></tr>
+  <tr><td>Screen size used</td><td><span class="box"></span>1280×800 &nbsp; <span class="box"></span>1920×1080</td></tr>
+  <tr><td>PTT used</td><td><span class="box"></span>mouse stand-in &nbsp; <span class="box"></span>Screen PTT &nbsp; <span class="box"></span>Space &nbsp; <span class="box"></span>pedal</td></tr>
+</table>
+
+<table>
+  <thead><tr><th>Procedure</th><th>Steps passed / total</th><th>Findings (step numbers)</th></tr></thead>
+  <tbody>
+  <tr><td>T1 G1 hardware</td><td>&nbsp;&nbsp;&nbsp;&nbsp; / 8</td><td></td></tr>
+  <tr><td>T2 Departure, normal</td><td>&nbsp;&nbsp;&nbsp;&nbsp; / 11</td><td></td></tr>
+  <tr><td>T3 Departure, mistakes</td><td>&nbsp;&nbsp;&nbsp;&nbsp; / 10</td><td></td></tr>
+  <tr><td>T4 Half-duplex, key-over</td><td>&nbsp;&nbsp;&nbsp;&nbsp; / 4</td><td></td></tr>
+  <tr><td>T5 Missed responses</td><td>&nbsp;&nbsp;&nbsp;&nbsp; / 4</td><td></td></tr>
+  <tr><td>T6 Exercise Planner</td><td>&nbsp;&nbsp;&nbsp;&nbsp; / 12</td><td></td></tr>
+  <tr><td>T7 Phraseology Studio</td><td>&nbsp;&nbsp;&nbsp;&nbsp; / 11</td><td></td></tr>
+  <tr><td>T8 Scenario Selection</td><td>&nbsp;&nbsp;&nbsp;&nbsp; / 5</td><td></td></tr>
+  <tr><td>T9 Assessment</td><td>&nbsp;&nbsp;&nbsp;&nbsp; / 8</td><td></td></tr>
+  <tr><td>T10 Settings, program closed</td><td>&nbsp;&nbsp;&nbsp;&nbsp; / 9</td><td></td></tr>
+  </tbody>
+</table>
+
+<table>
+  <tr><td style="width:45mm"><b>Measured values</b></td><td>Release to text (median): ______ s &nbsp; Release to pilot sound: ______ s &nbsp; "Say again" per run: ______ &nbsp; <code>free -m</code> used: ______ MB</td></tr>
+  <tr><td><b>Overall result</b></td><td><span class="box"></span>PASS &nbsp;&nbsp; <span class="box"></span>PASS WITH FINDINGS &nbsp;&nbsp; <span class="box"></span>FAIL</td></tr>
+  <tr><td><b>Remarks</b></td><td style="height:30mm"></td></tr>
+</table>
+
+<table class="sign">
+  <thead><tr><th style="width:30%">Role</th><th>Name</th><th>Signature</th><th style="width:22%">Date</th></tr></thead>
+  <tbody>
+  <tr><td>Tester</td><td></td><td></td><td></td></tr>
+  <tr><td>Instructor</td><td></td><td></td><td></td></tr>
+  <tr><td>Approved by (unit)</td><td></td><td></td><td></td></tr>
+  </tbody>
+</table>
+<p class="small">End of document. ATC-Trainer-SOP v0.1 DRAFT, 2026-11-27, build 15472d0.</p>
+</section>
+
+</body>
+</html>
