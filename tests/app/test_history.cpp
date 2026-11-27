@@ -211,6 +211,30 @@ TEST_F(History, ChangedScenarioIsSaidInTheHeader) {  // D-340
   EXPECT_EQ(h->head()["changed"].toString(), "Scenario changed since this run");
 }
 
+TEST_F(History, WithdrawnConsentIsNotPlayedAndSaysWhy) {  // EA-2
+  trainee("S01");
+  open("h6");
+  h->selectEntry(1);
+  h->play(false);
+  drain();
+  EXPECT_EQ(played, 0);
+  EXPECT_EQ(h->entry()["audioNote"].toString(), "consent withdrawn: not played");
+  open("h5");
+  EXPECT_EQ(h->head()["audio"].toString(), "Exercise audio not saved: disk nearly full");
+  open("h1");
+  EXPECT_EQ(h->head()["audio"].toString(), "");
+}
+
+TEST_F(History, PlayingUntilThePlaybackEnds) {  // the Stop button shows meanwhile
+  trainee("S01");
+  open("h1");
+  h->selectEntry(1);
+  h->play(false);
+  EXPECT_TRUE(h->playing());
+  drain();
+  EXPECT_FALSE(h->playing());  // the mock refuses: done at once
+}
+
 TEST_F(History, EntryFilters) {
   trainee("S01");
   open("h1");

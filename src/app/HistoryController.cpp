@@ -272,7 +272,7 @@ QVariantMap HistoryController::head() const {
           {"callsign", q(detail_->callsign)}, {"mode", modeText(r.assessed)},
           {"when", tr("%1 to %2").arg(date(r.startedMs), clock(r.endedMs))}, {"end", endText(r.end).toUpper()}, {"level", endLevel(r.end)},
           {"sub", tr("%1 of %2 steps   %3   fallback PTT used: %4   Model %5").arg(r.stepsDone).arg(r.steps).arg(length(r.endedMs - r.startedMs), detail_->fallbackPtt ? tr("yes") : tr("no"), q(detail_->model))},
-          {"placeholder", r.placeholder},
+          {"placeholder", r.placeholder}, {"audio", q(detail_->audioNote)},
           {"changed", r.scenarioChanged ? tr("Scenario changed since this run") : QString()}};
 }
 
@@ -314,7 +314,7 @@ QVariantMap HistoryController::entry() const {
   const bool atc = e.kind == Kind::Atc;
   return {{"title", e.step.empty() ? q(e.time) : tr("%1   %2").arg(q(e.time), q(e.step))}, {"atc", atc}, {"heard", q(e.heard)}, {"parsed", q(e.parsed)}, {"expected", q(e.expected)},
           {"outcome", q(e.outcome)}, {"cls", q(e.cls)}, {"delay", q(e.delay)}, {"level", e.level},
-          {"audio", e.audio}, {"audioNote", e.audio ? QString() : tr("no audio saved")},
+          {"audio", e.audio}, {"audioNote", e.audio ? QString() : e.noAudio.empty() ? tr("no audio saved") : q(e.noAudio)},
           {"mayReclassify", atc && instructor()}, {"text", q(e.text)}};
 }
 
@@ -340,7 +340,11 @@ void HistoryController::selectEntry(int no) {
 
 void HistoryController::play(bool keyedOnly) {
   if (!entry()["audio"].toBool() || busy() || !b_.play) return;  // only if it was saved with consent
-  b_.play(detail_->row.id, entry_, keyedOnly, answer({}));
+  playing_ = true;
+  b_.play(detail_->row.id, entry_, keyedOnly, [this, done = answer({})](const std::string& why) {
+    queued([this] { playing_ = false; });  // before done's own queued call, which tells the screen
+    done(why);
+  });
 }
 
 void HistoryController::stopPlay() {

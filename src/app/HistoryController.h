@@ -46,6 +46,7 @@ class HistoryController : public QObject {
   Q_PROPERTY(QVariantMap entry READ entry NOTIFY detailChanged)          // the selected one
   Q_PROPERTY(QVariantList reviews READ reviews NOTIFY detailChanged)     // {verdict, note, by}
   Q_PROPERTY(bool busy READ busy NOTIFY detailChanged)
+  Q_PROPERTY(bool playing READ playing NOTIFY detailChanged)
   Q_PROPERTY(int messageLevel READ messageLevel NOTIFY messageChanged)
   Q_PROPERTY(QString message READ message NOTIFY messageChanged)
  public:
@@ -79,6 +80,7 @@ class HistoryController : public QObject {
   QVariantMap entry() const;
   QVariantList reviews() const;
   bool busy() const { return waiting_ > 0; }
+  bool playing() const { return playing_; }
   int messageLevel() const { return messageLevel_; }
   QString message() const { return message_; }
 
@@ -122,6 +124,7 @@ class HistoryController : public QObject {
   std::string selected_;
   QString who_, trainee_, mode_ = QStringLiteral("all"), scenario_, entryFilter_ = QStringLiteral("all"), message_;
   int days_ = 30, entry_ = -1, waiting_ = 0, messageLevel_ = 0;
+  bool playing_ = false;
   bool loaded_ = false;
   unsigned loadNo_ = 0, openNo_ = 0;
   HistoryBackend b_;  // last
