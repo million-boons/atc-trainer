@@ -155,13 +155,14 @@ Item {
             SecondaryButton { id: back; x: Theme.s8; anchors.verticalCenter: parent.verticalCenter; text: qsTr("< History"); focusPolicy: Qt.NoFocus; onClicked: s.history.close() }
             Label { x: back.x + back.width + Theme.s12; y: Theme.s8; height: Theme.px(26); font.weight: Font.DemiBold
                     text: qsTr("%1   %2   %3   %4   %5").arg(s.h.trainee || "").arg(s.h.scenario || "").arg(s.h.callsign || "").arg(s.h.mode || "").arg(s.h.when || "") }
-            Label { x: back.x + back.width + Theme.s12; y: Theme.px(38); height: Theme.px(22); text: s.h.sub || ""; color: Theme.textSecondary; font.pixelSize: Theme.small }
+            Label { x: back.x + back.width + Theme.s12; y: Theme.px(38); height: Theme.px(22); text: (s.h.audio || "") === "" ? (s.h.sub || "") : qsTr("%1   %2").arg(s.h.sub || "").arg(s.h.audio); color: Theme.textSecondary; font.pixelSize: Theme.small }
             Row {
                 anchors { right: parent.right; rightMargin: Theme.s12 }
                 y: Theme.s8
                 spacing: Theme.s8
                 StateIcon { level: s.h.level || 0; size: Theme.px(16); anchors.verticalCenter: parent.verticalCenter }
                 Label { text: s.h.end || ""; font { pixelSize: Theme.h2; weight: Font.Bold } }
+                Tag { visible: (s.h.changed || "") !== ""; text: s.h.changed || ""; anchors.verticalCenter: parent.verticalCenter }
                 Tag { visible: s.h.placeholder === true; text: qsTr("PLACEHOLDER"); anchors.verticalCenter: parent.verticalCenter }
             }
         }
@@ -266,6 +267,7 @@ Item {
                         spacing: Theme.s4
                         SecondaryButton { text: qsTr("Play"); width: Theme.px(92); font.pixelSize: Theme.small; focusPolicy: Qt.NoFocus; enabled: s.e.audio === true && !s.history.busy; onClicked: s.history.play(false) }
                         SecondaryButton { text: qsTr("Keyed part"); width: Theme.px(108); font.pixelSize: Theme.small; focusPolicy: Qt.NoFocus; enabled: s.e.audio === true && !s.history.busy; onClicked: s.history.play(true) }
+                        SecondaryButton { visible: s.history.playing; text: qsTr("Stop"); width: Theme.px(80); font.pixelSize: Theme.small; focusPolicy: Qt.NoFocus; onClicked: s.history.stopPlay() }
                     }
                     Label { visible: s.e.atc === true; width: parent.width; height: Theme.px(20); text: s.e.audioNote || ""; color: Theme.textSecondary; font.pixelSize: Theme.caption }
                 }
@@ -327,7 +329,7 @@ Item {
         anchors.fill: parent
         active: s.dialog === "delete"
         sourceComponent: Component {
-            ConfirmDialog { title: qsTr("Delete this result?"); text: qsTr("The exercise log is deleted from this machine. The deletion is logged. Its audio, if saved, follows the rules for recordings.")
+            ConfirmDialog { title: qsTr("Delete this result?"); text: qsTr("The exercise log and its saved audio are deleted from this machine. The deletion is logged first.")
                             confirmText: qsTr("Delete result"); onConfirmed: { s.dialog = ""; s.history.removeSelected() } onClosed: s.dialog = "" }
         }
     }
