@@ -1,5 +1,6 @@
 #pragma once
 #include <map>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -33,8 +34,13 @@ struct ParserRules {
   std::map<std::string, Slot> slots;
   std::map<std::string, std::vector<Words>> flags;
   std::vector<Intent> intents;
+  // Digit counts of each callsign name in the airfield pools (D-204), e.g. EAGLE {3}, FALCON {2, 3}.
+  // Empty: not loaded, every callsign form counts. A name in no airfield keeps three digits.
+  std::map<std::string, std::set<int>> callsignDigits;
 };
 bool loadParserRules(const std::string& phraseologyFile, ParserRules& out, std::string& error);
+// Reads "callsigns" of every *.json in airfieldDir (all airfields, never one scenario's: D-48).
+bool loadCallsignDigits(const std::string& airfieldDir, ParserRules& rules, std::string& error);
 
 struct ParseOptions {
   double minConfidence = -1;  // a field below this is uncertain. Off: not usable on the engines so far

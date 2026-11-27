@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 
@@ -343,4 +344,56 @@ TEST(Parser, FixedWordsInSlotFormsAreChecked) {
   EXPECT_NE(loadChanged("\"{digit} {digit} {digit} decimal {digit}\"", "\"{digit} {digit} {digit} {digit} decimal\"").find("end with a value"), std::string::npos);
   EXPECT_NE(loadChanged("\"{digit} {digit} {digit} decimal {digit}\"", "\"decimal {digit} {digit}\"").find("fixed word"), std::string::npos);
   EXPECT_NE(loadChanged("\"{digit} {digit} {digit} decimal {digit}\"", "\"{digit} {digyt}\"").find("unknown pool {digyt}"), std::string::npos);
+}
+
+// D-204: digit counts per callsign name from the airfield pools (all airfields, not a scenario).
+namespace {
+std::string airfieldDir(const std::vector<std::string>& files) {
+  const auto d = std::filesystem::path(testing::TempDir()) / "airfields_test";
+  std::filesystem::remove_all(d);
+  std::filesystem::create_directories(d);
+  for (std::size_t i = 0; i < files.size(); ++i) std::ofstream(d / ("A" + std::to_string(i) + ".json")) << files[i];
+  return d.string();
+}
+}  // namespace
+TEST(Parser, CallsignDigitsComeFromTheAirfields) {
+  ParserRules r = rules();
+  std::string e;
+  ASSERT_TRUE(loadCallsignDigits(airfieldDir({R"({"callsigns": [{"id": "EAGLE-421"}, {"id": "FALCON-732"}]})",
+                                              R"({"callsigns": [{"id": "FALCON-12"}]})"}),
+                                 r, e)) << e;
+  EXPECT_EQ(r.callsignDigits.at("EAGLE"), (std::set<int>{3}));
+  EXPECT_EQ(r.callsignDigits.at("FALCON"), (std::set<int>{2, 3}));
+  const auto p = [&](const std::string& s) { return parseInstruction({s, {}}, r); };
+  auto x = p("eagle four two line up runway zero nine");  // a digit lost: say again, never EAGLE-42
+  EXPECT_EQ(x.cls, C::Ambiguous);
+  EXPECT_EQ(value(x, "callsign"), "?");
+  EXPECT_EQ(value(p("eagle four two one line up runway zero nine"), "callsign"), "EAGLE-421");
+  EXPECT_EQ(value(p("eagle one two three line up runway zero nine"), "callsign"), "EAGLE-123");  // any digits (bias rule)
+  EXPECT_EQ(value(p("falcon one two line up runway zero five"), "callsign"), "FALCON-12");
+  EXPECT_EQ(value(p("falcon seven three two line up runway zero nine"), "callsign"), "FALCON-732");
+  EXPECT_EQ(value(p("falcon seven three line up runway zero nine"), "callsign"), "FALCON-73");  // FALCON has both counts
+  EXPECT_EQ(value(p("hawk six seven line up runway two seven"), "callsign"), "?");               // in no airfield: three digits
+  EXPECT_EQ(value(p("hawk six seven four line up runway two seven"), "callsign"), "HAWK-674");
+  EXPECT_EQ(value(p("falcon one line up runway zero five"), "callsign"), "?");
+}
+TEST(Parser, AirfieldCallsignsAreChecked) {
+  ParserRules r = rules();
+  std::string e;
+  EXPECT_FALSE(loadCallsignDigits(airfieldDir({R"({"callsigns": [{"id": "EAGLE421"}]})"}), r, e));
+  EXPECT_NE(e.find("NAME-digits"), std::string::npos) << e;
+  EXPECT_FALSE(loadCallsignDigits(airfieldDir({R"({"runways": []})"}), r, e));
+  EXPECT_NE(e.find("no callsigns"), std::string::npos) << e;
+  EXPECT_FALSE(loadCallsignDigits(airfieldDir({}), r, e));
+  Paths paths;
+  ASSERT_TRUE(resolvePaths(systemPathInputs(), paths, e)) << e;
+  EXPECT_TRUE(loadCallsignDigits(paths.data + "/airfields", r, e)) << e;  // the shipped files
+  EXPECT_EQ(r.callsignDigits.at("EAGLE"), (std::set<int>{3}));
+}
+TEST(Parser, ClearToLandIsALandingCue) {  // D-204, to re-check with the dev speakers
+  const auto p = parse("Hawk, 674, runway, two, seven, clear to land.");
+  EXPECT_EQ(p.cls, C::Recognized);
+  EXPECT_EQ(p.intent, "LANDING_CLEARANCE");
+  EXPECT_EQ(value(p, "runway"), "27");
+  EXPECT_EQ(parse("Falcon three one eight, run with your nine, clear to stand.").cls, C::Unrecognized);
 }
