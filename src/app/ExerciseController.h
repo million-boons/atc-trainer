@@ -84,6 +84,12 @@ class ExerciseController : public QObject {
     audioConnected_ = true;
     emit changed();
   }
+  // The Lab's save switch also covers exercise audio (EA-1); set before each Start dialog. Off until told.
+  void setAudioSwitch(bool on) {
+    if (audioSwitch_ == on) return;
+    audioSwitch_ = on;
+    emit changed();
+  }
   void setPhase(Phase p);
   void setSteps(QList<ExerciseStep> s, int done);
   void setMissed(QStringList names);
@@ -117,9 +123,9 @@ class ExerciseController : public QObject {
   QString planWarning() const { return !ctx_.plan || planned() || planAssessed() ? QString() : tr("This plan is for %1. The result belongs to %2.").arg(ctx_.plan->trainee, who()); }
   QString assessedNote() const;
   QString who() const { return ctx_.trainee.isEmpty() ? tr("Guest") : ctx_.trainee; }
-  bool audioSaved() const { return consent_ && audioConnected_ && !ctx_.trainee.isEmpty(); }
+  bool audioSaved() const { return consent_ && audioSwitch_ && audioConnected_ && !ctx_.trainee.isEmpty(); }
   QString audioText() const {
-    return audioSaved() ? tr("Saved on this machine only") : ctx_.trainee.isEmpty() ? tr("Exercise audio not saved: guest") : !consent_ ? tr("Exercise audio not saved: no consent") : tr("Exercise audio not saved: not connected yet");
+    return audioSaved() ? tr("Saved on this machine only") : ctx_.trainee.isEmpty() ? tr("Exercise audio not saved: guest") : !audioSwitch_ ? tr("Exercise audio not saved: switched off in Settings") : !consent_ ? tr("Exercise audio not saved: no consent") : tr("Exercise audio not saved: not connected yet");
   }
   QStringList clearances() const { return hide() ? QStringList() : clearances_; }
   QString clearancesNote() const { return hide() ? tr("Shown in the debrief") : clearances_.isEmpty() ? tr("None yet") : QString(); }
@@ -179,7 +185,7 @@ class ExerciseController : public QObject {
 
   Phase phase_ = Idle;
   ExerciseContext ctx_;
-  bool assessed_ = false, consent_ = false, audioConnected_ = false;
+  bool assessed_ = false, consent_ = false, audioConnected_ = false, audioSwitch_ = false;
   QString preview_, waiting_;
   QStringList clearances_, missed_;
   QList<ExerciseStep> steps_;
