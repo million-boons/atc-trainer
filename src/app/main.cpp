@@ -221,7 +221,8 @@ int main(int argc, char** argv) {
               atc::describeModel, atc::availableMemoryMb);
     LiveExerciseSetup setup;
     std::string rulesError;
-    if (!atc::loadParserRules(phraseology->dir() + "/placeholder.json", setup.rules, rulesError)) {
+    if (!atc::loadParserRules(phraseology->dir() + "/placeholder.json", setup.rules, rulesError) ||
+        !atc::loadCallsignDigits(paths.data + "/airfields", setup.rules, rulesError)) {  // D-204
       qCritical("no exercise: %s", rulesError.c_str());
     } else {
       LiveExerciseConfig ec;

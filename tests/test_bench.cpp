@@ -156,20 +156,26 @@ TEST(Percentile, NearestRank) {
 TEST(Shape, RejectsDroppedDigitsAndNeverChangesValues) {
   const auto ok = [](const std::string& s) { return shapeOk(extractFields(words(s), kNames)); };
   EXPECT_TRUE(ok("eagle four two one taxi via alpha three hold short runway zero nine left"));
-  EXPECT_FALSE(ok("eagle four two taxi via alpha three runway zero nine"));   // callsign digit lost
+  EXPECT_FALSE(ok("eagle four taxi via alpha three runway zero nine"));       // callsign digits lost
+  EXPECT_TRUE(ok("eagle four two taxi via alpha three runway zero nine"));     // two digits: a valid callsign (D-203)
   EXPECT_FALSE(ok("eagle four two one runway nine cleared to land"));         // runway digit lost
   EXPECT_FALSE(ok("eagle four two one runway three seven cleared to land"));  // no such runway
   EXPECT_FALSE(ok("eagle four two one turn left heading four zero"));
   EXPECT_TRUE(ok("eagle four two one turn left heading zero four zero"));
   EXPECT_FALSE(ok("eagle four two one taxi via alpha runway zero nine"));
   EXPECT_TRUE(ok("eagle four two one contact tower one two four decimal five"));
+  EXPECT_TRUE(ok("falcon one two rajali tower read you five"));
+  EXPECT_FALSE(ok("falcon one two rajali tower read you six"));
+  EXPECT_FALSE(ok("falcon one two rajali tower read you five five"));
   EXPECT_FALSE(ok("eagle four two one contact tower two four decimal five"));
   EXPECT_FALSE(ok("eagle four two one climb flight level zero eight"));
   const auto e = extractFields(words("eagle four two one runway zero eight cleared to land"), kNames);
   EXPECT_EQ(e.fields.at("runway"), "08");
   Phrase p{"", false, {{"callsign", "EAGLE-421"}, {"runway", "09"}}};
   EXPECT_EQ(judge(p, e, 0, true), Outcome::Wrong);  // right shape, wrong value: shape cannot hide it
-  EXPECT_EQ(judge(p, extractFields(words("eagle four two runway zero nine"), kNames), 0, true), Outcome::Rejected);
+  EXPECT_EQ(judge(p, extractFields(words("eagle four runway zero nine"), kNames), 0, true), Outcome::Rejected);
+  // D-203: a lost digit of a three-digit callsign is a valid two-digit one; the scorer counts it WRONG.
+  EXPECT_EQ(judge(p, extractFields(words("eagle four two runway zero nine"), kNames), 0, true), Outcome::Wrong);
 }
 
 TEST(Action, SeesASwappedClearance) {

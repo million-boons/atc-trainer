@@ -106,6 +106,18 @@ TEST(Phraseology, PromptHasAllNamesAndNoDigitsOfAScenario) {
     EXPECT_NE(s.find(w), std::string::npos) << w;
   EXPECT_EQ(s.find_first_of("0123456789{}"), std::string::npos);
 }
+TEST(Phraseology, PromptStaysUnderWhispersLimit) {
+  // 223 tokens at most (text context 448 / 2 - 1); beyond that Whisper drops the start, the names.
+  // Measured with the tiny.en tokenizer: 165 tokens for 604 characters, 182 for 657, 209 for 800
+  // (3.6 to 3.8 characters a token), so 810 characters is the guard; count the tokens again when
+  // it fails. Every word of the phraseology stays in.
+  std::string s = whisperPrompt(real());
+  EXPECT_LE(s.size(), 810u) << s;
+  for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  for (char& c : s)
+    if (c == ',' || c == '.') c = ' ';
+  for (const auto& w : phraseologyWords(real())) EXPECT_NE((" " + s + " ").find(" " + w + " "), std::string::npos) << w;
+}
 TEST(Phraseology, PromptWordsComeLastOnceAndOnlyInThePrompt) {
   const auto p = real();
   ASSERT_FALSE(p.promptWords.empty());
@@ -118,8 +130,8 @@ TEST(Phraseology, PromptWordsComeLastOnceAndOnlyInThePrompt) {
   ExpandOptions o;
   o.perExample = 20;
   for (const auto& line : expandPhrases(p, o))
-    for (const char* w : {"rajali", "arakkonam", "circuit"}) EXPECT_EQ(line.find(w), std::string::npos) << line;
-  for (const auto& w : phraseologyWords(p)) EXPECT_NE(w, "rajali");
+    EXPECT_EQ(line.find("arakkonam"), std::string::npos) << line;  // "rajali" is in the radio check reply (D-203)
+  for (const auto& w : phraseologyWords(p)) EXPECT_NE(w, "arakkonam");
 }
 TEST(Phraseology, PromptWordsAreChecked) {
   EXPECT_NE(loadChanged("\"Rajali\"", "\"Rajali 7\"").find("promptWords"), std::string::npos);
@@ -188,6 +200,7 @@ TEST(Script, SeededBalancedAndEveryLineReadable) {
     ASSERT_EQ(again.size(), s.size());
     std::map<char, int> digits;
     std::set<char> letters;
+    int taxiLines = 0;
     int neg = 0, variant = 0, malformed = 0;
     for (std::size_t i = 0; i < s.size(); ++i) {
       EXPECT_EQ(phraseLine(s[i]), phraseLine(again[i]));
@@ -204,14 +217,17 @@ TEST(Script, SeededBalancedAndEveryLineReadable) {
         allText.insert(s[i].text);
         if (const auto c = s[i].expect.find("callsign"); c != s[i].expect.end())
           for (char d : c->second.substr(c->second.find('-') + 1)) ++digits[d];
-        if (const auto t = s[i].expect.find("taxiway"); t != s[i].expect.end()) letters.insert(t->second[0]);
+        if (const auto t = s[i].expect.find("taxiway"); t != s[i].expect.end()) letters.insert(t->second[0]), ++taxiLines;
       }
     }
     EXPECT_EQ(neg, 20);
     EXPECT_EQ(variant, 10);
     EXPECT_EQ(malformed, 8);
     for (char d = '0'; d <= '9'; ++d) EXPECT_GE(digits[d], 6) << d;
-    EXPECT_GE(letters.size(), 6u);
+    // Letters are balanced: every taxiway line has its own (D-203: the circuit intents leave
+    // fewer taxiway lines in 40).
+    EXPECT_GE(taxiLines, 2);
+    EXPECT_EQ(letters.size(), std::size_t(taxiLines));
   }
   EXPECT_GE(allText.size(), 150u);
 }

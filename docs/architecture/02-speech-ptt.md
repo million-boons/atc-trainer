@@ -219,7 +219,7 @@ Findings: (1) Vosk grammar order was tested against three alternatives, all with
 | ctx 384 | 2.28 s | 5.41 s | 6.91 s | 17 of 43 | 1.77 | 86 | 39 / 15 | 13 | 275.5 % |
 | prompt version 2, ctx 384 | 2.08 s | 4.07 s | 4.65 s | 19 of 43 | 1.77 | 85 | 39 / 13 | 12 | 318.5 % |
 
-- **No option meets p95 at most 2 s.** 2 threads gives the same text with about 40 % less CPU, but is slower.
+- **No option meets p95 at most 2 s** (the old target; D-202 replaced it with release to pilot reply at most 3 s at p95, not measured yet). Next: ctx 512 with an output-token cap, adopted only with 0 wrong accepts and no field-accuracy loss. 2 threads gives the same text with about 40 % less CPU, but is slower.
 - A smaller window is faster when it works, but Whisper then **loops** ("Eagle is very large bird." repeated; whole transmissions repeated until the token limit). The loops make the slowest cases slower and the WER very high, and runway accuracy drops. Wrong accepted stays 0 and off-script 0 of 30 in all, because the parser refuses repeated values.
 - Not measured: a q4 or q8 model (not on the panel, needs a download), a token limit against loops, a decode of only the speech (VAD trim before Whisper), and a faster panel CPU.
 
@@ -236,7 +236,7 @@ Approved gate (D-40), on the locked test set; **none of it is measured yet**:
 | Off-script speech accepted | at most 1 of 80 |
 | Scripted WER | at most 8 % (diagnostic, not a gate) |
 | niner/tree/fife and Indian-English subset | within 3 points of the rest |
-| Release-to-text | p95 at most 2 s, max at most 3 s |
+| Release to pilot reply (D-202; replaces release-to-text p95 at most 2 s, max 3 s) | p95 at most 3 s |
 | Engine memory | at most 450 MB |
 | CPU during TX | at most 1 core (Vosk) |
 | Memory growth over 4 h | none |
@@ -244,6 +244,8 @@ Approved gate (D-40), on the locked test set; **none of it is measured yet**:
 If no engine passes, options are vocabulary/phrasing aliases, model adaptation, or a hardware change. These go to you; thresholds are not quietly lowered.
 
 ## 4. Parser
+
+**Circuit intents (D-203).** Thirteen intents are parsed (the departure's four, LANDING_CLEARANCE and the eight of the circuit). Rules added: the longest cue wins ("taxi to holding point", "line up and wait", "readback incomplete confirm cleared for takeoff" over "taxi", "line up", "cleared for takeoff"); "hold short" with an instruction that lists the flag is that flag, otherwise the intent HOLD_SHORT, and with an instruction that does not list it two instructions (AMBIGUOUS); a form may hold a fixed word after a value ("decimal" writes the point). Two-digit callsigns: the digit counts per name come from the airfield pools (D-204), so "Eagle four two" is uncertain; a name with both counts (FALCON) still reads a lost digit as a valid callsign, which only the scenario catches. "clear to land" is a landing cue (D-204), to re-check with the dev speakers.
 
 Pipeline: text → normalise (niner/tree/fife, phonetic letters, number groupings, spoken variants from `vocabulary.json`) → tag slots → intent patterns → parameters → classification.
 

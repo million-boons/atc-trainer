@@ -1,5 +1,6 @@
 #pragma once
 #include <map>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -18,7 +19,8 @@ struct ParserRules {
     std::vector<Words> spoken;
   };
   struct Slot {
-    std::vector<std::vector<std::string>> forms;  // pool names
+    // Pool names, or "=word" for a fixed word of the form ("=decimal" writes the decimal point).
+    std::vector<std::vector<std::string>> forms;
     std::vector<Words> markers;  // empty: the slot starts with a value of its first pool
     int lo = 0, hi = 0;          // range of the number formed by the digits; hi 0 = no check
   };
@@ -32,8 +34,13 @@ struct ParserRules {
   std::map<std::string, Slot> slots;
   std::map<std::string, std::vector<Words>> flags;
   std::vector<Intent> intents;
+  // Digit counts of each callsign name in the airfield pools (D-204), e.g. EAGLE {3}, FALCON {2, 3}.
+  // Empty: not loaded, every callsign form counts. A name in no airfield keeps three digits.
+  std::map<std::string, std::set<int>> callsignDigits;
 };
 bool loadParserRules(const std::string& phraseologyFile, ParserRules& out, std::string& error);
+// Reads "callsigns" of every *.json in airfieldDir (all airfields, never one scenario's: D-48).
+bool loadCallsignDigits(const std::string& airfieldDir, ParserRules& rules, std::string& error);
 
 struct ParseOptions {
   double minConfidence = -1;  // a field below this is uncertain. Off: not usable on the engines so far
@@ -41,7 +48,9 @@ struct ParseOptions {
 
 // Pure function. A value is taken exactly as said or not at all; every word of the transmission
 // must be explained, otherwise the result is AMBIGUOUS ("cancel", "not", a second value, a number
-// without its marker). tx, modelId and modelConfig are the caller's.
+// without its marker). The longest cue wins ("line up and wait" is not "line up" plus two words);
+// an intent whose only cue is a flag of another intent found ("hold short" with "taxi") is that
+// flag, not a second instruction. tx, modelId and modelConfig are the caller's.
 ParsedInstruction parseInstruction(const SttResult& heard, const ParserRules& rules, const ParseOptions& o = {});
 
 }  // namespace atc

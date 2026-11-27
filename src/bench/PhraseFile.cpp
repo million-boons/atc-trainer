@@ -13,7 +13,7 @@ std::string trim(const std::string& s) {
 }  // namespace
 
 bool readPhrases(std::istream& in, std::vector<Phrase>& out, std::string& error) {
-  static const std::set<std::string> known{"callsign", "runway",   "taxiway",   "heading",
+  static const std::set<std::string> known{"callsign", "runway",   "taxiway",   "heading",   "readability",
                                            "level",    "altitude", "frequency", "hold_short", "action"};
   int n = 0;
   const auto fail = [&](const std::string& why) {

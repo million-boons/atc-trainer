@@ -75,6 +75,7 @@ class Gen {
     if (slot == "level") return v >= 10 && v <= 450;
     if (slot == "taxiway" || slot == "altitude" || slot == "altitudeHundred") return v >= 1;
     if (slot == "frequency") return v >= 118 && v <= 136;
+    if (slot == "readability") return v >= 1 && v <= 5;
     return true;
   }
   std::size_t balanced(const std::string& key, std::size_t n) {
@@ -136,6 +137,7 @@ class Gen {
     else if (slot == "level") f.value = "FL" + d;
     else if (slot == "altitude") f.value = std::to_string((d[0] - '0') * 1000 + (d.size() > 1 ? (d[1] - '0') * 100 : 0));
     else if (slot == "frequency") f.value = d.substr(0, 3) + "." + d.substr(3);
+    else if (slot == "readability") f.value = d;
     return f;
   }
   std::mt19937& rng() { return g_; }
@@ -169,8 +171,14 @@ std::vector<Phrase> makeScript(const Phraseology& p, const ScriptOptions& o, std
   std::set<std::string> names;
   for (const auto& v : p.pools.at("callsignName")) names.insert(v[0]);
   std::vector<std::pair<std::string, std::string>> examples;  // intent, text
+  // Only examples with a value besides the callsign: the bench accepts nothing less (accepted()),
+  // so "{callsign} read back runway" (D-203) cannot be scored and is left out of scripts.
   for (const auto& i : p.intents)
-    for (const auto& e : i.examples) examples.emplace_back(i.id, e);
+    for (const auto& e : i.examples) {
+      int slots = 0;
+      for (const auto& t : split(e)) slots += t.front() == '{' && t != "{callsign}";
+      if (slots > 0) examples.emplace_back(i.id, e);
+    }
 
   std::vector<Phrase> out;
   std::set<std::string> texts;

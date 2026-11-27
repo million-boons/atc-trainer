@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <set>
@@ -77,18 +78,54 @@ class Reader {
   }
 
   ParsedInstruction run() {
-    std::vector<const ParserRules::Intent*> found;
-    for (const auto& in : rules_.intents) {
-      bool any = false;
+    // Cues, longest first; a cue counts only on words no longer cue has taken.
+    struct Hit {
+      const ParserRules::Intent* in;
+      const Words* cue;
+      std::size_t at;
+    };
+    std::vector<Hit> hits;
+    for (const auto& in : rules_.intents)
       for (const auto& c : in.cues)
         for (std::size_t i = 0; i < tokens_.size(); ++i)
-          if (matches(c, i)) use(i, c.size()), any = true;
-      if (any) found.push_back(&in);
-    }
+          if (matches(c, i)) hits.push_back({&in, &c, i});
+    std::stable_sort(hits.begin(), hits.end(), [](const Hit& a, const Hit& b) { return a.cue->size() > b.cue->size(); });
+    std::vector<Hit> kept;
+    for (const auto& h : hits)
+      if (unused(h.at, h.cue->size())) use(h.at, h.cue->size()), kept.push_back(h);
+    std::vector<const ParserRules::Intent*> found;
+    for (const auto& h : kept)
+      if (std::find(found.begin(), found.end(), h.in) == found.end()) found.push_back(h.in);
+    // "hold short" with "taxi": the flag of the taxi instruction, not the intent HOLD_SHORT.
+    const auto isFlagOf = [&](const ParserRules::Intent* by, const Words& cue) {
+      for (const auto& [name, phrases] : rules_.flags)
+        if (std::find(phrases.begin(), phrases.end(), cue) != phrases.end() &&
+            (std::find(by->required.begin(), by->required.end(), name) != by->required.end() ||
+             std::find(by->optional.begin(), by->optional.end(), name) != by->optional.end()))
+          return true;
+      return false;
+    };
+    std::vector<const ParserRules::Intent*> drop;
+    for (const auto* f : found)
+      for (const auto* other : found) {
+        if (other == f) continue;
+        bool all = true;
+        for (const auto& h : kept)
+          if (h.in == f && !isFlagOf(other, *h.cue)) all = false;
+        if (all && std::find(drop.begin(), drop.end(), f) == drop.end()) drop.push_back(f);
+      }
+    if (drop.size() < found.size())
+      for (const auto* d : drop) {
+        for (const auto& h : kept)
+          if (h.in == d)
+            for (std::size_t k = h.at; k < h.at + h.cue->size(); ++k) tokens_[k].used = false;
+        found.erase(std::find(found.begin(), found.end(), d));
+      }
+    // Flags only on words no cue has taken ("hold short" as the intent HOLD_SHORT is no flag).
     for (const auto& [name, phrases] : rules_.flags)
       for (const auto& p : phrases)
         for (std::size_t i = 0; i < tokens_.size(); ++i)
-          if (matches(p, i)) {
+          if (matches(p, i) && unused(i, p.size())) {
             use(i, p.size());
             set(name, "yes", i, i + p.size());
           }
@@ -139,8 +176,16 @@ class Reader {
   void use(std::size_t i, std::size_t n) {
     for (std::size_t k = i; k < i + n; ++k) tokens_[k].used = true;
   }
+  bool unused(std::size_t i, std::size_t n) const {
+    for (std::size_t k = i; k < i + n; ++k)
+      if (tokens_[k].used) return false;
+    return true;
+  }
   // Length and id of a value of the pool at i; length 0 = none.
   std::pair<std::size_t, std::string> valueAt(const std::string& pool, std::size_t i) const {
+    if (pool.front() == '=')  // a fixed word of the form
+      return i < tokens_.size() && tokens_[i].text == pool.substr(1) ? std::pair<std::size_t, std::string>{1, pool == "=decimal" ? "." : ""}
+                                                                     : std::pair<std::size_t, std::string>{0, ""};
     std::pair<std::size_t, std::string> best{0, ""};
     for (const auto& v : rules_.pools.at(pool))
       for (const auto& s : v.spoken)
@@ -178,6 +223,12 @@ class Reader {
       std::string value;
       for (const auto& form : slot.forms)
         if (std::string v = fit(form, at, end); !v.empty()) value = v;
+      if (!value.empty() && name == "callsign" && !rules_.callsignDigits.empty()) {  // D-204
+        const auto dash = value.find('-');
+        const auto it = rules_.callsignDigits.find(value.substr(0, dash));
+        const int n = static_cast<int>(value.size() - dash - 1);
+        if (it == rules_.callsignDigits.end() ? n != 3 : !it->second.count(n)) value.clear();
+      }
       if (!value.empty() && slot.hi > 0) {
         std::string d;
         for (char c : value)
@@ -314,11 +365,18 @@ bool loadParserRules(const std::string& file, ParserRules& out, std::string& err
       std::istringstream in(form.get<std::string>());
       std::vector<std::string> items;
       for (std::string w; in >> w;) {
-        if (w.size() < 3 || w.front() != '{' || w.back() != '}' || !r.pools.count(w.substr(1, w.size() - 2)))
-          return fail("slots/" + name + ": the parser reads pools only, not " + w);
+        if (w.front() != '{') {  // a fixed word, e.g. "decimal" in a frequency
+          const Words n = normaliseText(w);
+          if (n.size() != 1 || n[0] != w || items.empty()) return fail("slots/" + name + ": a fixed word must be one plain word after a value: " + w);
+          items.push_back("=" + w);
+          continue;
+        }
+        if (w.size() < 3 || w.back() != '}' || !r.pools.count(w.substr(1, w.size() - 2)))
+          return fail("slots/" + name + ": unknown pool " + w);
         items.push_back(w.substr(1, w.size() - 2));
       }
       if (items.empty()) return fail("slots/" + name + ": empty form");
+      if (items.back().front() == '=') return fail("slots/" + name + ": a form must end with a value");
       s.forms.push_back(std::move(items));
     }
     if (s.forms.empty()) return fail("slots/" + name + ": no forms");
@@ -340,6 +398,39 @@ bool loadParserRules(const std::string& file, ParserRules& out, std::string& err
     r.slots.emplace(name, std::move(s));
   }
   out = std::move(r);
+  return true;
+}
+
+bool loadCallsignDigits(const std::string& dir, ParserRules& rules, std::string& error) {
+  namespace fs = std::filesystem;
+  std::error_code ec;
+  std::vector<fs::path> files;
+  for (const auto& e : fs::directory_iterator(dir, ec))
+    if (e.path().extension() == ".json") files.push_back(e.path());
+  if (ec || files.empty()) {
+    error = dir + ": no airfield files";
+    return false;
+  }
+  std::sort(files.begin(), files.end());
+  std::map<std::string, std::set<int>> digits;
+  for (const auto& f : files) {
+    std::ifstream in(f);
+    const json j = json::parse(in, nullptr, false);
+    const auto fail = [&](const std::string& why) {
+      error = f.string() + ": " + why;
+      return false;
+    };
+    if (!j.is_object() || !j.contains("callsigns") || !j["callsigns"].is_array()) return fail("no callsigns list");
+    for (const auto& c : j["callsigns"]) {
+      const std::string id = c.is_object() && c.contains("id") && c["id"].is_string() ? c["id"].get<std::string>() : "";
+      const auto dash = id.find('-');
+      const std::string d = dash == std::string::npos ? "" : id.substr(dash + 1);
+      if (dash == 0 || d.empty() || !std::all_of(d.begin(), d.end(), [](unsigned char x) { return std::isdigit(x); }))
+        return fail("callsign id must be NAME-digits: " + id);
+      digits[id.substr(0, dash)].insert(static_cast<int>(d.size()));
+    }
+  }
+  rules.callsignDigits = std::move(digits);
   return true;
 }
 
