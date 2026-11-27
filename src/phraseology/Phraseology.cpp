@@ -209,8 +209,13 @@ std::string whisperPrompt(const Phraseology& p) {
       for (const auto& s : v) list += (list.empty() ? " " : ", ") + (name == "digit" || name == "side" ? s : cap(s));
     o += list + ".";
   }
-  // Fixed wording between the slots, each once.
-  std::set<std::string> seen;
+  // Fixed wording between the slots, each once, and only if it adds a word: Whisper keeps at
+  // most 223 prompt tokens and drops the start (the names) beyond that (D-203).
+  std::set<std::string> seen, have;
+  for (const auto& [name, values] : p.pools)
+    for (const auto& v : values)
+      for (const auto& s : v)
+        for (const auto& w : split(s)) have.insert(w);
   std::string words;
   const auto add = [&](const std::string& form) {
     std::string run;
@@ -218,7 +223,9 @@ std::string whisperPrompt(const Phraseology& p) {
       if (!isRef(w)) {
         run += (run.empty() ? "" : " ") + w;
       } else if (!run.empty()) {
-        if (seen.insert(run).second) words += (words.empty() ? " " : ", ") + run;
+        bool adds = false;
+        for (const auto& x : split(run)) adds |= have.insert(x).second;
+        if (seen.insert(run).second && adds) words += (words.empty() ? " " : ", ") + run;
         run.clear();
       }
     }

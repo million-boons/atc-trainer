@@ -167,12 +167,13 @@ TEST(Parser, TwoInstructionsOrTwoValuesAreAmbiguous) {
   EXPECT_EQ(parse("eagle four two one line up runway zero nine runway zero nine").cls, C::Recognized);  // said twice, the same
 }
 TEST(Parser, AFieldTheIntentDoesNotHave) {
-  EXPECT_TRUE(because(parse("eagle four two one hold short runway zero nine line up"), "hold_short does not belong"));
+  // "hold short" is the intent HOLD_SHORT unless the other instruction has the flag (D-203).
+  EXPECT_TRUE(because(parse("eagle four two one hold short runway zero nine line up"), "several instructions"));
   EXPECT_EQ(parse("eagle four two one via alpha three runway zero nine cleared for takeoff").cls, C::Ambiguous);
 }
 TEST(Parser, OtherSpeechIsUnrecognized) {
   for (const char* s : {"", "   ", "Please tell the technician to check the printer", "The runway lights look fine today", "Eagle is a very large bird",
-                        "hawk six seven four runway two seven cleared to land", "eagle four two one", "eagle four two one turn left heading zero nine zero"})
+                        "eagle four two one", "eagle four two one turn left heading zero nine zero"})
     EXPECT_EQ(parse(s).cls, C::Unrecognized) << s;
   EXPECT_NE(parse("The taxi to the station was late again").cls, C::Recognized);
 }
@@ -188,8 +189,16 @@ TEST(Parser, OneDamagedWordNeverInventsAValue) {
         if (k != i) dropped += (dropped.empty() ? "" : " ") + w[k];
       }
       EXPECT_NE(parse(damaged).cls, C::Recognized) << damaged;
-      if (w[i] != "left") {  // a runway without its side is a full runway
-        EXPECT_NE(parse(dropped).cls, C::Recognized) << dropped;
+      if (w[i] == "left") continue;  // a runway without its side is a full runway
+      const auto d = parse(dropped);
+      if (d.cls != C::Recognized) continue;
+      // The one exception (D-430, D-203): a lost digit of a three-digit callsign leaves a valid
+      // two-digit callsign. Everything else must be exactly as before.
+      const std::string cs = value(d, "callsign"), was = value(want, "callsign");
+      EXPECT_TRUE(i >= 1 && i <= 3 && cs.size() == was.size() - 1 && cs.substr(0, cs.find('-')) == was.substr(0, was.find('-'))) << dropped;
+      for (const auto& [k, f] : want.fields) {
+        if (k == "callsign") continue;
+        EXPECT_EQ(value(d, k), f.value) << dropped << " " << k;
       }
     }
   }
@@ -279,7 +288,7 @@ TEST(Parser, EveryCircuitLineOfTheScriptParsesCompletely) {
 TEST(Parser, EveryExampleOfAParsedIntentParsesAsItself) {
   std::ifstream f(rulesFile());
   const auto j = nlohmann::json::parse(f);
-  const std::map<std::string, std::string> fill{{"{callsign}", "cobra seven"}, {"{runway}", "two three right"}, {"{taxiway}", "kilo four"},
+  const std::map<std::string, std::string> fill{{"{callsign}", "cobra seven one"}, {"{runway}", "two three right"}, {"{taxiway}", "kilo four"},
                                                 {"{readability}", "two"}, {"{frequency}", "one three zero decimal niner"}};
   int n = 0;
   for (const auto& i : j["intents"]) {

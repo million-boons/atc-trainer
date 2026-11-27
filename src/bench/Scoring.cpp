@@ -182,6 +182,10 @@ Extracted extractFields(const std::vector<SttWord>& w, const std::set<std::strin
       if (!d.empty()) set("level", "FL" + d, i, i + 2 + d.size());
     }
     if (is(i, "hold") && is(i + 1, "short")) set("hold_short", "yes", i, i + 2);
+    if (is(i, "read") && is(i + 1, "you")) {  // radio check reply (D-203)
+      const std::string d = digits(i + 2);
+      if (!d.empty()) set("readability", d, i, i + 2 + d.size());
+    }
     if (is(i, "decimal") || is(i, "point")) {
       std::size_t a = i;
       while (a > 0 && digitOf(w[a - 1].text) >= 0) --a;
@@ -243,11 +247,13 @@ bool shapeOk(const Extracted& e) {
   };
   for (const auto& [k, v] : e.fields) {
     bool ok = true;
-    if (k == "callsign") ok = v.find('-') != std::string::npos && number(v.substr(v.find('-') + 1), 3, 0, 999);
+    if (k == "callsign")  // two or three digits (D-430, D-203)
+      ok = v.find('-') != std::string::npos && (number(v.substr(v.find('-') + 1), 3, 0, 999) || number(v.substr(v.find('-') + 1), 2, 0, 99));
     else if (k == "runway") ok = number(v.substr(0, 2), 2, 1, 36) && (v.size() == 2 || (v.size() == 3 && std::string("LRC").find(v[2]) != std::string::npos));
     else if (k == "taxiway") ok = v.size() >= 2 && v.size() <= 3 && isDigits(v.substr(1));
     else if (k == "heading") ok = number(v, 3, 1, 360);
     else if (k == "level") ok = v.size() > 2 && number(v.substr(2), 3, 0, 999);
+    else if (k == "readability") ok = number(v, 1, 1, 5);
     else if (k == "frequency") {
       const auto dot = v.find('.');
       ok = dot == 3 && number(v.substr(0, 3), 3, 100, 399) && v.size() >= 5 && v.size() <= 7 && isDigits(v.substr(4));

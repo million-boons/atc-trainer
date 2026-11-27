@@ -245,6 +245,8 @@ If no engine passes, options are vocabulary/phrasing aliases, model adaptation, 
 
 ## 4. Parser
 
+**Circuit intents (D-203).** Thirteen intents are parsed (the departure's four, LANDING_CLEARANCE and the eight of the circuit). Rules added: the longest cue wins ("taxi to holding point", "line up and wait", "readback incomplete confirm cleared for takeoff" over "taxi", "line up", "cleared for takeoff"); "hold short" with an instruction that lists the flag is that flag, otherwise the intent HOLD_SHORT, and with an instruction that does not list it two instructions (AMBIGUOUS); a form may hold a fixed word after a value ("decimal" writes the point). Two-digit callsigns mean a lost digit of a three-digit one is a valid callsign: only the scenario can catch it.
+
 Pipeline: text → normalise (niner/tree/fife, phonetic letters, number groupings, spoken variants from `vocabulary.json`) → tag slots → intent patterns → parameters → classification.
 
 | Class | Rule |
