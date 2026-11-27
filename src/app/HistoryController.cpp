@@ -273,6 +273,7 @@ QVariantMap HistoryController::head() const {
           {"when", tr("%1 to %2").arg(date(r.startedMs), clock(r.endedMs))}, {"end", endText(r.end).toUpper()}, {"level", endLevel(r.end)},
           {"sub", tr("%1 of %2 steps   %3   fallback PTT used: %4   Model %5").arg(r.stepsDone).arg(r.steps).arg(length(r.endedMs - r.startedMs), detail_->fallbackPtt ? tr("yes") : tr("no"), q(detail_->model))},
           {"placeholder", r.placeholder}, {"audio", q(detail_->audioNote)},
+          {"standIn", r.pttStandIn ? tr("PTT: mouse stand-in, not the pedal") : QString()},
           {"changed", r.scenarioChanged ? tr("Scenario changed since this run") : QString()}};
 }
 
