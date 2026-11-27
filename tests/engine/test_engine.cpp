@@ -44,7 +44,7 @@ json readJson(const fs::path& f) {
   return json::parse(in, nullptr, false);
 }
 
-// The shipped departure with LINE_UP added to the intents (package 2e adds it for real).
+// The shipped departure, loaded from a copy of its files.
 std::shared_ptr<Exercise> departure() {
   static int n = 0;
   Paths paths;
@@ -56,9 +56,6 @@ std::shared_ptr<Exercise> departure() {
   const fs::path data = paths.data;
   const fs::path dir = fs::temp_directory_path() / ("atc_engine_" + std::to_string(getpid()) + "_" + std::to_string(n++));
   json ph = readJson(data / "phraseology" / "placeholder.json");
-  bool have = false;
-  for (const auto& i : ph["intents"]) have = have || i["id"] == "LINE_UP";
-  if (!have) ph["intents"].push_back({{"id", "LINE_UP"}, {"examples", json::array({"{callsign} line up runway {runway}"})}, {"validation", {{"status", "draft"}}}});
   fs::create_directories(dir / "phraseology" / "replies");
   fs::create_directories(dir / "airfields");
   std::ofstream(dir / "phraseology" / "placeholder.json") << ph.dump();
@@ -93,7 +90,7 @@ struct Engine : ::testing::Test {
   ParsedInstruction taxi() const {
     return Simulator::instruction("TAXI_INSTRUCTION", {{"callsign", param("callsign")}, {"taxiway", param("taxiway")}, {"runway", param("runway")}});
   }
-  ParsedInstruction lineUp() const { return Simulator::instruction("LINE_UP", {{"callsign", param("callsign")}, {"runway", param("runway")}}); }
+  ParsedInstruction lineUp() const { return Simulator::instruction("LINE_UP_AND_WAIT", {{"callsign", param("callsign")}, {"runway", param("runway")}}); }
   ParsedInstruction takeoff() const {
     return Simulator::instruction("TAKEOFF_CLEARANCE", {{"callsign", param("callsign")}, {"runway", param("runway")}});
   }
@@ -887,9 +884,9 @@ struct Readback : Engine {
     auto e = std::make_shared<Exercise>(*departure());
     PilotReply part;
     part.id = "TEST_LINING_UP";
-    part.text = "lining up, {callsign}";
+    part.text = "test short, {callsign}";
     part.slots = {"callsign"};
-    part.readbackOf = "LINE_UP";
+    part.readbackOf = "LINE_UP_AND_WAIT";
     e->replies[part.id] = part;
     StepResponse& c = e->scenario.steps[1].responses.at(Outcome::Correct);
     if (alternate)
@@ -935,12 +932,12 @@ struct Readback : Engine {
 TEST_F(Readback, ChallengedInTheNextTransmissionGetsTheFullReadback) {
   with(1);
   toLineUp();
-  EXPECT_EQ(lastPilot(), "lining up, " + param("callsign"));
+  EXPECT_EQ(lastPilot(), "test short, " + param("callsign"));
   EXPECT_EQ(step(), "TAKEOFF");
   const std::size_t judged = outputs<out::Judged>().size();
   sim->transmit(challenge());
   EXPECT_EQ(checks(), std::vector<out::ReadbackResult>{out::ReadbackResult::Caught});
-  EXPECT_EQ(lastPilot(), "line up runway " + param("runway") + ", " + param("callsign"));
+  EXPECT_EQ(lastPilot(), "Lining up runway " + param("runway") + " and waiting, " + param("callsign") + ".");
   EXPECT_EQ(outputs<out::Judged>().size(), judged);  // no attempt of the step
   EXPECT_EQ(step(), "TAKEOFF");
   sim->transmit(takeoff());
@@ -987,10 +984,10 @@ TEST_F(Readback, AChallengeWithAWrongValueIsAWrongValueAndKeepsItDue) {
 TEST_F(Readback, AChallengeAfterACompleteReadbackIsUnnecessary) {
   with(0);
   toLineUp();
-  EXPECT_EQ(lastPilot(), "line up runway " + param("runway") + ", " + param("callsign"));
+  EXPECT_EQ(lastPilot(), "Lining up runway " + param("runway") + " and waiting, " + param("callsign") + ".");
   sim->transmit(challenge());
   EXPECT_EQ(checks(), std::vector<out::ReadbackResult>{out::ReadbackResult::Unnecessary});
-  EXPECT_EQ(lastPilot(), "line up runway " + param("runway") + ", " + param("callsign"));
+  EXPECT_EQ(lastPilot(), "Lining up runway " + param("runway") + " and waiting, " + param("callsign") + ".");
   EXPECT_EQ(lineUpResult().unnecessaryChallenges, 1);
   EXPECT_EQ(lineUpResult().readbackMissed, 0);
 }
@@ -1011,7 +1008,7 @@ TEST_F(Readback, IncompleteReadbacksComeAtTheirRate) {
   const int n = 400;
   for (int seed = 1; seed <= n; ++seed) {
     toLineUp(static_cast<std::uint64_t>(seed));
-    incomplete += lastPilot().starts_with("lining up");
+    incomplete += lastPilot().starts_with("test short");
   }
   EXPECT_GT(incomplete, n * 12 / 100);  // 0.25 within about 6 standard deviations
   EXPECT_LT(incomplete, n * 38 / 100);
@@ -1030,7 +1027,7 @@ TEST_F(Readback, AlternatesAreBothSaidAndNeedNoChallenge) {
     sim->transmit(takeoff());
     EXPECT_TRUE(checks().empty());
   }
-  EXPECT_EQ(said, (std::set<std::string>{"lining up", "line up r"}));
+  EXPECT_EQ(said, (std::set<std::string>{"test shor", "Lining up"}));
 }
 
 TEST_F(Readback, AValueInARangeIsChosenByTheTrainee) {

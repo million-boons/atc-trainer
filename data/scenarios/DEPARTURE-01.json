@@ -119,7 +119,7 @@
       },
       "expects": [
         {
-          "intent": "LINE_UP",
+          "intent": "LINE_UP_AND_WAIT",
           "required": [
             "callsign",
             "runway"

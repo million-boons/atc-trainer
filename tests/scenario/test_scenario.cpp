@@ -49,13 +49,6 @@ struct Departure : ::testing::Test {
     replies = readJson(d / "phraseology" / "replies" / "placeholder.json");
     phraseology = readJson(d / "phraseology" / "placeholder.json");
     ASSERT_TRUE(scenario.is_object() && airfield.is_object() && replies.is_object() && phraseology.is_object());
-    // LINE_UP comes with package 2e; until then the tests add it.
-    bool have = false;
-    for (const auto& i : phraseology["intents"]) have = have || i["id"] == "LINE_UP";
-    if (!have)
-      phraseology["intents"].push_back({{"id", "LINE_UP"},
-                                        {"examples", json::array({"{callsign} line up runway {runway}"})},
-                                        {"validation", {{"status", "draft"}}}});
   }
   void TearDown() override {
     std::error_code ec;
@@ -420,7 +413,7 @@ struct Circuit : Departure {
                                       {"examples", json::array({"{callsign} confirm runway {runway}"})},
                                       {"parse", {{"required", {"callsign"}}, {"optional", {"runway"}}}},
                                       {"validation", {{"status", "draft"}}}});
-    replies["replies"].push_back({{"id", "TEST_LINING_UP"}, {"readbackOf", "LINE_UP"}, {"text", "lining up, {callsign}"}});
+    replies["replies"].push_back({{"id", "TEST_LINING_UP"}, {"readbackOf", "LINE_UP_AND_WAIT"}, {"text", "lining up, {callsign}"}});
     replies["replies"].push_back({{"id", "TEST_ROLLING"}, {"readbackOf", "TAKEOFF_CLEARANCE"}, {"text", "rolling, {callsign}"}});
   }
   json check(double rate = 0.25) const {
@@ -496,7 +489,7 @@ TEST_F(Circuit, FrequenciesComeFromTheirUnit) {
 
 TEST_F(Circuit, AValueTheTraineeChoosesNeedsARange) {
   for (auto& i : phraseology["intents"])
-    if (i["id"] == "LINE_UP") i["examples"].push_back("{callsign} line up runway {runway} read you {readability}");
+    if (i["id"] == "LINE_UP_AND_WAIT") i["examples"].push_back("{callsign} runway {runway} line up and wait read you {readability}");
   step(1)["expects"][0]["required"].push_back("readability");
   expectError(kFile, "/steps/1/expects/0", "needs a mustMatch or a check");
   step(1)["expects"][0]["check"] = {{"readability", {{"range", {1, 5}}}}};
