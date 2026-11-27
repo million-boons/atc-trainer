@@ -193,10 +193,14 @@
    "{digit} {digit} {digit} decimal {digit}"
   ]
  },
+ "promptWords": {
+  "comment": "PLACEHOLDER. Words only for the Whisper prompt, for the coming circuit scenario (user, 2026-11-27, D-128 follow-up). Not approved phraseology: no sentence, script or parser rule uses them. Frequencies use the digit pool and the frequency slot (with decimal), so no frequency value is named here (D-48).",
+  "words": ["Rajali", "Arakkonam", "read you", "circuit", "final", "ground", "decimal"]
+ },
  "parse": {
-  "comment": "PLACEHOLDER. How the parser finds values (02 section 4). Slots without a marker start with a pool name (callsign). Every word must be explained: there are no filler words.",
+  "comment": "PLACEHOLDER. How the parser finds values (02 section 4). Slots without a marker start with a pool name (callsign). Every word must be explained: there are no filler words. Runway marker \"run with\": how Whisper writes \"runway\" for speaker s1 (D-201), to re-check with the dev speakers.",
   "markers": {
-   "runway": ["runway"],
+   "runway": ["runway", "run with"],
    "taxiway": ["via", "taxiway"]
   },
   "flags": {

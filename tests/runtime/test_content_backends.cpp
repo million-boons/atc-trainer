@@ -244,6 +244,30 @@ TEST(HistoryServiceTest, TheDebriefIsTheLogAndReviewsStandBesideIt) {
   EXPECT_NE(x.ask([&](auto done) { x.b.play(id, atc, false, done); }), "");  // no exercise audio (D-314)
 }
 
+// D-340: a result whose scenario files changed since the run says so.
+TEST(HistoryServiceTest, AChangedScenarioIsSaid) {
+  History x;
+  const auto dir = x.t.path / "exercises";
+  exercise(dir, "20261126T100000Z-aaaa", "S01", true);
+  EXPECT_FALSE(x.list("").first.at(0).scenarioChanged);
+  // Today's files, one of them changed: the same check with a copy of the data.
+  TempDir data;
+  for (const char* d : {"scenarios", "airfields", "phraseology"}) fs::copy(paths().data + "/" + d, data.path / d, fs::copy_options::recursive);
+  HistoryService other(HistoryService::Config{data.path.string(), dir.string()},
+                       HistoryService::Rules{[] { return std::pair{Role::Instructor, std::string()}; }, [] { return std::string(); }});
+  std::vector<HistoryRow> rows;
+  const auto list = [&] {
+    other.backend().list("", [&](std::vector<HistoryRow> r, const std::string&) { rows = std::move(r); });
+    other.wait();
+  };
+  list();
+  ASSERT_EQ(rows.size(), 1u);
+  EXPECT_FALSE(rows[0].scenarioChanged);
+  std::ofstream(data.path / "scenarios/DEPARTURE-01.json", std::ios::app) << "\n";
+  list();
+  EXPECT_TRUE(rows[0].scenarioChanged);
+}
+
 TEST(HistoryServiceTest, ALogThatStopsEarlyIsAFault) {
   History x;
   const auto dir = x.t.path / "exercises";

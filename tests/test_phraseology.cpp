@@ -106,6 +106,26 @@ TEST(Phraseology, PromptHasAllNamesAndNoDigitsOfAScenario) {
     EXPECT_NE(s.find(w), std::string::npos) << w;
   EXPECT_EQ(s.find_first_of("0123456789{}"), std::string::npos);
 }
+TEST(Phraseology, PromptWordsComeLastOnceAndOnlyInThePrompt) {
+  const auto p = real();
+  ASSERT_FALSE(p.promptWords.empty());
+  const auto s = whisperPrompt(p);
+  for (const auto& w : p.promptWords) EXPECT_NE(s.find(w), std::string::npos) << w;
+  EXPECT_GT(s.find("Rajali"), s.find("hold short runway"));
+  std::size_t n = 0;
+  for (auto at = s.find("decimal"); at != std::string::npos; at = s.find("decimal", at + 1)) ++n;
+  EXPECT_EQ(n, 1u);  // already in the frequency slot
+  ExpandOptions o;
+  o.perExample = 20;
+  for (const auto& line : expandPhrases(p, o))
+    for (const char* w : {"rajali", "arakkonam", "circuit"}) EXPECT_EQ(line.find(w), std::string::npos) << line;
+  for (const auto& w : phraseologyWords(p)) EXPECT_NE(w, "rajali");
+}
+TEST(Phraseology, PromptWordsAreChecked) {
+  EXPECT_NE(loadChanged("\"Rajali\"", "\"Rajali 7\"").find("promptWords"), std::string::npos);
+  EXPECT_NE(loadChanged("\"Rajali\"", "3").find("promptWords"), std::string::npos);
+  EXPECT_NE(loadChanged("\"words\": [", "\"wordz\": [").find("promptWords"), std::string::npos);
+}
 TEST(Phraseology, ErrorsNameThePlace) {
   EXPECT_NE(loadChanged("\"7\": [", "\"x\": [").find("digits/7"), std::string::npos);
   EXPECT_NE(loadChanged("\"Q\": [", "\"QQ\": [").find("letters/Q"), std::string::npos);

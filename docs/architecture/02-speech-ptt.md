@@ -197,6 +197,33 @@ Findings: (1) Vosk grammar order was tested against three alternatives, all with
 - *The scorer could not see a swapped instruction.* Both order-4 runs checked (seeds 1 and 2) heard "cleared for takeoff" as "cleared to land" and were scored correct; the old-prompt whisper run had a similar climb/land error. `actionOf` now scores takeoff, land, turn left/right, climb and descend (`stt_bench --action`); it must be part of the gate.
 - **All of these use wording the s1 prompts were written from, so they are optimistic, and order/seed were chosen on s1.**
 
+**Timing run T (D-202), 2026-11-27, idle window (D-340), panel i3-3217U, measured.** `stt_bench` in real time on s1, Whisper tiny.en q5_1, 4 threads, ctx 768, greedy, one pass; each config twice (old, new, new, old), the same text both times; 43 recordings of 2 to 6 s, so 86 per config. No build running; CPU about 97 % idle at the start; Firefox open but idle.
+
+| Config | p50 | p95 | max | over 2 s | CPU s per s of audio | highest memory | fields (s1) | parser right / wrong / say again of 20 |
+|---|---|---|---|---|---|---|---|---|
+| `whisper-tiny-genprompt` (exercise model) | 2.39 s | 2.59 s | 3.74 s | 86 of 86 | 1.75 | 163 MB | 87 / 102 | 12 / 0 / 8 |
+| `whisper-tiny-genprompt-2` (candidate) | 2.51 s | 2.77 s | 3.17 s | 86 of 86 | 1.84 | 170 MB | 86 / 102 | 10 / 0 / 10 |
+
+- **Neither meets the release-to-text gate** (p95 at most 2 s); the quickest of 172 was 2.27 s. The bench delay is from the end of the recording; in an exercise the 200 ms tail comes on top (exercise logs: 2.7 to 3.3 s).
+- Version 2 is about 0.12 s slower: its prompt is 182 tokens against 165 (limit 223).
+- s1 never says "niner", so the niner-first order is not tested on speech. In the 23:23 run of 2026-11-25 (text in the log, no audio, old prompt) "niner" came through in all 11 runway mentions.
+- "run with" as a runway marker (D-201), parsed from the same decodes with the marker in the data: old prompt 12 right become **15 of 20** (say again 8 to 5), new 10 become 14; wrong accepted stays 0, off-script accepted stays 0 of 30; the 23:23 text: no change (12 of 12 the same).
+
+**Speed options, measured the same way (old prompt unless named, one pass each, 43 recordings of 2 to 6 s).** Decoding is already greedy, one pass, no temperature fallback; tiny q5_1 is the smallest model on the panel.
+
+| Option | p50 | p95 | max | at most 2 s | CPU s per s of audio | fields (s1) | callsign / runway | parser right of 20 | WER |
+|---|---|---|---|---|---|---|---|---|---|
+| Exercise model (4 threads, ctx 768) | 2.39 s | 2.59 s | 3.74 s | 0 of 43 | 1.75 | 87 | 37 / 18 | 15 | 8.3 % |
+| 2 threads | 2.61 s | 3.19 s | 4.30 s | 0 of 43 | 1.02 | 87 (same text) | 37 / 18 | 15 | 8.3 % |
+| ctx 512 | 1.97 s | 3.69 s | 4.11 s | 23 of 43 | 1.52 | 85 | 37 / 17 | 13 | 72.7 % |
+| ctx 384 | 2.28 s | 5.41 s | 6.91 s | 17 of 43 | 1.77 | 86 | 39 / 15 | 13 | 275.5 % |
+| prompt version 2, ctx 384 | 2.08 s | 4.07 s | 4.65 s | 19 of 43 | 1.77 | 85 | 39 / 13 | 12 | 318.5 % |
+
+- **No option meets p95 at most 2 s.** 2 threads gives the same text with about 40 % less CPU, but is slower.
+- A smaller window is faster when it works, but Whisper then **loops** ("Eagle is very large bird." repeated; whole transmissions repeated until the token limit). The loops make the slowest cases slower and the WER very high, and runway accuracy drops. Wrong accepted stays 0 and off-script 0 of 30 in all, because the parser refuses repeated values.
+- Not measured: a q4 or q8 model (not on the panel, needs a download), a token limit against loops, a decode of only the speech (VAD trim before Whisper), and a faster panel CPU.
+
+
 Approved gate (D-40), on the locked test set; **none of it is measured yet**:
 
 | Metric | Target |

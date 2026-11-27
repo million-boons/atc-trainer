@@ -122,6 +122,17 @@ bool loadPhraseology(const std::string& file, Phraseology& out, std::string& err
           return fail("intents/" + in.id + ": unknown slot " + w);
     p.intents.push_back(std::move(in));
   }
+  if (j.contains("promptWords")) {
+    const auto& w = j["promptWords"];
+    if (!w.is_object() || !w.contains("words") || !w["words"].is_array() || w["words"].empty())
+      return fail("promptWords: needs a list words");
+    for (const auto& x : w["words"]) {
+      const std::string s = x.is_string() ? x.get<std::string>() : std::string();
+      if (split(s).empty() || s.find_first_of("{}0123456789,.") != std::string::npos)
+        return fail("promptWords: each word is text without digits, braces, commas or full stops");
+      p.promptWords.push_back(s);
+    }
+  }
   out = std::move(p);
   return true;
 }
@@ -216,7 +227,11 @@ std::string whisperPrompt(const Phraseology& p) {
     for (const auto& e : i.examples) add(e);
   for (const auto& [n, forms] : p.slots)
     for (const auto& s : forms) add(s);
-  return o + words + ".";
+  o += words + ".";
+  std::string extra;
+  for (const auto& w : p.promptWords)
+    if (seen.insert(w).second) extra += (extra.empty() ? " " : ", ") + w;
+  return extra.empty() ? o : o + extra + ".";
 }
 
 }  // namespace atc
