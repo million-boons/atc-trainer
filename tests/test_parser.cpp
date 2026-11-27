@@ -143,7 +143,7 @@ TEST(Parser, PartialNamesWhatIsMissing) {
 }
 TEST(Parser, EveryWordMustBeExplained) {
   for (const char* s : {"eagle four two one cancel runway zero nine cleared for takeoff", "eagle four two one runway zero nine not cleared for takeoff",
-                        "eagle four two one line up and wait runway zero nine", "eagle four two one run with zero nine line up",
+                        "eagle four two one line up and wait runway zero nine", "eagle four two one run with your zero nine line up",
                         "tiger four two one line up runway zero nine", "four two one line up runway zero nine",
                         "eagle four two one line up runway zero nine correction runway two seven",
                         "eagle four two one taxi via alpha three hole short runway zero nine",
@@ -214,6 +214,26 @@ TEST(Parser, RulesAreChecked) {
   EXPECT_NE(loadChanged("\"required\": [\"callsign\", \"runway\"]", "\"required\": [\"callsign\", \"gate\"]").find("unknown slot gate"), std::string::npos);
   EXPECT_NE(loadChanged("\"required\": [\"callsign\", \"runway\"]", "\"required\": [\"altitude\"]").find("pools only"), std::string::npos);
   EXPECT_NE(loadChanged("\"runway\": [1, 36]", "\"runway\": [36, 1]").find("needs [low, high]"), std::string::npos);
-  EXPECT_NE(loadChanged("   \"runway\": [\"runway\"],\n", "").find("needs a marker"), std::string::npos);
+  EXPECT_NE(loadChanged("   \"runway\": [\"runway\", \"run with\"],\n", "").find("needs a marker"), std::string::npos);
   EXPECT_NE(loadChanged("\"parse\": {\n  \"comment\"", "\"parsed\": {\n  \"comment\"").find("parse: missing"), std::string::npos);
+}
+
+// D-201: "run with" is a runway marker (Whisper's spelling of "runway" on s1); to re-check with
+// the dev speakers. It only marks the runway: the value is still taken exactly or not at all.
+TEST(Parser, RunWithMarksTheRunwayAndNothingElse) {
+  const auto a = parse("Eagle, five, zero, nine, taxi via, bravo, six, run with three, six.");
+  EXPECT_EQ(a.cls, C::Recognized);
+  EXPECT_EQ(value(a, "runway"), "36");
+  EXPECT_EQ(value(a, "taxiway"), "B6");
+  const auto b = parse("eagle four two one run with your niner cleared for takeoff");
+  EXPECT_EQ(b.cls, C::Ambiguous);
+  EXPECT_TRUE(because(b, "unexplained words"));
+  EXPECT_EQ(parse("eagle four two one taxi via alpha three run with zero").cls, C::Ambiguous);
+  EXPECT_EQ(parse("eagle four two one run with").cls, C::Unrecognized);
+  const auto d = parse("eagle four two one run with zero nine line up");  // was AMBIGUOUS before D-201
+  EXPECT_EQ(d.cls, C::Recognized);
+  EXPECT_EQ(value(d, "runway"), "09");
+  const auto c = parse("eagle four two one taxi via alpha three run with zero nine runway two seven");
+  EXPECT_EQ(c.cls, C::Ambiguous);  // two runway values: never one picked
+  EXPECT_EQ(parse("falcon three one eight run with three six").cls, C::Unrecognized);  // no instruction cue
 }
