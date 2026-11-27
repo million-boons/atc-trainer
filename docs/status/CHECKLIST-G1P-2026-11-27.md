@@ -1,5 +1,7 @@
 # G1-P: foot pedal test (D-309, 06 §2), 2026-11-27
 
+**Result: all rows OK, reported by the user on 2026-11-27. G1-P passed (D-339).**
+
 Pedal: Microchip "Preon", USB 04d8:0055, `/dev/input/by-id/usb-Microchip_Technology_Inc._Preon-event-mouse` (event3 today; the number may change). Mouse-type, `BTN_RIGHT` (273): 1 on press, 0 only on release (your evtest). On the panel, with nothing else running. Write OK, or what you saw, in the last column.
 
 ## 0. Install (you run it; I never run sudo)

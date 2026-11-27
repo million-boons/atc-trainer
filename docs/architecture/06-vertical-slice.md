@@ -28,7 +28,7 @@ Sessions: b2 = `runtime`, 93 = `stt`, 31 = `ui`, 8d = `engine`.
 | 1c | Recordings: speaker ID and consent required before saving, saving wired to RadioCore, off switch in Settings, list, instructor-only logged delete, low-space warning (D-101, D-102, 04 §5b). Speakers are added by the instructor role only. | 31 | 1a; role mechanism (A-4) | to be estimated by 31 |
 | **G1** | User tests Lab and Dashboard on the panel with the H540; PTT is the mouse stand-in, Screen PTT and Space (D-309). **Passed 2026-11-25** (user, D-315), pedal pending | user | 1a, 1b | – |
 | 1d | Keyboard-type PTT is refused without exclusive grab and exact VID:PID (new config keys, fake-device tests); udev rule with `LIBINPUT_IGNORE_DEVICE` for the matched pedal only, its VID:PID filled in when the pedal arrives (D-310) | b2 | 1a; before G1-P | – |
-| **G1-P** | Pedal arrived 2026-11-27 (04d8:0055, evtest OK, D-338); configured; checklist `CHECKLIST-G1P-2026-11-27.md` with the user. Final acceptance and deployment (phase 10) require it (D-309) | user, b2 | 1d, pedal | – |
+| **G1-P** | **Passed 2026-11-27 (D-339)**: Preon pedal 04d8:0055, all rows of `CHECKLIST-G1P-2026-11-27.md` OK; D-02 passed, D-03 closed. Final acceptance and deployment (phase 10) require it (D-309) | user, b2 | 1d, pedal | – |
 | 2a | Loader (hand-written checks, D-408), generator, `scenario_check`, departure JSON | 8d | 0c | 4–5 |
 | 2b | Context, validator, sequence engine, pilot behaviour, result metrics, `sim_cli` | 8d | 2a | 8–10 |
 | 2c | Template parser, voice bank, coverage, `PhraseAssembler` | 8d | 2a | 4–5 |
@@ -39,7 +39,7 @@ Sessions: b2 = `runtime`, 93 = `stt`, 31 = `ui`, 8d = `engine`.
 | 3a | `ExerciseRuntime`: RadioCore, STT, parser, engine, voice, player; model lock; JSON Lines log (D-401); "fallback PTT used" in log and result (D-311) | b2 | G1, 2a–2f | 7–9 |
 | 3b | Real controllers for Exercise, Result, Dashboard Start/Stop | 31 | 2g, 3a | 3–4 |
 | T | Clean STT timing run on the idle panel (D-406) | 93 | before 3c demo | 1 |
-| 3c | **Accepted 2026-11-25 (D-330)**, pedal pending (D-309); panel measurements (T) open. Acceptance run, fixes, panel measurements | all, b2 leads | 3a, 3b, T | 6–10 |
+| 3c | **Accepted 2026-11-25 (D-330)**, pedal passed 2026-11-27 (D-339); panel measurements (T) open. Acceptance run, fixes, panel measurements | all, b2 leads | 3a, 3b, T | 6–10 |
 
 Order: `0a → 0b, 0c, 0d → 1a → G1 → 3a → 3b → 3c`. Wave 2 runs beside Wave 1 from 0c. 1c follows 1a. G1 does not wait for 1c; it needs only 1a and 1b (D-415). G1 has no pedal checks; they are G1-P, and neither 3a nor 3c waits for G1-P (D-309).
 Estimate before the move to the PC: 67–88 session-hours (before 0d, which adds 2–4, and before 1c, not yet estimated), likely 5–6 working days, range 4–8. Not yet re-estimated for the PC: builds get faster, the move itself (§4) is extra.
