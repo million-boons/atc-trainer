@@ -61,6 +61,7 @@ bool header(const json& j, EventLogHeader& h, std::string& error) {
     h.replyToMs = (*d)[1].is_number() ? (*d)[1].get<int>() : 0;
   }
   h.radio = text(j, "radio");
+  h.pttStandIn = flag(j, "pttStandIn");  // D-435
   if (const auto p = j.find("plan"); p != j.end() && p->is_object()) {
     h.planId = text(*p, "id");
     h.planName = text(*p, "name");

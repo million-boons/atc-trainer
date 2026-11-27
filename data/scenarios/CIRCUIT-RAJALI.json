@@ -4,9 +4,7 @@
   "id": "CIRCUIT-RAJALI",
   "name": "Circuit - Rajali (PLACEHOLDER)",
   "category": "circuit",
-  "objectives": [
-    "PLACEHOLDER - validate against approved SOP"
-  ],
+  "objectives": ["Radio check", "Taxi instructions", "Holding point / hold short", "Line-up", "Take-off clearance", "Circuit joining", "Landing clearance", "Frequency change", "Readback discipline"],
   "difficulty": "basic",
   "validation": {
     "status": "placeholder"

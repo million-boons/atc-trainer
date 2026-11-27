@@ -37,6 +37,7 @@ struct EventLogHeader {
   std::string radio;
   std::string planId, planName, planPreset;  // empty: no plan
   int planRun = 0;                           // 0: unnumbered
+  bool pttStandIn = false;  // D-435: keyed with the mouse stand-in (--ptt-device stand-in), not the pedal; filled by the runtime
 };
 
 // Letters, digits, - and _: the same rule as speaker IDs in ptt_record.

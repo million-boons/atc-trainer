@@ -121,6 +121,7 @@ std::string headerJson(const EventLogHeader& h) {
                {"replyDelayMs", {h.replyFromMs, h.replyToMs}},
                {"radio", h.radio}};
   if (!h.planId.empty()) j["plan"] = {{"id", h.planId}, {"name", h.planName}, {"preset", h.planPreset}, {"run", h.planRun}};
+  if (h.pttStandIn) j["pttStandIn"] = true;  // D-435; left out otherwise, so older headers stay as they were
   return line(j);
 }
 

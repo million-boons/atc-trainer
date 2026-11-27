@@ -1,6 +1,6 @@
 # 12. Scenario "Circuit – Rajali" (design, not built)
 
-Status: **2026-11-27: C-2 answered and the engine part built (D-431, not compiled yet); C-1, C-3, C-4, C-7, C-9 open.** First version: DRAFT for the user, 2026-11-27. Source: the user's script of 2026-11-27 and answers (all wording **PLACEHOLDER – validate against approved SOP**; no SOP reference yet). Owner: engine, with parts for stt and runtime (§7). Questions C-1 to C-9 are in §8, each with a recommendation.
+Status: **2026-11-27: all C-points answered (D-431, D-435); engine part, data and the departure's move built (D-431 to D-435), compiled in part by b2. Open: the tower frequency, the Piper run.** First version: DRAFT for the user, 2026-11-27. Source: the user's script of 2026-11-27 and answers (all wording **PLACEHOLDER – validate against approved SOP**; no SOP reference yet). Owner: engine, with parts for stt and runtime (§7). Questions C-1 to C-9 are in §8, each with a recommendation.
 
 ## 1. What the user decided
 

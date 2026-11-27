@@ -1083,6 +1083,15 @@ TEST_F(Readback, AValueInARangeIsChosenByTheTrainee) {
   EXPECT_EQ(at(""), Outcome::MissingInfo);
 }
 
+TEST(EventJson, StandInRunsAreMarkedInTheHeader) {  // D-435
+  EventLogHeader h;
+  h.sessionId = "x";
+  h.scenarioId = "S";
+  EXPECT_FALSE(json::parse(headerJson(h)).contains("pttStandIn"));
+  h.pttStandIn = true;
+  EXPECT_EQ(json::parse(headerJson(h))["pttStandIn"], true);
+}
+
 TEST(EventJson, ReadbackCheckIsWritten) {
   const EngineEvent e{4, 9, EngineOutput(out::ReadbackCheck{"LINE_UP", 3, 2, out::ReadbackResult::Missed})};
   const json j = json::parse(eventJson(e));
