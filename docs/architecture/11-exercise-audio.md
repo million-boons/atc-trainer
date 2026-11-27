@@ -1,4 +1,4 @@
-# 11 Exercise audio with consent (D-108): backend (proposal, for the user's approval)
+# 11 Exercise audio with consent (D-108): backend (approved 2026-11-27, D-341: EA-1 to EA-6 yes)
 
 By b2, 2026-11-27 (D-340 queue). **No code before approval.** Binding: D-101, D-102, D-108, D-112, D-121, D-133 to D-135, D-312, D-314, D-412, D-44. Today nothing of an exercise is stored but its log (D-314); the screens say "Exercise audio not saved" until a backend says it stores audio (D-121). Points for the user: **EA-1 to EA-6** (section 5).
 
