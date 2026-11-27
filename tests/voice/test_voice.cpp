@@ -26,8 +26,8 @@ namespace {
 Exercise exercise() {
   Exercise e;
   e.scenario.id = "TEST";
-  e.scenario.generators["callsign"] = {"callsigns", ""};
-  e.scenario.generators["runway"] = {"runways", ""};
+  e.scenario.generators["callsign"] = {"callsigns", "", ""};
+  e.scenario.generators["runway"] = {"runways", "", ""};
   e.airfield.runways = {"09", "27"};
   Airfield::Callsign c;
   c.id = "EAGLE-421";

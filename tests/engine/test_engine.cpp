@@ -44,7 +44,7 @@ json readJson(const fs::path& f) {
   return json::parse(in, nullptr, false);
 }
 
-// The shipped departure with LINE_UP added to the intents (package 2e adds it for real).
+// The shipped departure, loaded from a copy of its files.
 std::shared_ptr<Exercise> departure() {
   static int n = 0;
   Paths paths;
@@ -56,9 +56,6 @@ std::shared_ptr<Exercise> departure() {
   const fs::path data = paths.data;
   const fs::path dir = fs::temp_directory_path() / ("atc_engine_" + std::to_string(getpid()) + "_" + std::to_string(n++));
   json ph = readJson(data / "phraseology" / "placeholder.json");
-  bool have = false;
-  for (const auto& i : ph["intents"]) have = have || i["id"] == "LINE_UP";
-  if (!have) ph["intents"].push_back({{"id", "LINE_UP"}, {"examples", json::array({"{callsign} line up runway {runway}"})}, {"validation", {{"status", "draft"}}}});
   fs::create_directories(dir / "phraseology" / "replies");
   fs::create_directories(dir / "airfields");
   std::ofstream(dir / "phraseology" / "placeholder.json") << ph.dump();
@@ -93,7 +90,7 @@ struct Engine : ::testing::Test {
   ParsedInstruction taxi() const {
     return Simulator::instruction("TAXI_INSTRUCTION", {{"callsign", param("callsign")}, {"taxiway", param("taxiway")}, {"runway", param("runway")}});
   }
-  ParsedInstruction lineUp() const { return Simulator::instruction("LINE_UP", {{"callsign", param("callsign")}, {"runway", param("runway")}}); }
+  ParsedInstruction lineUp() const { return Simulator::instruction("LINE_UP_AND_WAIT", {{"callsign", param("callsign")}, {"runway", param("runway")}}); }
   ParsedInstruction takeoff() const {
     return Simulator::instruction("TAKEOFF_CLEARANCE", {{"callsign", param("callsign")}, {"runway", param("runway")}});
   }
@@ -303,6 +300,34 @@ TEST_F(Engine, WrongCallsignGetsSilence) {
   EXPECT_EQ(outputs<out::PilotRequested>().size(), 1u);  // only the pilot's own first call
   ASSERT_EQ(outputs<out::NoReply>().size(), 1u);
   EXPECT_EQ(outputs<out::NoReply>()[0].tx, 1u);
+}
+// D-434: the own callsign with one digit lost is "say again" and a suspected recognition error.
+TEST(Callsign, OneDigitMissingIsANearMiss) {
+  EXPECT_TRUE(oneDigitMissing("EAGLE-42", "EAGLE-421"));
+  EXPECT_TRUE(oneDigitMissing("EAGLE-41", "EAGLE-421"));
+  EXPECT_TRUE(oneDigitMissing("EAGLE-21", "EAGLE-421"));
+  EXPECT_TRUE(oneDigitMissing("FALCON-1", "FALCON-12"));
+  EXPECT_FALSE(oneDigitMissing("EAGLE-421", "EAGLE-421"));
+  EXPECT_FALSE(oneDigitMissing("EAGLE-4", "EAGLE-421"));    // two missing
+  EXPECT_FALSE(oneDigitMissing("EAGLE-321", "EAGLE-421"));  // a wrong digit
+  EXPECT_FALSE(oneDigitMissing("EAGLE-4210", "EAGLE-421"));
+  EXPECT_FALSE(oneDigitMissing("HAWK-42", "EAGLE-421"));
+  EXPECT_FALSE(oneDigitMissing("EAGLE-", "EAGLE-1"));
+  EXPECT_FALSE(oneDigitMissing("EAGLE42", "EAGLE-421"));
+}
+TEST_F(Engine, OwnCallsignWithADigitLostGetsSayAgainNotSilence) {
+  const std::string own = param("callsign");
+  for (std::size_t cut = own.rfind('-') + 1; cut < own.size(); ++cut) {
+    auto p = taxi();
+    p.fields["callsign"].value = own.substr(0, cut) + own.substr(cut + 1);
+    expectStays(p, Outcome::Ambiguous, "one digit missing");
+    EXPECT_TRUE(lastJudged().suspectedStt);
+    EXPECT_TRUE(outputs<out::NoReply>().empty());
+    EXPECT_EQ(outputs<out::PilotRequested>().back().utterance.replyId, "SAY_AGAIN");
+    const auto r = buildResult(ex->scenario, log.events);
+    EXPECT_TRUE(r.steps[0].errors.empty());  // not the trainee's error
+    EXPECT_EQ(r.steps[0].suspectedStt, 1);
+  }
 }
 TEST_F(Engine, MissingCallsignOrFieldAsksForIt) {
   auto p = taxi();
@@ -887,9 +912,9 @@ struct Readback : Engine {
     auto e = std::make_shared<Exercise>(*departure());
     PilotReply part;
     part.id = "TEST_LINING_UP";
-    part.text = "lining up, {callsign}";
+    part.text = "test short, {callsign}";
     part.slots = {"callsign"};
-    part.readbackOf = "LINE_UP";
+    part.readbackOf = "LINE_UP_AND_WAIT";
     e->replies[part.id] = part;
     StepResponse& c = e->scenario.steps[1].responses.at(Outcome::Correct);
     if (alternate)
@@ -935,12 +960,12 @@ struct Readback : Engine {
 TEST_F(Readback, ChallengedInTheNextTransmissionGetsTheFullReadback) {
   with(1);
   toLineUp();
-  EXPECT_EQ(lastPilot(), "lining up, " + param("callsign"));
+  EXPECT_EQ(lastPilot(), "test short, " + param("callsign"));
   EXPECT_EQ(step(), "TAKEOFF");
   const std::size_t judged = outputs<out::Judged>().size();
   sim->transmit(challenge());
   EXPECT_EQ(checks(), std::vector<out::ReadbackResult>{out::ReadbackResult::Caught});
-  EXPECT_EQ(lastPilot(), "line up runway " + param("runway") + ", " + param("callsign"));
+  EXPECT_EQ(lastPilot(), "Lining up runway " + param("runway") + " and waiting, " + param("callsign") + ".");
   EXPECT_EQ(outputs<out::Judged>().size(), judged);  // no attempt of the step
   EXPECT_EQ(step(), "TAKEOFF");
   sim->transmit(takeoff());
@@ -987,10 +1012,10 @@ TEST_F(Readback, AChallengeWithAWrongValueIsAWrongValueAndKeepsItDue) {
 TEST_F(Readback, AChallengeAfterACompleteReadbackIsUnnecessary) {
   with(0);
   toLineUp();
-  EXPECT_EQ(lastPilot(), "line up runway " + param("runway") + ", " + param("callsign"));
+  EXPECT_EQ(lastPilot(), "Lining up runway " + param("runway") + " and waiting, " + param("callsign") + ".");
   sim->transmit(challenge());
   EXPECT_EQ(checks(), std::vector<out::ReadbackResult>{out::ReadbackResult::Unnecessary});
-  EXPECT_EQ(lastPilot(), "line up runway " + param("runway") + ", " + param("callsign"));
+  EXPECT_EQ(lastPilot(), "Lining up runway " + param("runway") + " and waiting, " + param("callsign") + ".");
   EXPECT_EQ(lineUpResult().unnecessaryChallenges, 1);
   EXPECT_EQ(lineUpResult().readbackMissed, 0);
 }
@@ -1011,7 +1036,7 @@ TEST_F(Readback, IncompleteReadbacksComeAtTheirRate) {
   const int n = 400;
   for (int seed = 1; seed <= n; ++seed) {
     toLineUp(static_cast<std::uint64_t>(seed));
-    incomplete += lastPilot().starts_with("lining up");
+    incomplete += lastPilot().starts_with("test short");
   }
   EXPECT_GT(incomplete, n * 12 / 100);  // 0.25 within about 6 standard deviations
   EXPECT_LT(incomplete, n * 38 / 100);
@@ -1030,7 +1055,7 @@ TEST_F(Readback, AlternatesAreBothSaidAndNeedNoChallenge) {
     sim->transmit(takeoff());
     EXPECT_TRUE(checks().empty());
   }
-  EXPECT_EQ(said, (std::set<std::string>{"lining up", "line up r"}));
+  EXPECT_EQ(said, (std::set<std::string>{"test shor", "Lining up"}));
 }
 
 TEST_F(Readback, AValueInARangeIsChosenByTheTrainee) {
@@ -1058,10 +1083,68 @@ TEST_F(Readback, AValueInARangeIsChosenByTheTrainee) {
   EXPECT_EQ(at(""), Outcome::MissingInfo);
 }
 
+TEST(EventJson, StandInRunsAreMarkedInTheHeader) {  // D-435
+  EventLogHeader h;
+  h.sessionId = "x";
+  h.scenarioId = "S";
+  EXPECT_FALSE(json::parse(headerJson(h)).contains("pttStandIn"));
+  h.pttStandIn = true;
+  EXPECT_EQ(json::parse(headerJson(h))["pttStandIn"], true);
+}
+
 TEST(EventJson, ReadbackCheckIsWritten) {
   const EngineEvent e{4, 9, EngineOutput(out::ReadbackCheck{"LINE_UP", 3, 2, out::ReadbackResult::Missed})};
   const json j = json::parse(eventJson(e));
   EXPECT_EQ(j["event"], "readback_check");
   EXPECT_EQ(j["result"], "missed");
   EXPECT_EQ(j["step"], "LINE_UP");
+}
+
+// The shipped circuit end to end: every step correct, every incomplete readback challenged (D-431).
+TEST(ShippedCircuit, CompletesWithEveryShortReadbackChallenged) {
+  Paths paths;
+  std::string error;
+  ASSERT_TRUE(resolvePaths(systemPathInputs(), paths, error)) << error;
+  auto ex = std::make_shared<Exercise>();
+  std::vector<LoadError> errors;
+  ASSERT_TRUE(loadExercise(scenarioSources(paths.data, paths.data + "/scenarios/CIRCUIT-RAJALI.json"), *ex, errors))
+      << (errors.empty() ? "" : toString(errors[0]));
+  int shortOnes = 0;
+  for (std::uint64_t seed = 1; seed <= 30; ++seed) {
+    MemoryLog log;
+    Simulator sim(SequenceEngine(ex, seed), log);
+    const auto lastReply = [&] {
+      std::string id;
+      for (const auto& e : log.events)
+        if (const auto* o = std::get_if<EngineOutput>(&e.body))
+          if (const auto* p = std::get_if<out::PilotRequested>(o)) id = p->utterance.replyId;
+      return id;
+    };
+    sim.start();
+    sim.wait(ms(6000));
+    const ParamValues& v = sim.engine().context().params;
+    const std::map<std::string, std::string> rw{{"callsign", v.at("callsign")}, {"runway", v.at("runway")}};
+    const std::vector<std::pair<std::string, std::map<std::string, std::string>>> calls{
+        {"RADIO_CHECK_REPLY", {{"callsign", v.at("callsign")}, {"readability", "5"}}},
+        {"TAXI_TO_HOLDING_POINT", rw}, {"HOLD_SHORT", rw}, {"LINE_UP_AND_WAIT", rw}, {"TAKEOFF_CLEARANCE", rw},
+        {"JOIN_CIRCUIT", rw}, {"REPORT_FINAL", rw}, {"LANDING_CLEARANCE", rw},
+        {"CONTACT_FREQUENCY", {{"callsign", v.at("callsign")}, {"frequency", v.at("frequency")}}}};
+    for (const auto& [intent, fields] : calls) {
+      sim.transmit(Simulator::instruction(intent, fields));
+      sim.waitForPilot();
+      if (lastReply().ends_with("_SHORT")) {
+        ++shortOnes;
+        sim.transmit(Simulator::instruction("READBACK_CHALLENGE", {{"callsign", v.at("callsign")}}));
+        sim.waitForPilot();
+        EXPECT_FALSE(lastReply().ends_with("_SHORT"));
+      }
+    }
+    sim.wait(ms(5000));
+    EXPECT_EQ(sim.reason(), out::EndReason::Completed) << seed;
+    for (const auto& s : buildResult(ex->scenario, log.events).steps) {
+      EXPECT_TRUE(s.completed) << s.id;
+      EXPECT_EQ(s.readbackMissed, 0) << s.id;
+    }
+  }
+  EXPECT_GT(shortOnes, 0);  // 4 steps at 0.25 over 30 seeds
 }

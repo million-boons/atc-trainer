@@ -4,9 +4,7 @@
   "id": "DEPARTURE-01",
   "name": "Departure 01 (PLACEHOLDER)",
   "category": "departure",
-  "objectives": [
-    "PLACEHOLDER - validate against approved SOP"
-  ],
+  "objectives": ["Taxi instructions", "Holding point / hold short", "Line-up", "Take-off clearance"],
   "difficulty": "basic",
   "validation": {
     "status": "placeholder"
@@ -119,7 +117,7 @@
       },
       "expects": [
         {
-          "intent": "LINE_UP",
+          "intent": "LINE_UP_AND_WAIT",
           "required": [
             "callsign",
             "runway"

@@ -37,8 +37,8 @@
     },
     {
       "id": "READBACK_LINE_UP",
-      "readbackOf": "LINE_UP",
-      "text": "line up runway {runway}, {callsign}",
+      "readbackOf": "LINE_UP_AND_WAIT",
+      "text": "Lining up runway {runway} and waiting, {callsign}.",
       "validation": {
         "status": "draft"
       }

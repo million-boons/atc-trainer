@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "comment": "PLACEHOLDER - validate against approved SOP. Pilot replies of Circuit - Rajali, the user's script of 2026-11-27 (D-430); values made {slots}. Never read by the speech corpus generator (D-402).",
+  "validation": {
+    "status": "placeholder"
+  },
+  "replies": [
+    {
+      "id": "CIRCUIT_RADIO_CHECK",
+      "text": "Rajali Tower, {callsign}, radio check.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_RADIO_CHECK",
+      "readbackOf": "RADIO_CHECK_REPLY",
+      "text": "Rajali Tower, {callsign}, reading you five by five. Ready for departure, request taxi.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_RADIO_CHECK_ALT",
+      "readbackOf": "RADIO_CHECK_REPLY",
+      "text": "Loud and clear, {callsign}.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_TAXI",
+      "readbackOf": "TAXI_TO_HOLDING_POINT",
+      "text": "Taxiing to holding point runway {runway}, {callsign}.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_TAXI_ALT",
+      "readbackOf": "TAXI_TO_HOLDING_POINT",
+      "text": "Wilco, taxiing to the holding point, {callsign}.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_HOLD_SHORT",
+      "readbackOf": "HOLD_SHORT",
+      "text": "Holding short runway {runway}, {callsign}.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_HOLD_SHORT_SHORT",
+      "readbackOf": "HOLD_SHORT",
+      "text": "Wilco, holding short of the runway, {callsign}.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_LINE_UP",
+      "readbackOf": "LINE_UP_AND_WAIT",
+      "text": "Lining up runway {runway} and waiting, {callsign}.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_LINE_UP_SHORT",
+      "readbackOf": "LINE_UP_AND_WAIT",
+      "text": "Lining up, {callsign}.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_TAKEOFF",
+      "readbackOf": "TAKEOFF_CLEARANCE",
+      "text": "Cleared for takeoff runway {runway}, rolling, {callsign}.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_TAKEOFF_SHORT",
+      "readbackOf": "TAKEOFF_CLEARANCE",
+      "text": "Rolling, {callsign}.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_JOIN",
+      "readbackOf": "JOIN_CIRCUIT",
+      "text": "Joining the circuit runway {runway}, {callsign}.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_JOIN_ALT",
+      "readbackOf": "JOIN_CIRCUIT",
+      "text": "Joining the circuit as instructed, {callsign}.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_REPORT_FINAL",
+      "readbackOf": "REPORT_FINAL",
+      "text": "Wilco, will report final, {callsign}.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_LANDING",
+      "readbackOf": "LANDING_CLEARANCE",
+      "text": "Cleared to land runway {runway}, {callsign}.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_LANDING_SHORT",
+      "readbackOf": "LANDING_CLEARANCE",
+      "text": "Cleared to land, continuing approach, {callsign}.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_CONTACT",
+      "readbackOf": "CONTACT_FREQUENCY",
+      "text": "Contacting ground {frequency}, {callsign}.",
+      "validation": {
+        "status": "draft"
+      }
+    },
+    {
+      "id": "CIRCUIT_READBACK_CONTACT_ALT",
+      "readbackOf": "CONTACT_FREQUENCY",
+      "text": "Over to ground, good day, {callsign}.",
+      "validation": {
+        "status": "draft"
+      }
+    }
+  ]
+}

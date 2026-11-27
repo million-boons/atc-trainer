@@ -1,6 +1,6 @@
 # 12. Scenario "Circuit – Rajali" (design, not built)
 
-Status: **2026-11-27: C-2 answered and the engine part built (D-431, not compiled yet); C-1, C-3, C-4, C-7, C-9 open.** First version: DRAFT for the user, 2026-11-27. Source: the user's script of 2026-11-27 and answers (all wording **PLACEHOLDER – validate against approved SOP**; no SOP reference yet). Owner: engine, with parts for stt and runtime (§7). Questions C-1 to C-9 are in §8, each with a recommendation.
+Status: **2026-11-27: all C-points answered (D-431, D-435); engine part, data and the departure's move built (D-431 to D-435), compiled in part by b2. Open: the tower frequency, the Piper run.** First version: DRAFT for the user, 2026-11-27. Source: the user's script of 2026-11-27 and answers (all wording **PLACEHOLDER – validate against approved SOP**; no SOP reference yet). Owner: engine, with parts for stt and runtime (§7). Questions C-1 to C-9 are in §8, each with a recommendation.
 
 ## 1. What the user decided
 
@@ -71,6 +71,41 @@ Tests for each: loader errors with file and path, the rate (0, 1 and the shares 
 The parser must know: the 9 intents and their cues; two-digit callsigns (`{callsignName} {digit} {digit}`; the slot has three digits today); "read you {readability}"; "decimal" in frequencies; "Rajali Tower" and "ground" as station words (Whisper heard "Rajali" as "a rally", O-5, so a station name is **not required** in the slice, C-3); "line up and wait"; the challenge intent (C-2). Every word must be explained (no filler words), so every ATC line of the script must parse completely.
 
 ## 6. Voice
+
+**Missing clips, 2026-11-27** (36 needed, 30 not in the bank `en_US-norman-medium`; worked out by a script that follows `PhraseTemplateParser`'s rules, so `voice_tool list` after the build is the authority; reply that first needs each in brackets):
+
+- `CALLSIGN_FALCON_12@final`  ( CHALLENGE )
+- `CALLSIGN_FALCON_12@initial`  ( CALL_AGAIN )
+- `CALLSIGN_FALCON_12@medial`  ( CIRCUIT_RADIO_CHECK )
+- `FREQUENCY_121_7@medial`  ( CIRCUIT_READBACK_CONTACT )
+- `PH_AND_WAITING@medial`  ( CIRCUIT_READBACK_LINE_UP )
+- `PH_CLEARED_FOR_TAKEOFF_RUNWAY@initial`  ( CIRCUIT_READBACK_TAKEOFF )
+- `PH_CLEARED_TO_LAND@initial`  ( CIRCUIT_READBACK_LANDING_SHORT )
+- `PH_CLEARED_TO_LAND_RUNWAY@initial`  ( CIRCUIT_READBACK_LANDING )
+- `PH_CONTACTING_GROUND@initial`  ( CIRCUIT_READBACK_CONTACT )
+- `PH_CONTINUING_APPROACH@medial`  ( CIRCUIT_READBACK_LANDING_SHORT )
+- `PH_GOOD_DAY@medial`  ( CIRCUIT_READBACK_CONTACT_ALT )
+- `PH_HOLDING_SHORT_OF_THE_RUNWAY@medial`  ( CIRCUIT_READBACK_HOLD_SHORT_SHORT )
+- `PH_HOLDING_SHORT_RUNWAY@initial`  ( CIRCUIT_READBACK_HOLD_SHORT )
+- `PH_JOINING_THE_CIRCUIT_AS_INSTRUCTED@initial`  ( CIRCUIT_READBACK_JOIN_ALT )
+- `PH_JOINING_THE_CIRCUIT_RUNWAY@initial`  ( CIRCUIT_READBACK_JOIN )
+- `PH_LINING_UP@initial`  ( CIRCUIT_READBACK_LINE_UP_SHORT )
+- `PH_LINING_UP_RUNWAY@initial`  ( CIRCUIT_READBACK_LINE_UP )
+- `PH_LOUD_AND_CLEAR@initial`  ( CIRCUIT_READBACK_RADIO_CHECK_ALT )
+- `PH_OVER_TO_GROUND@initial`  ( CIRCUIT_READBACK_CONTACT_ALT )
+- `PH_RADIO_CHECK@final`  ( CIRCUIT_RADIO_CHECK )
+- `PH_RAJALI_TOWER@initial`  ( CIRCUIT_RADIO_CHECK )
+- `PH_READING_YOU_FIVE_BY_FIVE@medial`  ( CIRCUIT_READBACK_RADIO_CHECK )
+- `PH_READY_FOR_DEPARTURE@medial`  ( CIRCUIT_READBACK_RADIO_CHECK )
+- `PH_ROLLING@initial`  ( CIRCUIT_READBACK_TAKEOFF_SHORT )
+- `PH_ROLLING@medial`  ( CIRCUIT_READBACK_TAKEOFF )
+- `PH_TAXIING_TO_HOLDING_POINT_RUNWAY@initial`  ( CIRCUIT_READBACK_TAXI )
+- `PH_TAXIING_TO_THE_HOLDING_POINT@medial`  ( CIRCUIT_READBACK_TAXI_ALT )
+- `PH_WILCO@initial`  ( CIRCUIT_READBACK_HOLD_SHORT_SHORT )
+- `PH_WILL_REPORT_FINAL@medial`  ( CIRCUIT_READBACK_REPORT_FINAL )
+- `RUNWAY_05@medial`  ( CIRCUIT_READBACK_HOLD_SHORT )
+
+Earlier estimate:
 
 New clips: about 16 fixed phrases × their positions, FALCON-12 @initial and @final, runway 05 positions, the frequency's digits and "decimal". The list comes from `voice_tool list` once the data loads; coverage then fails, naming every missing clip, until Piper has made them. That is an offline Piper run on the panel with nobody building (D-418, D-329), after the idle window. No clips go into git.
 

@@ -49,13 +49,6 @@ struct Departure : ::testing::Test {
     replies = readJson(d / "phraseology" / "replies" / "placeholder.json");
     phraseology = readJson(d / "phraseology" / "placeholder.json");
     ASSERT_TRUE(scenario.is_object() && airfield.is_object() && replies.is_object() && phraseology.is_object());
-    // LINE_UP comes with package 2e; until then the tests add it.
-    bool have = false;
-    for (const auto& i : phraseology["intents"]) have = have || i["id"] == "LINE_UP";
-    if (!have)
-      phraseology["intents"].push_back({{"id", "LINE_UP"},
-                                        {"examples", json::array({"{callsign} line up runway {runway}"})},
-                                        {"validation", {{"status", "draft"}}}});
   }
   void TearDown() override {
     std::error_code ec;
@@ -420,7 +413,7 @@ struct Circuit : Departure {
                                       {"examples", json::array({"{callsign} confirm runway {runway}"})},
                                       {"parse", {{"required", {"callsign"}}, {"optional", {"runway"}}}},
                                       {"validation", {{"status", "draft"}}}});
-    replies["replies"].push_back({{"id", "TEST_LINING_UP"}, {"readbackOf", "LINE_UP"}, {"text", "lining up, {callsign}"}});
+    replies["replies"].push_back({{"id", "TEST_LINING_UP"}, {"readbackOf", "LINE_UP_AND_WAIT"}, {"text", "lining up, {callsign}"}});
     replies["replies"].push_back({{"id", "TEST_ROLLING"}, {"readbackOf", "TAKEOFF_CLEARANCE"}, {"text", "rolling, {callsign}"}});
   }
   json check(double rate = 0.25) const {
@@ -496,7 +489,7 @@ TEST_F(Circuit, FrequenciesComeFromTheirUnit) {
 
 TEST_F(Circuit, AValueTheTraineeChoosesNeedsARange) {
   for (auto& i : phraseology["intents"])
-    if (i["id"] == "LINE_UP") i["examples"].push_back("{callsign} line up runway {runway} read you {readability}");
+    if (i["id"] == "LINE_UP_AND_WAIT") i["examples"].push_back("{callsign} runway {runway} line up and wait read you {readability}");
   step(1)["expects"][0]["required"].push_back("readability");
   expectError(kFile, "/steps/1/expects/0", "needs a mustMatch or a check");
   step(1)["expects"][0]["check"] = {{"readability", {{"range", {1, 5}}}}};
@@ -504,4 +497,24 @@ TEST_F(Circuit, AValueTheTraineeChoosesNeedsARange) {
   EXPECT_EQ(e.scenario.step("LINE_UP")->expects[0].ranges.at("readability"), (std::pair<int, int>{1, 5}));
   step(1)["expects"][0]["check"]["readability"]["range"] = {5, 1};
   expectError(kFile, "/steps/1/expects/0/check/readability/range", "from at most to");
+}
+
+// The shipped circuit (D-430, D-431). Needs stt's circuit intents (stt db77be4) in data/phraseology.
+TEST(ShippedCircuit, Loads) {
+  const std::string d = shippedData();
+  Exercise e;
+  std::vector<LoadError> errors;
+  ASSERT_TRUE(loadExercise(scenarioSources(d, d + "/scenarios/CIRCUIT-RAJALI.json"), e, errors)) << (errors.empty() ? "" : toString(errors[0]));
+  EXPECT_EQ(e.scenario.steps.size(), 10u);
+  EXPECT_EQ(e.scenario.initialStep, "RADIO_CHECK");
+  ASSERT_TRUE(e.scenario.readbackCheck);
+  EXPECT_EQ(e.scenario.readbackCheck->challenge.intent, "READBACK_CHALLENGE");
+  EXPECT_EQ(e.scenario.step("TAKEOFF")->responses.at(Outcome::Correct).incompleteReply, "CIRCUIT_READBACK_TAKEOFF_SHORT");
+  EXPECT_FALSE(e.replies.at("CIRCUIT_READBACK_TAKEOFF_SHORT").completeReadback);
+  EXPECT_TRUE(e.replies.at("CIRCUIT_READBACK_TAKEOFF").completeReadback);
+  EXPECT_EQ(e.scenario.step("RADIO_CHECK")->expects[0].ranges.at("readability"), (std::pair<int, int>{1, 5}));
+  EXPECT_TRUE(e.placeholder);
+  ParamValues v;
+  ASSERT_TRUE(generateParams(e.scenario, e.airfield, 1, v));
+  EXPECT_EQ(v, (ParamValues{{"callsign", "FALCON-12"}, {"frequency", "121.7"}, {"runway", "05"}}));
 }

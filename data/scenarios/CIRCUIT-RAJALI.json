@@ -1,0 +1,668 @@
+{
+  "schemaVersion": 1,
+  "comment": "PLACEHOLDER - validate against approved SOP. The user's script Circuit - Rajali, 2026-11-27 (D-430, D-431). ASSUMED until the user answers: C-1 (hold short incomplete; radio check, taxi, circuit and contact as alternates), C-7 (rate 0.25).",
+  "id": "CIRCUIT-RAJALI",
+  "name": "Circuit - Rajali (PLACEHOLDER)",
+  "category": "circuit",
+  "objectives": ["Radio check", "Taxi instructions", "Holding point / hold short", "Line-up", "Take-off clearance", "Circuit joining", "Landing clearance", "Frequency change", "Readback discipline"],
+  "difficulty": "basic",
+  "validation": {
+    "status": "placeholder"
+  },
+  "airfield": "RAJALI",
+  "initialState": {
+    "phase": "parked"
+  },
+  "generators": {
+    "runway": {
+      "pool": "runways"
+    },
+    "callsign": {
+      "pool": "callsigns"
+    },
+    "frequency": {
+      "pool": "frequencies",
+      "unit": "GROUND"
+    }
+  },
+  "readbackCheck": {
+    "incompleteRate": 0.25,
+    "challenge": {
+      "intent": "READBACK_CHALLENGE",
+      "required": [
+        "callsign"
+      ],
+      "optional": [
+        "runway"
+      ],
+      "mustMatch": {
+        "callsign": "{callsign}",
+        "runway": "{runway}"
+      }
+    }
+  },
+  "initialStep": "RADIO_CHECK",
+  "steps": [
+    {
+      "id": "RADIO_CHECK",
+      "label": "Radio check",
+      "phase": "parked",
+      "onEnter": {
+        "say": "CIRCUIT_RADIO_CHECK",
+        "delaySeconds": 1
+      },
+      "expects": [
+        {
+          "intent": "RADIO_CHECK_REPLY",
+          "required": [
+            "callsign",
+            "readability"
+          ],
+          "mustMatch": {
+            "callsign": "{callsign}"
+          },
+          "check": {
+            "readability": {
+              "range": [
+                1,
+                5
+              ]
+            }
+          }
+        }
+      ],
+      "timeoutSeconds": 30,
+      "maxPilotCalls": 2,
+      "maxSayAgain": 3,
+      "responses": {
+        "CORRECT": {
+          "action": "say",
+          "reply": "CIRCUIT_READBACK_RADIO_CHECK",
+          "alternates": [
+            "CIRCUIT_READBACK_RADIO_CHECK_ALT"
+          ]
+        },
+        "MISSING_INFO": {
+          "action": "say",
+          "reply": "REQUEST_MISSING"
+        },
+        "AMBIGUOUS": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "UNINTELLIGIBLE": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "WRONG_CALLSIGN": {
+          "action": "silent"
+        },
+        "CONFLICT": {
+          "action": "say",
+          "reply": "CHALLENGE"
+        },
+        "UNEXPECTED": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "INCORRECT": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "TIMEOUT": {
+          "action": "say",
+          "reply": "CALL_AGAIN"
+        }
+      },
+      "transitions": [
+        {
+          "on": "CORRECT",
+          "to": "TAXI"
+        }
+      ]
+    },
+    {
+      "id": "TAXI",
+      "label": "Taxi",
+      "phase": "taxi",
+      "expects": [
+        {
+          "intent": "TAXI_TO_HOLDING_POINT",
+          "required": [
+            "callsign",
+            "runway"
+          ],
+          "mustMatch": {
+            "callsign": "{callsign}",
+            "runway": "{runway}"
+          }
+        }
+      ],
+      "timeoutSeconds": 30,
+      "maxPilotCalls": 2,
+      "maxSayAgain": 3,
+      "responses": {
+        "CORRECT": {
+          "action": "say",
+          "reply": "CIRCUIT_READBACK_TAXI",
+          "alternates": [
+            "CIRCUIT_READBACK_TAXI_ALT"
+          ]
+        },
+        "MISSING_INFO": {
+          "action": "say",
+          "reply": "REQUEST_MISSING"
+        },
+        "AMBIGUOUS": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "UNINTELLIGIBLE": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "WRONG_CALLSIGN": {
+          "action": "silent"
+        },
+        "CONFLICT": {
+          "action": "say",
+          "reply": "CHALLENGE"
+        },
+        "UNEXPECTED": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "INCORRECT": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "TIMEOUT": {
+          "action": "say",
+          "reply": "CALL_AGAIN"
+        }
+      },
+      "transitions": [
+        {
+          "on": "CORRECT",
+          "to": "HOLD_SHORT"
+        }
+      ]
+    },
+    {
+      "id": "HOLD_SHORT",
+      "label": "Hold short",
+      "phase": "taxi",
+      "expects": [
+        {
+          "intent": "HOLD_SHORT",
+          "required": [
+            "callsign",
+            "runway"
+          ],
+          "mustMatch": {
+            "callsign": "{callsign}",
+            "runway": "{runway}"
+          }
+        }
+      ],
+      "timeoutSeconds": 30,
+      "maxPilotCalls": 2,
+      "maxSayAgain": 3,
+      "responses": {
+        "CORRECT": {
+          "action": "say",
+          "reply": "CIRCUIT_READBACK_HOLD_SHORT",
+          "incompleteReply": "CIRCUIT_READBACK_HOLD_SHORT_SHORT"
+        },
+        "MISSING_INFO": {
+          "action": "say",
+          "reply": "REQUEST_MISSING"
+        },
+        "AMBIGUOUS": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "UNINTELLIGIBLE": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "WRONG_CALLSIGN": {
+          "action": "silent"
+        },
+        "CONFLICT": {
+          "action": "say",
+          "reply": "CHALLENGE"
+        },
+        "UNEXPECTED": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "INCORRECT": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "TIMEOUT": {
+          "action": "say",
+          "reply": "CALL_AGAIN"
+        }
+      },
+      "transitions": [
+        {
+          "on": "CORRECT",
+          "to": "LINE_UP"
+        }
+      ]
+    },
+    {
+      "id": "LINE_UP",
+      "label": "Line up",
+      "phase": "lineup",
+      "expects": [
+        {
+          "intent": "LINE_UP_AND_WAIT",
+          "required": [
+            "callsign",
+            "runway"
+          ],
+          "mustMatch": {
+            "callsign": "{callsign}",
+            "runway": "{runway}"
+          }
+        }
+      ],
+      "timeoutSeconds": 30,
+      "maxPilotCalls": 2,
+      "maxSayAgain": 3,
+      "responses": {
+        "CORRECT": {
+          "action": "say",
+          "reply": "CIRCUIT_READBACK_LINE_UP",
+          "incompleteReply": "CIRCUIT_READBACK_LINE_UP_SHORT"
+        },
+        "MISSING_INFO": {
+          "action": "say",
+          "reply": "REQUEST_MISSING"
+        },
+        "AMBIGUOUS": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "UNINTELLIGIBLE": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "WRONG_CALLSIGN": {
+          "action": "silent"
+        },
+        "CONFLICT": {
+          "action": "say",
+          "reply": "CHALLENGE"
+        },
+        "UNEXPECTED": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "INCORRECT": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "TIMEOUT": {
+          "action": "say",
+          "reply": "CALL_AGAIN"
+        }
+      },
+      "transitions": [
+        {
+          "on": "CORRECT",
+          "to": "TAKEOFF"
+        }
+      ]
+    },
+    {
+      "id": "TAKEOFF",
+      "label": "Takeoff",
+      "phase": "takeoff",
+      "expects": [
+        {
+          "intent": "TAKEOFF_CLEARANCE",
+          "required": [
+            "callsign",
+            "runway"
+          ],
+          "mustMatch": {
+            "callsign": "{callsign}",
+            "runway": "{runway}"
+          }
+        }
+      ],
+      "timeoutSeconds": 30,
+      "maxPilotCalls": 2,
+      "maxSayAgain": 3,
+      "responses": {
+        "CORRECT": {
+          "action": "say",
+          "reply": "CIRCUIT_READBACK_TAKEOFF",
+          "incompleteReply": "CIRCUIT_READBACK_TAKEOFF_SHORT"
+        },
+        "MISSING_INFO": {
+          "action": "say",
+          "reply": "REQUEST_MISSING"
+        },
+        "AMBIGUOUS": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "UNINTELLIGIBLE": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "WRONG_CALLSIGN": {
+          "action": "silent"
+        },
+        "CONFLICT": {
+          "action": "say",
+          "reply": "CHALLENGE"
+        },
+        "UNEXPECTED": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "INCORRECT": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "TIMEOUT": {
+          "action": "say",
+          "reply": "CALL_AGAIN"
+        }
+      },
+      "transitions": [
+        {
+          "on": "CORRECT",
+          "to": "CIRCUIT"
+        }
+      ]
+    },
+    {
+      "id": "CIRCUIT",
+      "label": "Join circuit",
+      "phase": "circuit",
+      "expects": [
+        {
+          "intent": "JOIN_CIRCUIT",
+          "required": [
+            "callsign",
+            "runway"
+          ],
+          "mustMatch": {
+            "callsign": "{callsign}",
+            "runway": "{runway}"
+          }
+        }
+      ],
+      "timeoutSeconds": 30,
+      "maxPilotCalls": 2,
+      "maxSayAgain": 3,
+      "responses": {
+        "CORRECT": {
+          "action": "say",
+          "reply": "CIRCUIT_READBACK_JOIN",
+          "alternates": [
+            "CIRCUIT_READBACK_JOIN_ALT"
+          ]
+        },
+        "MISSING_INFO": {
+          "action": "say",
+          "reply": "REQUEST_MISSING"
+        },
+        "AMBIGUOUS": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "UNINTELLIGIBLE": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "WRONG_CALLSIGN": {
+          "action": "silent"
+        },
+        "CONFLICT": {
+          "action": "say",
+          "reply": "CHALLENGE"
+        },
+        "UNEXPECTED": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "INCORRECT": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "TIMEOUT": {
+          "action": "say",
+          "reply": "CALL_AGAIN"
+        }
+      },
+      "transitions": [
+        {
+          "on": "CORRECT",
+          "to": "FINAL"
+        }
+      ]
+    },
+    {
+      "id": "FINAL",
+      "label": "Report final",
+      "phase": "circuit",
+      "expects": [
+        {
+          "intent": "REPORT_FINAL",
+          "required": [
+            "callsign",
+            "runway"
+          ],
+          "mustMatch": {
+            "callsign": "{callsign}",
+            "runway": "{runway}"
+          }
+        }
+      ],
+      "timeoutSeconds": 30,
+      "maxPilotCalls": 2,
+      "maxSayAgain": 3,
+      "responses": {
+        "CORRECT": {
+          "action": "say",
+          "reply": "CIRCUIT_READBACK_REPORT_FINAL"
+        },
+        "MISSING_INFO": {
+          "action": "say",
+          "reply": "REQUEST_MISSING"
+        },
+        "AMBIGUOUS": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "UNINTELLIGIBLE": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "WRONG_CALLSIGN": {
+          "action": "silent"
+        },
+        "CONFLICT": {
+          "action": "say",
+          "reply": "CHALLENGE"
+        },
+        "UNEXPECTED": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "INCORRECT": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "TIMEOUT": {
+          "action": "say",
+          "reply": "CALL_AGAIN"
+        }
+      },
+      "transitions": [
+        {
+          "on": "CORRECT",
+          "to": "LANDING"
+        }
+      ]
+    },
+    {
+      "id": "LANDING",
+      "label": "Landing",
+      "phase": "final",
+      "expects": [
+        {
+          "intent": "LANDING_CLEARANCE",
+          "required": [
+            "callsign",
+            "runway"
+          ],
+          "mustMatch": {
+            "callsign": "{callsign}",
+            "runway": "{runway}"
+          }
+        }
+      ],
+      "timeoutSeconds": 30,
+      "maxPilotCalls": 2,
+      "maxSayAgain": 3,
+      "responses": {
+        "CORRECT": {
+          "action": "say",
+          "reply": "CIRCUIT_READBACK_LANDING",
+          "incompleteReply": "CIRCUIT_READBACK_LANDING_SHORT"
+        },
+        "MISSING_INFO": {
+          "action": "say",
+          "reply": "REQUEST_MISSING"
+        },
+        "AMBIGUOUS": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "UNINTELLIGIBLE": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "WRONG_CALLSIGN": {
+          "action": "silent"
+        },
+        "CONFLICT": {
+          "action": "say",
+          "reply": "CHALLENGE"
+        },
+        "UNEXPECTED": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "INCORRECT": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "TIMEOUT": {
+          "action": "say",
+          "reply": "CALL_AGAIN"
+        }
+      },
+      "transitions": [
+        {
+          "on": "CORRECT",
+          "to": "CONTACT"
+        }
+      ]
+    },
+    {
+      "id": "CONTACT",
+      "label": "Contact ground",
+      "phase": "landed",
+      "expects": [
+        {
+          "intent": "CONTACT_FREQUENCY",
+          "required": [
+            "callsign",
+            "frequency"
+          ],
+          "mustMatch": {
+            "callsign": "{callsign}",
+            "frequency": "{frequency}"
+          }
+        }
+      ],
+      "timeoutSeconds": 30,
+      "maxPilotCalls": 2,
+      "maxSayAgain": 3,
+      "responses": {
+        "CORRECT": {
+          "action": "say",
+          "reply": "CIRCUIT_READBACK_CONTACT",
+          "alternates": [
+            "CIRCUIT_READBACK_CONTACT_ALT"
+          ]
+        },
+        "MISSING_INFO": {
+          "action": "say",
+          "reply": "REQUEST_MISSING"
+        },
+        "AMBIGUOUS": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "UNINTELLIGIBLE": {
+          "action": "say",
+          "reply": "SAY_AGAIN"
+        },
+        "WRONG_CALLSIGN": {
+          "action": "silent"
+        },
+        "CONFLICT": {
+          "action": "say",
+          "reply": "CHALLENGE"
+        },
+        "UNEXPECTED": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "INCORRECT": {
+          "action": "say",
+          "reply": "QUERY"
+        },
+        "TIMEOUT": {
+          "action": "say",
+          "reply": "CALL_AGAIN"
+        }
+      },
+      "transitions": [
+        {
+          "on": "CORRECT",
+          "to": "DONE"
+        }
+      ]
+    },
+    {
+      "id": "DONE",
+      "label": "Done",
+      "phase": "landed",
+      "expects": [],
+      "responses": {},
+      "transitions": []
+    }
+  ],
+  "pttRules": {
+    "pressDuringPilot": "interrupt",
+    "interruptedReply": "repeat"
+  },
+  "completion": {
+    "finalSteps": [
+      "DONE"
+    ],
+    "maxDurationSeconds": 1500
+  }
+}

@@ -9,7 +9,7 @@
     "comment": { "type": "string" },
     "id": { "type": "string", "pattern": "^[A-Z0-9_-]+$" },
     "name": { "type": "string" },
-    "category": { "enum": ["departure", "arrival", "ground", "landing", "go-around", "emergency", "rcf", "abnormal"] },
+    "category": { "enum": ["departure", "arrival", "ground", "landing", "go-around", "emergency", "rcf", "abnormal", "circuit"] },
     "objectives": { "type": "array", "items": { "type": "string" } },
     "difficulty": { "enum": ["basic", "intermediate", "advanced"] },
     "validation": { "$ref": "#/definitions/validation" },
