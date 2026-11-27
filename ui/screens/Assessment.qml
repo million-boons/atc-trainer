@@ -155,7 +155,7 @@ Item {
             SecondaryButton { id: back; x: Theme.s8; anchors.verticalCenter: parent.verticalCenter; text: qsTr("< History"); focusPolicy: Qt.NoFocus; onClicked: s.history.close() }
             Label { x: back.x + back.width + Theme.s12; y: Theme.s8; height: Theme.px(26); font.weight: Font.DemiBold
                     text: qsTr("%1   %2   %3   %4   %5").arg(s.h.trainee || "").arg(s.h.scenario || "").arg(s.h.callsign || "").arg(s.h.mode || "").arg(s.h.when || "") }
-            Label { x: back.x + back.width + Theme.s12; y: Theme.px(38); height: Theme.px(22); text: (s.h.audio || "") === "" ? (s.h.sub || "") : qsTr("%1   %2").arg(s.h.sub || "").arg(s.h.audio); color: Theme.textSecondary; font.pixelSize: Theme.small }
+            Label { x: back.x + back.width + Theme.s12; y: Theme.px(38); height: Theme.px(22); text: [s.h.sub || "", s.h.standIn || "", s.h.audio || ""].filter(x => x !== "").join("   "); color: Theme.textSecondary; font.pixelSize: Theme.small }
             Row {
                 anchors { right: parent.right; rightMargin: Theme.s12 }
                 y: Theme.s8
@@ -163,6 +163,7 @@ Item {
                 StateIcon { level: s.h.level || 0; size: Theme.px(16); anchors.verticalCenter: parent.verticalCenter }
                 Label { text: s.h.end || ""; font { pixelSize: Theme.h2; weight: Font.Bold } }
                 Tag { visible: (s.h.changed || "") !== ""; text: s.h.changed || ""; anchors.verticalCenter: parent.verticalCenter }
+                Tag { visible: (s.h.standIn || "") !== ""; text: qsTr("PTT STAND-IN"); anchors.verticalCenter: parent.verticalCenter }
                 Tag { visible: s.h.placeholder === true; text: qsTr("PLACEHOLDER"); anchors.verticalCenter: parent.verticalCenter }
             }
         }

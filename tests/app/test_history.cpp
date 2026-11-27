@@ -211,6 +211,14 @@ TEST_F(History, ChangedScenarioIsSaidInTheHeader) {  // D-340
   EXPECT_EQ(h->head()["changed"].toString(), "Scenario changed since this run");
 }
 
+TEST_F(History, StandInRunIsMarked) {  // D-435
+  trainee("S01");
+  open("h3");
+  EXPECT_EQ(h->head()["standIn"].toString(), "PTT: mouse stand-in, not the pedal");
+  open("h1");
+  EXPECT_EQ(h->head()["standIn"].toString(), "");
+}
+
 TEST_F(History, WithdrawnConsentIsNotPlayedAndSaysWhy) {  // EA-2
   trainee("S01");
   open("h6");

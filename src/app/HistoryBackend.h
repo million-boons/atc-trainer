@@ -20,6 +20,7 @@ struct HistoryRow {
   int stepsDone = 0, steps = 0, errors = 0, missed = 0, suspected = 0, ptt = 0, reclassified = 0;
   int responseMs = -1;         // median; -1: none
   bool scenarioChanged = false; // the log header's scenario hash differs from today's file (D-340)
+  bool pttStandIn = false;      // the log header: run with the mouse stand-in, not the pedal (D-435)
 };
 
 struct HistoryReview {

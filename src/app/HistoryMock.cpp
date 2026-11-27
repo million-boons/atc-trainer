@@ -91,6 +91,7 @@ HistoryBackend mockHistory(std::int64_t now) {
   rows[4].assessed = true;
   rows[4].placeholder = false;
   rows[5].scenarioChanged = true;
+  rows[2].pttStandIn = true;  // h3
   for (const HistoryRow& r : rows) all->push_back(detail(r));
   for (HistoryEntry& e : (*all)[5].entries)  // h6: consent withdrawn since (EA-2)
     if (e.audio) e.audio = false, e.noAudio = "consent withdrawn: not played";

@@ -38,6 +38,7 @@ class ExerciseController : public QObject {
   Q_PROPERTY(bool pttLive READ pttLive NOTIFY phaseChanged)  // Space is PTT
   Q_PROPERTY(QVariantMap context READ context NOTIFY changed)  // scenario, callsign, runway, taxiway, type, rule, model
   Q_PROPERTY(bool placeholder READ placeholder NOTIFY changed)
+  Q_PROPERTY(QString standInText READ standInText NOTIFY changed)
   Q_PROPERTY(bool assessed READ assessed NOTIFY changed)
   Q_PROPERTY(QString modeText READ modeText NOTIFY changed)
   Q_PROPERTY(QString preview READ preview NOTIFY changed)  // mock: why this is only a preview
@@ -84,6 +85,12 @@ class ExerciseController : public QObject {
     audioConnected_ = true;
     emit changed();
   }
+  // The run uses the mouse stand-in (--ptt-device stand-in), not the pedal (D-435); set at each start.
+  void setPttStandIn(bool on) {
+    if (pttStandIn_ == on) return;
+    pttStandIn_ = on;
+    emit changed();
+  }
   // The Lab's save switch also covers exercise audio (EA-1); set before each Start dialog. Off until told.
   void setAudioSwitch(bool on) {
     if (audioSwitch_ == on) return;
@@ -111,6 +118,7 @@ class ExerciseController : public QObject {
   bool pttLive() const { return phase_ == Running || phase_ == Paused || phase_ == Complete; }
   QVariantMap context() const;
   bool placeholder() const { return ctx_.placeholder; }
+  QString standInText() const { return pttStandIn_ ? tr("PTT: mouse stand-in, not the pedal") : QString(); }
   bool assessed() const { return assessed_; }
   QString modeText() const { return assessed_ ? tr("ASSESSED") : tr("PRACTICE"); }
   QString preview() const { return preview_; }
@@ -185,7 +193,7 @@ class ExerciseController : public QObject {
 
   Phase phase_ = Idle;
   ExerciseContext ctx_;
-  bool assessed_ = false, consent_ = false, audioConnected_ = false, audioSwitch_ = false;
+  bool assessed_ = false, consent_ = false, audioConnected_ = false, audioSwitch_ = false, pttStandIn_ = false;
   QString preview_, waiting_;
   QStringList clearances_, missed_;
   QList<ExerciseStep> steps_;

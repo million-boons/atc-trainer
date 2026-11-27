@@ -110,6 +110,7 @@ void show(ExerciseController& c, const QString& id, bool assessed, bool consent,
     x.plan = ExercisePlan{q(plan->plan.name), q(plan->plan.trainee), plan->plan.assessed, plan->run};
   }
   c.begin(std::move(x), assessed, consent, assessed ? t("PREVIEW: Assessed is off in the slice (placeholder text)") : QString());
+  c.setPttStandIn(id == "exresulta");  // the stopped result shows a stand-in run (D-435)
   const auto steps = [&c](int done, int a, int b, int d) { c.setSteps({{t("Taxi"), a}, {t("Line up"), b}, {t("Takeoff"), d}}, done); };
   const QString cTaxi = t("Taxi via A3, runway 09"), cLine = t("Line up and wait runway 09"), cGo = t("Cleared for takeoff 09");
   C::Phase phase = C::Running;

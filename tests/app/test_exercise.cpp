@@ -172,6 +172,15 @@ TEST(Exercise, TheSaveSwitchCoversExerciseAudio) {  // EA-1
   EXPECT_EQ(c.audioText(), "Saved on this machine only");
 }
 
+TEST(Exercise, StandInRunIsMarked) {  // D-435
+  C c;
+  EXPECT_EQ(c.standInText(), "");
+  c.setPttStandIn(true);
+  EXPECT_EQ(c.standInText(), "PTT: mouse stand-in, not the pedal");
+  c.setPttStandIn(false);
+  EXPECT_EQ(c.standInText(), "");
+}
+
 TEST(Exercise, AGuestHasNoAudio) {  // D-127
   C c;
   c.setAudioConnected();

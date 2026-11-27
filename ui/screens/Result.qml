@@ -39,10 +39,16 @@ Item {
         }
         Column {
             anchors { right: parent.right; rightMargin: Theme.px(20); verticalCenter: parent.verticalCenter }
-            visible: s.ex.placeholder
+            visible: s.ex.placeholder || s.ex.standInText !== ""
             spacing: Theme.s4
-            Tag { anchors.right: parent.right; text: qsTr("PLACEHOLDER") }
-            Label { text: qsTr("No pass mark: the content is not validated"); color: Theme.textSecondary; font.pixelSize: Theme.caption }
+            Row {
+                anchors.right: parent.right
+                spacing: Theme.s8
+                Tag { visible: s.ex.standInText !== ""; text: qsTr("PTT STAND-IN") }
+                Tag { visible: s.ex.placeholder; text: qsTr("PLACEHOLDER") }
+            }
+            Label { anchors.right: parent.right; visible: s.ex.standInText !== ""; text: s.ex.standInText; color: Theme.textSecondary; font.pixelSize: Theme.caption }
+            Label { anchors.right: parent.right; visible: s.ex.placeholder; text: qsTr("No pass mark: the content is not validated"); color: Theme.textSecondary; font.pixelSize: Theme.caption }
         }
     }
 
