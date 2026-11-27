@@ -6,7 +6,9 @@ All procedure text, transitions and safety rules are data. Samples are **PLACEHO
 
 Schemas: [`schema/scenario.schema.json`](schema/scenario.schema.json), [`schema/airfield.schema.json`](schema/airfield.schema.json). Samples: `schema/sample-*.json`.
 
-Every text block carries `validation: {status: placeholder|validated, sopRef, validatedBy}`. In assessed mode a scenario with any `placeholder` is refused (P-11).
+Every text block carries `validation: {status: placeholder|validated, sopRef, validated_by, validated_at}` (one spelling for scenarios, airfields, intents and replies; D-429). In assessed mode a scenario with any `placeholder` is refused (P-11).
+
+Data for the screens (D-429): a scenario's `objectives`, `difficulty` and validation record are kept by the loader; an intent may have a `shortName` (at most 24 characters) for step names; a pilot reply may say `readbackOf: <intent>`. A step's CORRECT reply (and each `withField` reply) must be a readback of an intent the step expects. A readback is **complete** when its text has every `parse.required` value of that intent, callsign included; "Rolling" is a readback that is not complete. What the engine does with an incomplete readback comes with the circuit scenario (not built). A project list of objectives (Builder B-2) waits for the user's wording.
 
 Two validation passes at load, both with file and path in the error:
 1. Schema: shape, types, enums.

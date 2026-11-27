@@ -131,6 +131,7 @@ std::vector<std::string> jsonFiles(const std::string& dir) {
 bool placeholderOf(const Node& parent, const char* open, std::initializer_list<const char*> needed) {
   if (!parent.has("validation")) return true;
   const Node n = parent.child("validation");
+  if (n.has("validatedBy")) n.child("validatedBy").fail("is now validated_by, with validated_at (D-429)");
   if (!n.object({"status"}, {"sopRef", "validatedBy", "validated_by", "validated_at"})) return true;
   const std::string status = n.text("status");
   if (status == open || status.empty()) return true;
@@ -151,7 +152,7 @@ void loadAirfield(const std::string& file, const std::string& id, Airfield& a, R
   n.version();
   a.id = n.text("id");
   if (!a.id.empty() && a.id != id) n.child("id").fail("must be " + id + ", as the file name");
-  a.placeholder = placeholderOf(n, "placeholder", {"sopRef", "validatedBy"});
+  a.placeholder = placeholderOf(n, "placeholder", {"sopRef", "validated_by", "validated_at"});
   std::set<std::string> seen;
   const auto once = [&seen](const Node& at, const std::string& v) {
     if (!v.empty() && !seen.insert(v).second) at.fail(v + " is listed twice");
@@ -225,14 +226,21 @@ void loadIntents(const std::string& dir, std::map<std::string, IntentInfo>& out,
         if (!templateSlots(e, slots)) x.fail("bad {slot} in an example");
         info.slots.insert(slots.begin(), slots.end());
       }
-      if (x.has("parse") && x.child("parse").j.is_object() && x.child("parse").has("optional"))
-        for (const auto& f : x.child("parse").texts("optional", true)) info.optional.insert(f);
+      if (x.has("parse") && x.child("parse").j.is_object()) {
+        if (x.child("parse").has("optional"))
+          for (const auto& f : x.child("parse").texts("optional", true)) info.optional.insert(f);
+        if (x.child("parse").has("required"))
+          for (const auto& f : x.child("parse").texts("required", true)) info.required.insert(f);
+      }
+      info.shortName = x.text("shortName");
+      if (info.shortName.size() > 24) x.child("shortName").fail("at most 24 characters");
       if (!out.emplace(id, std::move(info)).second) x.fail(id + " is defined twice");
     });
   }
 }
 
-void loadReplies(const std::string& dir, std::map<std::string, PilotReply>& out, Report& r) {
+void loadReplies(const std::string& dir, const std::map<std::string, IntentInfo>& intents, std::map<std::string, PilotReply>& out,
+                 Report& r) {
   const auto files = jsonFiles(dir);
   if (files.empty()) r.errors.push_back({dir, "/", "no pilot reply files"});
   for (const auto& file : files) {
@@ -243,13 +251,24 @@ void loadReplies(const std::string& dir, std::map<std::string, PilotReply>& out,
     n.version();
     const bool filePlaceholder = placeholderOf(n, "placeholder", {});
     n.each("replies", false, [&](const Node& x) {
-      if (!x.object({"id", "text"}, {"validation"})) return;
+      if (!x.object({"id", "text"}, {"validation", "readbackOf"})) return;
       PilotReply p;
       p.id = x.text("id");
       p.text = x.text("text");
       if (!p.id.empty() && !chars(p.id, kIdChars)) x.child("id").fail("capital letters, digits, - and _ only");
       if (!p.text.empty() && !templateSlots(p.text, p.slots)) x.child("text").fail("bad {slot}");
       p.placeholder = placeholderOf(x, "draft", {"sopRef", "validated_by", "validated_at"}) || filePlaceholder;
+      p.readbackOf = x.text("readbackOf");
+      if (!p.readbackOf.empty()) {
+        const auto in = intents.find(p.readbackOf);
+        if (in == intents.end()) {
+          x.child("readbackOf").fail("no intent named " + p.readbackOf);
+        } else {
+          p.completeReadback = true;
+          for (const auto& f : in->second.required)
+            p.completeReadback = p.completeReadback && std::find(p.slots.begin(), p.slots.end(), f) != p.slots.end();
+        }
+      }
       const std::string id = p.id;
       if (!id.empty() && !out.emplace(id, std::move(p)).second) x.child("id").fail(id + " is defined twice");
     });
@@ -479,10 +498,17 @@ void loadScenario(const Node& n, const ScenarioSources& src, Exercise& e, std::m
   s.category = n.text("category");
   static const std::set<std::string> categories{"departure", "arrival", "ground", "landing", "go-around", "emergency", "rcf", "abnormal"};
   if (!s.category.empty() && !categories.count(s.category)) n.child("category").fail("unknown category " + s.category);
-  s.placeholder = placeholderOf(n, "placeholder", {"sopRef", "validatedBy"});
-  n.texts("objectives", true);
-  const std::string difficulty = n.text("difficulty");
-  if (!difficulty.empty() && difficulty != "basic" && difficulty != "intermediate" && difficulty != "advanced")
+  s.placeholder = placeholderOf(n, "placeholder", {"sopRef", "validated_by", "validated_at"});
+  if (n.has("validation") && n.child("validation").j.is_object()) {
+    const json& v = n.child("validation").j;  // types are reported by placeholderOf
+    const auto raw = [&](const char* k) { return v.contains(k) && v[k].is_string() ? v[k].get<std::string>() : std::string(); };
+    s.sopRef = raw("sopRef");
+    s.validatedBy = raw("validated_by");
+    s.validatedAt = raw("validated_at");
+  }
+  s.objectives = n.texts("objectives", true);
+  s.difficulty = n.text("difficulty");
+  if (!s.difficulty.empty() && s.difficulty != "basic" && s.difficulty != "intermediate" && s.difficulty != "advanced")
     n.child("difficulty").fail("must be basic, intermediate or advanced");
   if (n.has("unexpectedEvents") && !(n.child("unexpectedEvents").j.is_array() && n.child("unexpectedEvents").j.empty()))
     n.child("unexpectedEvents").fail("unexpected events are not supported yet");
@@ -540,6 +566,24 @@ void loadScenario(const Node& n, const ScenarioSources& src, Exercise& e, std::m
       if (!s.generators.count(slot)) u.at.fail(u.reply + " uses {" + slot + "}, which no generator supplies");
     e.replies[u.reply] = it->second;
   }
+  // D-429: the pilot answers a correct instruction with a readback of it (complete or not).
+  for (std::size_t i = 0; i < s.steps.size(); ++i) {
+    const ScenarioStep& st = s.steps[i];
+    const auto c = st.responses.find(Outcome::Correct);
+    if (c == st.responses.end() || !c->second.say) continue;
+    std::vector<std::pair<std::string, Node>> said;
+    const Node at = n.child("steps").item(i).child("responses").child("CORRECT");
+    if (!c->second.reply.empty()) said.emplace_back(c->second.reply, at.child("reply"));
+    for (const auto& [f, id] : c->second.withField) said.emplace_back(id, at.child("withField").child(f));
+    for (const auto& [id, where] : said) {
+      const auto it = replies.find(id);
+      if (it == replies.end()) continue;  // reported above
+      const std::string& of = it->second.readbackOf;
+      const bool expected = std::any_of(st.expects.begin(), st.expects.end(), [&](const Expectation& x) { return x.intent == of; });
+      if (!expected) where.fail(id + (of.empty() ? " is no readback" : " reads back " + of + ", which this step does not expect") +
+                                "; CORRECT needs a readback (readbackOf)");
+    }
+  }
 }
 
 bool anyPlaceholder(const Exercise& e) {
@@ -587,7 +631,7 @@ bool loadExercise(const ScenarioSources& src, Exercise& out, std::vector<LoadErr
   Exercise e;
   std::map<std::string, PilotReply> replies;
   loadIntents(src.phraseologyDir, e.intents, r);
-  loadReplies((fs::path(src.phraseologyDir) / "replies").string(), replies, r);
+  loadReplies((fs::path(src.phraseologyDir) / "replies").string(), e.intents, replies, r);
   if (const auto j = read(src.scenarioFile, r)) {
     const Node n{*j, src.scenarioFile, "", r};
     loadScenario(n, src, e, replies, r);

@@ -44,9 +44,9 @@ Sessions: b2 = `runtime`, 93 = `stt`, 31 = `ui`, 8d = `engine`.
 Order: `0a → 0b, 0c, 0d → 1a → G1 → 3a → 3b → 3c`. Wave 2 runs beside Wave 1 from 0c. 1c follows 1a. G1 does not wait for 1c; it needs only 1a and 1b (D-415). G1 has no pedal checks; they are G1-P, and neither 3a nor 3c waits for G1-P (D-309).
 Estimate before the move to the PC: 67–88 session-hours (before 0d, which adds 2–4, and before 1c, not yet estimated), likely 5–6 working days, range 4–8. Not yet re-estimated for the PC: builds get faster, the move itself (§4) is extra.
 
-### G1-P: pedal test (D-309, deferred until the pedal arrives)
+### G1-P: pedal test (D-309)
 
-The pedal is still **not passed** (D-02, D-03); G1 does not pass it.
+**Passed 2026-11-27 (D-339)** with the Preon pedal (04d8:0055); D-02 passed, D-03 closed. The list below is kept as the plan it was.
 
 1. VID:PID and the kind of device Linux reports (mouse, joystick or keyboard). A keyboard-type pedal only under D-310: exact VID:PID and grabbed exclusively; no other keyboard.
 2. Press and release are reported as separate events, also for a hold of several seconds; not pulse type (D-01). Which event code it sends; `pttDevice`, `pttCode` and `pttGrab` in `ui.json` are set to match.
@@ -124,7 +124,7 @@ Not affected: the udev rules and H540 service, which use fixed system paths by d
 7. Result screen: steps, attempts, response time, PTT discipline, suspected STT errors shown separately, no pass mark.
 8. Release-to-reply time, RAM and CPU measured on the idle panel and reported.
 
-Out of scope: Phraseology Studio, real recordings, SQLite and resume, injected events, assessed mode, packaging, pedal gate (D-03; its checks are G1-P, D-309).
+Out of scope: Phraseology Studio, real recordings, SQLite and resume, injected events, assessed mode, packaging, pedal gate (D-03, now closed by G1-P, D-339).
 
 Modes (ruling 2026-11-24): Practice shows the live verdict; Assessed hides it until debrief. The slice runs Practice only; P-11 refuses Assessed while any text is placeholder. Exercise audio is stored only with the trainee's consent on record; until A-5 is answered none is saved. (ui records these as D-107 and D-108.)
 

@@ -9,6 +9,7 @@
 #include <functional>
 #include <nlohmann/json.hpp>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -114,7 +115,7 @@ TEST_F(Departure, PlaceholderTextRefusesAssessedMode) {
 }
 
 TEST_F(Departure, OnePlaceholderReplyIsEnoughToRefuseAssessedMode) {
-  const json ok = {{"status", "validated"}, {"sopRef", "TEST"}, {"validatedBy", "TEST"}};
+  const json ok = {{"status", "validated"}, {"sopRef", "TEST"}, {"validated_by", "TEST"}, {"validated_at", "TEST"}};
   const json okText = {{"status", "validated"}, {"sopRef", "TEST"}, {"validated_by", "TEST"}, {"validated_at", "TEST"}};
   scenario["validation"] = airfield["validation"] = ok;
   replies["validation"] = phraseology["validation"] = {{"status", "validated"}};
@@ -129,7 +130,54 @@ TEST_F(Departure, OnePlaceholderReplyIsEnoughToRefuseAssessedMode) {
 
 TEST_F(Departure, ValidatedNeedsItsRecord) {
   scenario["validation"] = {{"status", "validated"}, {"sopRef", "TEST"}};
-  expectError(kFile, "/validation", "validatedBy");
+  expectError(kFile, "/validation", "validated_by");
+  expectError(kFile, "/validation", "validated_at");  // D-429
+  scenario["validation"]["validatedBy"] = "TEST";      // the old name
+  expectError(kFile, "/validation/validatedBy", "validated_by");
+}
+
+// D-429: what the screens need is kept.
+TEST_F(Departure, ScreenFieldsAreKept) {
+  scenario["objectives"] = {"PLACEHOLDER one", "PLACEHOLDER two"};
+  scenario["difficulty"] = "intermediate";
+  scenario["validation"] = {{"status", "placeholder"}, {"sopRef", "SOP-1"}};
+  ASSERT_TRUE(load()) << all();
+  EXPECT_EQ(e.scenario.objectives, (std::vector<std::string>{"PLACEHOLDER one", "PLACEHOLDER two"}));
+  EXPECT_EQ(e.scenario.difficulty, "intermediate");
+  EXPECT_EQ(e.scenario.sopRef, "SOP-1");
+  EXPECT_EQ(e.scenario.validatedAt, "");
+  EXPECT_EQ(e.intents.at("TAXI_INSTRUCTION").shortName, "Taxi");
+  EXPECT_EQ(e.intents.at("TAXI_INSTRUCTION").required, (std::set<std::string>{"callsign", "taxiway", "runway"}));
+  phraseology["intents"][0]["shortName"] = std::string(25, 'x');
+  expectError("placeholder.json", "/intents/0/shortName", "at most 24");
+}
+
+// D-429: a reply says which intent it reads back, and whether it says every required value.
+TEST_F(Departure, CorrectIsAnsweredWithAReadbackOfTheStepsIntent) {
+  ASSERT_TRUE(load()) << all();
+  EXPECT_EQ(e.replies.at("READBACK_TAXI").readbackOf, "TAXI_INSTRUCTION");
+  EXPECT_TRUE(e.replies.at("READBACK_TAXI").completeReadback);
+  const json good = replies;
+  const auto at = [&](const std::string& id) -> json& {
+    for (auto& r : replies["replies"])
+      if (r["id"] == id) return r;
+    throw std::runtime_error(id);
+  };
+  at("READBACK_TAKEOFF")["text"] = "rolling";  // deliberately incomplete: still a readback
+  ASSERT_TRUE(load()) << all();
+  EXPECT_FALSE(e.replies.at("READBACK_TAKEOFF").completeReadback);
+  replies = good;
+  at("READBACK_LINE_UP").erase("readbackOf");
+  expectError(kFile, "/steps/1/responses/CORRECT/reply", "READBACK_LINE_UP is no readback");
+  replies = good;
+  at("READBACK_LINE_UP")["readbackOf"] = "TAKEOFF_CLEARANCE";
+  expectError(kFile, "/steps/1/responses/CORRECT/reply", "which this step does not expect");
+  replies = good;
+  at("READBACK_TAXI_HOLD_SHORT").erase("readbackOf");
+  expectError(kFile, "/steps/0/responses/CORRECT/withField/hold_short", "is no readback");
+  replies = good;
+  at("QUERY")["readbackOf"] = "NOWHERE";
+  expectError("placeholder.json", "/replies/9/readbackOf", "no intent named NOWHERE");
 }
 
 // O-3: what is given is read back, and a field is optional only where the intent says so.

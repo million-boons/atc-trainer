@@ -36,11 +36,17 @@ struct PilotReply {
   std::string id, text;  // text with {slot}s
   std::vector<std::string> slots;
   bool placeholder = true;
+  // D-429: the intent this reply reads back; empty if it is no readback. Complete: it says every
+  // required value of that intent (callsign included); "Rolling" is not complete.
+  std::string readbackOf;
+  bool completeReadback = false;
 };
 
 struct IntentInfo {
   std::set<std::string> slots;
+  std::set<std::string> required;  // parse.required
   std::set<std::string> optional;  // parse.optional
+  std::string shortName;           // D-429: for the screens, e.g. "Taxi"; empty: show the id
   bool placeholder = true;
 };
 
@@ -72,6 +78,10 @@ struct ParamGenerator { std::string pool, mustServe; };
 struct Scenario {
   std::string id, name, category, airfield, initialPhase, initialStep;
   bool placeholder = true;
+  // D-429: kept for the screens (5d, Builder); the engine does not use them.
+  std::vector<std::string> objectives;
+  std::string difficulty;  // empty, basic, intermediate or advanced
+  std::string sopRef, validatedBy, validatedAt;  // as in the file; validated needs all three
   std::map<std::string, ParamGenerator> generators;
   std::vector<ScenarioStep> steps;
   PressRule pressDuringPilot = PressRule::Interrupt;

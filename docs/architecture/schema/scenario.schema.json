@@ -62,10 +62,11 @@
       "properties": {
         "status": { "enum": ["placeholder", "validated"] },
         "sopRef": { "type": "string" },
-        "validatedBy": { "type": "string" }
+        "validated_by": { "type": "string" },
+        "validated_at": { "type": "string" }
       },
       "if": { "properties": { "status": { "const": "validated" } } },
-      "then": { "required": ["status", "sopRef", "validatedBy"] }
+      "then": { "required": ["status", "sopRef", "validated_by", "validated_at"] }
     },
     "outcome": { "enum": ["CORRECT", "MISSING_INFO", "AMBIGUOUS", "UNINTELLIGIBLE", "WRONG_CALLSIGN", "UNSAFE", "CONFLICT", "UNEXPECTED", "INCORRECT", "TIMEOUT"] },
     "response": {
