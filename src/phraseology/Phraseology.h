@@ -18,6 +18,9 @@ struct Phraseology {
   std::map<std::string, std::vector<std::vector<std::string>>> pools;  // values -> spoken forms; includes "digit", "letter"
   std::map<std::string, std::vector<std::string>> slots;               // forms, e.g. "{digit} {digit}"
   std::vector<Intent> intents;
+  // Optional "promptWords": words only for the whisper prompt, as written there (e.g. station names
+  // of a coming scenario). Not phraseology: sentences, scripts and the parser never use them.
+  std::vector<std::string> promptWords;
 };
 
 // All ten digits and all 26 letters are required. On error returns false and says where.
@@ -38,7 +41,8 @@ struct ExpandOptions {
 std::vector<std::string> expandPhrases(const Phraseology& p, const ExpandOptions& o, std::string* error = nullptr);
 // Every word that can occur, in order of first use.
 std::vector<std::string> phraseologyWords(const Phraseology& p);
-// Vocabulary prompt for whisper: every pool value, no example sentence.
+// Vocabulary prompt for whisper: every pool value, the fixed wording, then promptWords; no example
+// sentence and no digit, so no value of a scenario.
 std::string whisperPrompt(const Phraseology& p);
 
 }  // namespace atc
