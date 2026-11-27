@@ -153,6 +153,7 @@ struct Rig {
   std::vector<EngineOutput> outputs;
   std::optional<ExerciseResult> result;
   int startedOk = 0;
+  std::vector<std::pair<std::uint64_t, std::size_t>> audio;  // tx, samples handed over for keeping (11)
   std::shared_ptr<MemoryLog::Store> log = std::make_shared<MemoryLog::Store>();
   PreparedExercise ready;
   ExerciseOptions opt;
@@ -171,6 +172,7 @@ struct Rig {
     cb.started = [this](bool ok, const std::string& why) { ok ? void(++startedOk) : refusals.push_back(why); };
     cb.output = [this](Ns, const EngineOutput& o) { outputs.push_back(o); };
     cb.ended = [this](const ExerciseResult& r) { result = r; };
+    cb.audio = [this](const RadioTx& t) { audio.emplace_back(t.id, t.audio.size()); };
     cb.fault = [this](const std::string& s) { faults.push_back(s); order.push_back("fault"); };
     cb.input = [this](Ns, const EngineInput& i) { order.push_back(std::visit([](const auto& x) { return std::string(x.kName); }, i)); };
     run = std::make_unique<ExerciseRuntime>(rc, rules, model, cb);
@@ -263,7 +265,7 @@ struct Rig {
     return spoken.at(x);
   }
   std::string taxi(const std::string& runway = {}) const { return v("callsign") + " taxi via " + v("taxiway") + " runway " + (runway.empty() ? v("runway") : runway); }
-  std::string lineUp() const { return v("callsign") + " line up runway " + v("runway"); }
+  std::string lineUp() const { return v("callsign") + " runway " + v("runway") + " line up and wait"; }  // D-430
   std::string takeoff() const { return v("callsign") + " runway " + v("runway") + " cleared for takeoff"; }
   std::string otherRunway() const { return v("runway") == "zero nine" ? "two seven" : "zero nine"; }
 
@@ -565,7 +567,8 @@ TEST(ExerciseRuntime, SilentOrBrokenRecogniserIsNoTraineeError) {
   r.pass(10);
   EXPECT_EQ(r.logged<in::Recognised>().size(), 1u);  // exactly one per transmission
   EXPECT_EQ(r.logged<out::StepEntered>().size(), 1u);
-  r.hearPilot();
+  r.pass(4000);  // the "say again" was due at once (D-342: 5 s since the release is more than any delay); let it end
+  ASSERT_FALSE(r.sounding);
   // The model vanishes: recorded as a fault too.
   r.speech.model = false;
   r.down(); r.pass(1500); r.up(); r.pass(400);
@@ -647,6 +650,7 @@ TEST(ExerciseRuntime, APlansValuesRunAndAreLogged) {
   r.opt.values = other;
   r.opt.replyDelay = std::pair{ms(300), ms(400)};
   r.opt.plan = {"p1", "Departure, runway", "custom", 3};
+  r.opt.pttStandIn = true;  // D-435
   ASSERT_EQ(r.start(), "");
   EXPECT_EQ(r.log->header.values, other);
   EXPECT_EQ(r.log->header.replyFromMs, 300);
@@ -656,12 +660,54 @@ TEST(ExerciseRuntime, APlansValuesRunAndAreLogged) {
   EXPECT_EQ(h["version"], 2);
   EXPECT_EQ(h["values"]["runway"], other["runway"]);
   EXPECT_EQ(h["plan"]["name"], "Departure, runway");
+  EXPECT_EQ(h["pttStandIn"], true);
   r.hearPilot();
   const auto said = r.logged<out::PilotRequested>().front().utterance.text;
   for (const auto& c : r.ready.exercise->airfield.callsigns)
     if (c.id == other["callsign"]) {
       EXPECT_NE(said.find(c.id), std::string::npos) << said;
     }
+}
+
+// 11: each closed transmission of the exercise is handed over with its audio; nothing else (Lab, short tap).
+TEST(ExerciseRuntime, TheAudioOfEachTransmissionIsHandedOver) {
+  Rig r;
+  r.down(); r.pass(10); r.up(); r.pass(400);  // a short tap before the start: not the exercise's
+  ASSERT_EQ(r.start(), "");
+  r.hearPilot();
+  const auto tx = r.transmit();
+  r.down(); r.pass(50); r.up(); r.pass(400);  // a short tap: cancelled, no audio
+  ASSERT_EQ(r.audio.size(), 1u);
+  EXPECT_EQ(r.audio[0].first, tx);
+  EXPECT_GT(r.audio[0].second, 16000u);  // pre-roll, 1.5 s, tail
+}
+
+// D-342: the reply delay is the whole response time from the release; a slow recogniser does not add to it.
+TEST(ExerciseRuntime, RecognitionTimeIsNotAddedToTheReplyDelay) {
+  Rig r;
+  ASSERT_EQ(r.start(), "");
+  r.hearPilot();
+  const auto pilotStarts = [&] { return r.logged<in::PilotStarted>(); };
+  // A slow result: 2.5 s after the release, more than any configured delay (0.5 to 1.5 s).
+  const auto tx = r.transmit();  // includes 0.4 s after the release
+  r.pass(2100);
+  const std::size_t before = pilotStarts().size();
+  r.text(tx, r.taxi());
+  r.pass(60);
+  ASSERT_EQ(pilotStarts().size(), before + 1);  // at once, no further delay
+  const Ns since = pilotStarts().back().sinceRelease;
+  EXPECT_GE(since, ms(2500));
+  EXPECT_LT(since, ms(2700));
+  r.hearPilot();
+  // A quick result: the pilot still waits for the configured delay, counted from the release.
+  const auto tx2 = r.transmit();
+  r.text(tx2, r.lineUp());
+  r.hearPilot();
+  const Ns since2 = pilotStarts().back().sinceRelease;
+  EXPECT_GE(since2, ms(500));
+  EXPECT_LT(since2, ms(1600));
+  const json j = json::parse(eventJson(EngineEvent{1, 0, EngineInput(pilotStarts().back())}));
+  EXPECT_EQ(j["sinceRelease"].get<Ns>(), since2);  // in the log
 }
 
 TEST(ExerciseRuntime, StartIsRefusedWithAReason) {
@@ -1110,7 +1156,7 @@ TEST(ExerciseRuntimeThreads, DepartureWithRealThreadsLockedModelAndLogFile) {
     if (c.id == p["callsign"]) call = c.spoken;
   const std::string rwy = p["runway"] == "09" ? "zero nine" : "two seven", twy = p["taxiway"] == "A3" ? "alpha three" : "bravo two";
   auto words = std::make_shared<std::vector<std::string>>(std::vector<std::string>{
-      call + " taxi via " + twy + " runway " + rwy, call + " line up runway " + rwy, call + " runway " + rwy + " cleared for takeoff"});
+      call + " taxi via " + twy + " runway " + rwy, call + " runway " + rwy + " line up and wait", call + " runway " + rwy + " cleared for takeoff"});
 
   ExerciseRuntime* runtime = nullptr;
   std::atomic<int> labResults{0}, faults{0}, ended{0};

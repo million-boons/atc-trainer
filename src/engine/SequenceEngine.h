@@ -67,6 +67,7 @@ class SequenceEngine {
   void enter(const std::string& id, Outputs& o);
   void takeBranch(Outcome outcome, Outputs& o);
   PilotUtterance& say(const std::string& replyId, Outcome cause, std::uint64_t tx, bool unprompted, Outputs& o);
+  void answerChallenge(std::uint64_t tx, Outputs& o);
   void stepTimedOut(Outputs& o);
   void finish(out::EndReason why, Outputs& o);
   void settle(Ns t, Outputs& o);
@@ -92,6 +93,9 @@ class SequenceEngine {
   std::map<std::uint64_t, std::uint64_t> cut_;         // D-325: cut and not owed -> latest transmission before the cut
   std::uint64_t lastTx_ = 0;
   std::uint64_t nextUtterance_ = 1;
+  // D-430: an incomplete readback waiting for its challenge, and the latest readback said in full.
+  struct Readback { std::string step, fullReply; std::uint64_t utterance = 0; };
+  std::optional<Readback> due_, lastReadback_;
   std::array<TimerState, 3> timers_{};
 };
 

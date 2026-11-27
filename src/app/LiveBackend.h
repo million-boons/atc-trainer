@@ -31,6 +31,7 @@ struct LiveConfig {
   StatusConfig status;
   std::optional<LiveExerciseSetup> exercise;  // empty: this program runs no exercise
   atc::StudioService* studio = nullptr;
+  std::function<void(atc::LocalEnd)> historyPlay;  // 5e: a playback of exercise audio began or ended
 };
 
 // The Speech Lab and the status tiles as clients of RadioCore. RadioCore runs on its own
@@ -47,6 +48,9 @@ class LiveBackend : public QObject {
   // For LiveExercise; empty functions without an exercise set-up.
   ExerciseRadio exerciseRadio();
   ExerciseStatus exerciseStatus();
+  // Local playback through the radio (refused while it is in use); any thread.
+  void playLocal(atc::LocalSound what, std::vector<std::int16_t> s, int rate) { core_->playLocal(what, std::move(s), rate); }
+  void stopLocal() { core_->stopLocal(); }
 
  signals:
   void sideTone();

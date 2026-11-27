@@ -182,6 +182,7 @@ int main(int argc, char** argv) {
   std::unique_ptr<atc::PlannerService> plannerService;
   std::unique_ptr<atc::ScenarioService> scenarioService;
   std::unique_ptr<atc::HistoryService> historyService;
+  std::shared_ptr<atc::ExerciseAudio> exerciseAudio;
   std::unique_ptr<atc::SetupService> setupService;
   std::unique_ptr<LiveBackend> live;
   if (!useMock) {
@@ -232,8 +233,15 @@ int main(int argc, char** argv) {
       ec.scenarioFile = paths.data + "/scenarios/" + cfg["scenario"].toString("DEPARTURE-01").toStdString() + ".json";
       ec.model = cfg["exerciseModel"].toString(at(ec.model)).toStdString();
       ec.pttMissingBlocks = lc.status.pttMissingBlocks;
+      ec.pttStandIn = lc.status.pttStandIn;  // D-435
       ec.mayUse = [consent](const std::string& id) { return consent->mayUse(id); };
       ec.phraseology = [phraseology] { return phraseology->dir(); };
+      // Exercise audio (11, D-341): kept only under the Lab's rules; the consent is asked again before each file.
+      ec.audio = std::make_shared<atc::ExerciseAudio>(atc::ExerciseAudio::Config{
+          paths.writable + "/exercise-audio", cfg["recordingsMinFreeMb"].toInt(200), {}, [consent](const std::string& id) {
+            const auto p = consent->find(id);
+            return atc::ExerciseAudio::Answer{consent->mayBeRecorded(id), p ? p->consentDate : std::string(), p ? p->consentVersion : std::string()};
+          }});
       ec.planCard = [](const atc::PlanSelection& s) {
         PlanChoice c;
         c.plan = s.plan;
@@ -246,6 +254,7 @@ int main(int argc, char** argv) {
       if (const auto r = atc::radioIntensityFromString(effect)) ec.radio = *r;
       else qWarning("radioEffect \"%s\" is not known; using light", effect.c_str());
       setup.runtime.recogniseLimit = atc::ms(std::clamp(cfg["recogniserTimeoutMs"].toInt(10'000), 1000, 60'000));
+      exerciseAudio = ec.audio;
       exercise = std::make_unique<LiveExercise>(ec, &stt, &lab, &access, &settings);
       setup.callbacks = exercise->callbacks();
       lc.exercise = std::move(setup);
@@ -303,8 +312,12 @@ int main(int argc, char** argv) {
                                       [consent](const std::string& id) { return consent->mayUse(id); }, gui,
                                       [ex](const std::string& file) { ex->useScenario(file); }});
       scenarios.setBackend(scenarioService->backend());
-      historyService = std::make_unique<atc::HistoryService>(atc::HistoryService::Config{paths.data, paths.writable + "/exercises"},
-                                                             atc::HistoryService::Rules{who, now});
+      historyService = std::make_unique<atc::HistoryService>(
+          atc::HistoryService::Config{paths.data, paths.writable + "/exercises", exerciseAudio, [consent](const std::string& id) { return consent->mayBeRecorded(id); }},
+          atc::HistoryService::Rules{who, now,
+                                     [&live](std::vector<std::int16_t> s, int rate) { if (live) live->playLocal(atc::LocalSound::History, std::move(s), rate); },
+                                     [&live] { if (live) live->stopLocal(); }});
+      lc.historyPlay = [h = historyService.get()](atc::LocalEnd e) { h->onPlay(e); };
       history.setBackend(historyService->backend());
       atc::SetupService::Config setupCfg{setupFile, paths.voices, paths.writable + "/voices", {}, {}, {}};
       for (auto it = starting.begin(); it != starting.end(); ++it) {

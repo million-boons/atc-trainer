@@ -23,6 +23,9 @@ struct StepResult {
   int suspectedStt = 0;            // not counted
   std::vector<MissedResponse> missed;  // one per timeout
   std::optional<Ns> responseTime;  // pilot end to key-down, first attempt; from the first call left unanswered
+  // D-430, the pilot's incomplete readbacks of this step. Missed is a trainee error ("incomplete readback
+  // not challenged"); Unnecessary is a warning only; Open: the exercise ended first, not counted.
+  int readbackCaught = 0, readbackMissed = 0, unnecessaryChallenges = 0, readbackOpen = 0;
 };
 
 struct PttResult {

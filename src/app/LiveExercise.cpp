@@ -49,6 +49,12 @@ ExerciseRuntime::Callbacks LiveExercise::callbacks() {
   cb.output = [this](Ns t, const EngineOutput& o) { ui([this, t, o] { view_.output(t, o); }); };
   cb.ended = [this](const ExerciseResult& r) { ui([this, r] { ended(r); }); };
   cb.fault = [this](const std::string& why) { ui([this, why] { view_.fault(q(why)); }); };
+  cb.audio = [this](const RadioTx& t) {  // RadioCore's thread; the store asks the consent again
+    if (!cfg_.audio) return;
+    const int rate = 16000;  // RadioConfig::rate
+    const int keyed = int(std::max<Ns>(0, t.release - t.press) * rate / 1'000'000'000);
+    cfg_.audio->transmission(t.id, t.audio, rate, t.preRoll, keyed);
+  };
   return cb;
 }
 
@@ -58,6 +64,7 @@ void LiveExercise::connectRadio(ExerciseRadio radio, ExerciseStatus status, Stat
   connect(feed, &StatusFeed::startExerciseRequested, this, &LiveExercise::prepare);
   connect(feed, &StatusFeed::stopExerciseRequested, &c_, &ExerciseController::stop);
   if (access_) connect(access_.data(), &AccessController::confirmed, &c_, &ExerciseController::endConfirmed);
+  if (cfg_.audio) c_.setAudioConnected();  // D-121: this backend really stores it
   connect(&c_, &ExerciseController::phaseChanged, this, [this] {
     if (recheck_) ui([this] { if (recheck_) recheck(); });  // later: while an exercise begins the phase is idle for a moment
   });
@@ -139,6 +146,7 @@ void LiveExercise::prepare() {
     showPlan();
     shown = ExercisePlan{q(plan_->plan.name), q(plan_->plan.trainee), plan_->plan.assessed, plan_->run};
   }
+  c_.setAudioSwitch(settings_ && settings_->saveRecordings());  // EA-1: the Lab's switch, as it is now
   view_.prepare({.exercise = ready_.exercise, .seed = seed_,
                  .model = stt_ ? stt_->nameOf(cfg_.model) : q(cfg_.model), .trainee = access_ && access_->trainee() ? access_->personId() : QString(),
                  .consent = access_ && access_->consent(),
@@ -161,6 +169,7 @@ void LiveExercise::start(bool assessed) {
   o.model = cfg_.model;
   o.pttFallback = !cfg_.pttMissingBlocks || (settings_ && settings_->pttFallback());
   o.radio = cfg_.radio;
+  o.pttStandIn = cfg_.pttStandIn;
   if (plan_) {  // D-334: exactly what the card and the dialog show
     const PlanDifficulty& d = plan_->plan.difficulty;
     o.values = plan_->values;
@@ -170,15 +179,21 @@ void LiveExercise::start(bool assessed) {
     o.plan = {plan_->plan.id, plan_->plan.name, presets[int(d.preset)], plan_->run};
   }
   session_ = o.sessionId;
+  if (cfg_.audio) {  // EA-1, EA-3: the Lab's rule (switch, trainee, consent); a guest never
+    const bool keep = access_ && settings_ && saveRule(settings_->saveRecordings(), access_->role(), access_->consent()) == SaveRule::Save;
+    cfg_.audio->begin(o.sessionId, keep ? o.traineeId : std::string());
+  }
   starting_ = true;  // before start(): started() may come at once
   assessed_ = assessed;
   const std::string why = radio_.start(ready_, o, cfg_.makeLog ? cfg_.makeLog() : std::make_unique<JsonlEventLog>(cfg_.logs));
   if (why.empty()) return;
   starting_ = false;
+  if (cfg_.audio) cfg_.audio->end();
   view_.refused(q(why));
 }
 
 void LiveExercise::ended(const ExerciseResult& r) {
+  if (cfg_.audio) cfg_.audio->end();
   second_.stop();
   if (status_.running) status_.running(false);
   view_.ended(r, QDateTime::currentDateTime());

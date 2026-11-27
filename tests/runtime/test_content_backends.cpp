@@ -16,6 +16,7 @@
 #include "app/HistoryService.h"
 #include "app/ScenarioService.h"
 #include "app/SetupService.h"
+#include "storage/ExerciseAudio.h"
 #include "core/PathResolver.h"
 #include "engine/EventJson.h"
 #include "engine/EventRead.h"
@@ -81,7 +82,7 @@ std::string exercise(const fs::path& dir, const std::string& session, const std:
     if (complete) {
       sim.transmit(Simulator::instruction("TAXI_INSTRUCTION", {{"callsign", v["callsign"]}, {"taxiway", v["taxiway"]}, {"runway", v["runway"]}}));
       sim.waitForPilot();
-      sim.transmit(Simulator::instruction("LINE_UP", {{"callsign", v["callsign"]}, {"runway", v["runway"]}}));
+      sim.transmit(Simulator::instruction("LINE_UP_AND_WAIT", {{"callsign", v["callsign"]}, {"runway", v["runway"]}}));
       sim.waitForPilot();
       sim.transmit(Simulator::instruction("TAKEOFF_CLEARANCE", {{"callsign", v["callsign"]}, {"runway", v["runway"]}}));
       sim.waitForPilot();
@@ -101,8 +102,8 @@ struct History {
   HistoryBackend b;
   History() {
     fs::create_directories(t.path / "exercises");
-    s = std::make_unique<HistoryService>(HistoryService::Config{paths().data, (t.path / "exercises").string()},
-                                         HistoryService::Rules{[this] { return std::pair{role, person}; }, [] { return std::string("2026-11-26 11:00"); }});
+    s = std::make_unique<HistoryService>(HistoryService::Config{paths().data, (t.path / "exercises").string(), {}, {}},
+                                         HistoryService::Rules{[this] { return std::pair{role, person}; }, [] { return std::string("2026-11-26 11:00"); }, {}, {}});
     b = s->backend();
   }
   std::pair<std::vector<HistoryRow>, std::string> list(const std::string& who) {
@@ -164,7 +165,8 @@ TEST(EventRead, EveryKindOfEventComesBackUnchanged) {
       {6, 15, EngineInput(in::PttPresence{false})}, {7, 16, EngineInput(in::FallbackPttUsed{3, "SPACE"})},
       {8, 17, EngineInput(in::InstructorContinue{})}, {9, 18, EngineOutput(out::AtcBeforePilot{3})},
       {10, 19, EngineOutput(out::NoReply{3})}, {11, 20, EngineOutput(out::InstructorAlert{"why", true})},
-      {12, 21, EngineInput(in::ProgramClosed{})}, {13, 22, EngineOutput(out::Ended{out::EndReason::ProgramClosed})}};
+      {12, 21, EngineInput(in::ProgramClosed{})}, {13, 22, EngineOutput(out::ReadbackCheck{"TAXI", 3, 4, out::ReadbackResult::Missed})},
+      {14, 23, EngineOutput(out::Ended{out::EndReason::ProgramClosed})}};
   TempDir t;
   EventLogHeader h;
   h.sessionId = "x";
@@ -253,8 +255,8 @@ TEST(HistoryServiceTest, AChangedScenarioIsSaid) {
   // Today's files, one of them changed: the same check with a copy of the data.
   TempDir data;
   for (const char* d : {"scenarios", "airfields", "phraseology"}) fs::copy(paths().data + "/" + d, data.path / d, fs::copy_options::recursive);
-  HistoryService other(HistoryService::Config{data.path.string(), dir.string()},
-                       HistoryService::Rules{[] { return std::pair{Role::Instructor, std::string()}; }, [] { return std::string(); }});
+  HistoryService other(HistoryService::Config{data.path.string(), dir.string(), {}, {}},
+                       HistoryService::Rules{[] { return std::pair{Role::Instructor, std::string()}; }, [] { return std::string(); }, {}, {}});
   std::vector<HistoryRow> rows;
   const auto list = [&] {
     other.backend().list("", [&](std::vector<HistoryRow> r, const std::string&) { rows = std::move(r); });
@@ -335,7 +337,9 @@ TEST(ScenarioServiceTest, ListsChecksAndSelects) {
   std::vector<ScenarioInfo> list;
   b.load([&](std::vector<ScenarioInfo> l, const std::string& why) { list = std::move(l); EXPECT_EQ(why, ""); });
   s.wait();
-  ASSERT_EQ(list.size(), 1u);
+  const auto dep = std::find_if(list.begin(), list.end(), [](const ScenarioInfo& i) { return i.id == "DEPARTURE-01"; });
+  ASSERT_NE(dep, list.end());
+  std::rotate(list.begin(), dep, dep + 1);  // the departure first: the checks below are about it
   EXPECT_EQ(list[0].id, "DEPARTURE-01");
   EXPECT_EQ(list[0].category, "departure");
   EXPECT_EQ(list[0].difficulty, "basic");
@@ -482,4 +486,83 @@ TEST(SetupServiceTest, PinAndGuests) {
   for (int i = 0; i < 500 && !got; ++i) std::this_thread::sleep_for(std::chrono::milliseconds(10));
   EXPECT_EQ(why, "");
   EXPECT_EQ(count, 0);
+}
+
+// ---- Exercise audio in the debrief (11, D-341)
+
+TEST(HistoryServiceTest, SavedAudioIsPlayedOnlyWhileTheConsentHolds) {
+  TempDir t;
+  const auto dir = t.path / "exercises";
+  fs::create_directories(dir);
+  const std::string id = exercise(dir, "20261126T100000Z-aaaa", "S01", true);
+  std::atomic<bool> yes{true};
+  auto audio = std::make_shared<ExerciseAudio>(ExerciseAudio::Config{(t.path / "ea").string(), 0, {}, [&](const std::string& w) {
+    return ExerciseAudio::Answer{yes && w == "S01", "2026-11-25", "draft-1"};
+  }});
+  // The first ATC transmission of that run has audio, with 0.3 s of pre-roll and 0.5 s keyed.
+  const ReadLog log = readEventLog((dir / (id + ".jsonl")).string());
+  std::uint64_t tx = 0;
+  for (const auto& e : log.events)
+    if (const auto* i = std::get_if<EngineInput>(&e.body); i && !tx)
+      if (const auto* r = std::get_if<in::Recognised>(i)) tx = r->instruction.tx;
+  ASSERT_NE(tx, 0u);
+  audio->begin(id, "S01");
+  audio->transmission(tx, std::vector<std::int16_t>(16000, 100), 16000, 4800, 8000);
+  audio->wait();
+  Role role = Role::Instructor;
+  std::string person;
+  std::vector<std::size_t> played;
+  HistoryService s(HistoryService::Config{paths().data, dir.string(), audio, [&](const std::string& w) { return yes && w == "S01"; }},
+                   HistoryService::Rules{[&] { return std::pair{role, person}; }, [] { return std::string(); },
+                                         [&](std::vector<std::int16_t> pcm, int) { played.push_back(pcm.size()); }, {}});
+  auto b = s.backend();
+  HistoryDetail d;
+  b.open(id, [&](HistoryDetail x, const std::string&) { d = std::move(x); });
+  s.wait();
+  int atc = -1, other = -1;
+  for (std::size_t i = 0; i < d.entries.size(); ++i) {
+    if (d.entries[i].audio && atc < 0) atc = int(i);
+    if (d.entries[i].kind == HistoryEntry::Kind::Atc && !d.entries[i].audio && other < 0) other = int(i);
+  }
+  ASSERT_GE(atc, 0);
+  ASSERT_GE(other, 0);  // a transmission without saved audio
+  EXPECT_EQ(d.entries[std::size_t(other)].noAudio, "");
+  std::string why = "(none)";
+  b.play(id, atc, true, [&](const std::string& w) { why = w; });
+  s.wait();
+  EXPECT_EQ(why, "(none)");  // answers when the playback ends
+  ASSERT_EQ(played.size(), 1u);
+  EXPECT_EQ(played[0], 8000u);  // the keyed part only
+  s.onPlay(LocalEnd::Started);
+  EXPECT_EQ(why, "(none)");
+  s.onPlay(LocalEnd::Completed);
+  EXPECT_EQ(why, "");
+  b.play(id, atc, false, [&](const std::string& w) { why = w; });
+  s.wait();
+  EXPECT_EQ(played.back(), 16000u);
+  s.onPlay(LocalEnd::Refused);
+  EXPECT_EQ(why, "the radio is in use");
+  role = Role::Trainee;
+  person = "S02";
+  why = "(none)";
+  b.play(id, atc, false, [&](const std::string& w) { why = w; });
+  s.wait();
+  EXPECT_NE(why, "(none)");  // somebody else's result (EA-5)
+  EXPECT_NE(why, "");
+  person = "S01";
+  yes = false;  // withdrawn (EA-2)
+  b.open(id, [&](HistoryDetail x, const std::string&) { d = std::move(x); });
+  s.wait();
+  EXPECT_FALSE(d.entries[std::size_t(atc)].audio);
+  EXPECT_EQ(d.entries[std::size_t(atc)].noAudio, "consent withdrawn: not played");
+  b.play(id, atc, false, [&](const std::string& w) { why = w; });
+  s.wait();
+  EXPECT_EQ(why, "consent withdrawn: not played");
+  EXPECT_EQ(played.size(), 2u);
+  EXPECT_TRUE(fs::exists(t.path / "ea" / id));  // the files stay (D-102)
+  role = Role::Instructor;
+  b.remove(id, [&](const std::string& w) { why = w; });
+  s.wait();
+  EXPECT_EQ(why, "");
+  EXPECT_FALSE(fs::exists(t.path / "ea" / id));  // deleted with its result
 }

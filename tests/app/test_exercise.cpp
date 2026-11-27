@@ -77,6 +77,7 @@ TEST(Exercise, NoPlaybackWithoutConsentOrStoredAudio) {
   C c;
   int plays = 0;
   QObject::connect(&c, &C::playRequested, [&](int) { ++plays; });
+  c.setAudioSwitch(true);
   exercise_mock::show(c, "exresult", false, false);
   c.play(0);
   EXPECT_EQ(plays, 0);
@@ -160,9 +161,21 @@ TEST(Exercise, StopInAssessedNeedsThePinAlsoWhilePaused) {  // D-129
   EXPECT_EQ(stops, 0);
 }
 
+TEST(Exercise, TheSaveSwitchCoversExerciseAudio) {  // EA-1
+  C c;
+  c.setAudioConnected();
+  exercise_mock::show(c, "exresult", false, true);
+  EXPECT_FALSE(c.audioSaved());  // off until told
+  EXPECT_EQ(c.audioText(), "Exercise audio not saved: switched off in Settings");
+  c.setAudioSwitch(true);
+  EXPECT_TRUE(c.audioSaved());
+  EXPECT_EQ(c.audioText(), "Saved on this machine only");
+}
+
 TEST(Exercise, AGuestHasNoAudio) {  // D-127
   C c;
   c.setAudioConnected();
+  c.setAudioSwitch(true);
   c.begin({}, false, true);
   EXPECT_FALSE(c.audioSaved());
   EXPECT_TRUE(c.audioText().contains("guest"));

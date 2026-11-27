@@ -254,7 +254,7 @@ TEST_F(History, AnUncertainValueIsShownAsHeard) {
   open("h1");
   h->selectEntry(6);
   EXPECT_EQ(h->entry()["parsed"].toString(), "RWY \"0.9\" ?");
-  EXPECT_EQ(h->entry()["heard"].toString(), "eagle four two one line up runway 0.9");
+  EXPECT_EQ(h->entry()["heard"].toString(), "eagle four two one runway 0.9 line up and wait");
 }
 
 TEST_F(History, PlayOnlyIfAudioWasSaved) {

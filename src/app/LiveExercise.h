@@ -15,6 +15,7 @@
 #include "app/SttController.h"
 #include "app/EngineHeaders.h"
 #include "app/PlannerService.h"
+#include "storage/ExerciseAudio.h"
 
 struct LiveExerciseConfig {
   std::string data, voices;  // folders
@@ -22,11 +23,13 @@ struct LiveExerciseConfig {
   std::string scenarioFile;
   std::string model = "whisper-tiny-genprompt";  // D-414
   atc::RadioIntensity radio = atc::RadioIntensity::Light;
+  bool pttStandIn = false;       // D-435: the PTT device is the mouse stand-in (--ptt-device stand-in)
   bool pttMissingBlocks = true;  // configuration; the instructor's option comes from SettingsController
   std::function<std::unique_ptr<atc::IEventLog>()> makeLog;  // empty: JSON Lines in `logs`
   atc::VoiceBank::MayUse mayUse;             // the speaker's answer today (D-133); called on the check's thread
   atc::ExerciseCheck::Folder phraseology;    // the folder in use (D-318); empty: data/phraseology
   std::function<QVariantMap(const atc::PlanSelection&)> planCard;  // the Planner's keys for the Dashboard card
+  std::shared_ptr<atc::ExerciseAudio> audio;  // empty: exercise audio is never kept
   std::function<atc::CheckResult(const std::string&)> check;  // tests: the result at once; empty: ExerciseCheck
 };
 

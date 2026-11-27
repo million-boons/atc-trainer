@@ -23,12 +23,15 @@ struct Airfield {
   struct Taxiway { std::string id; std::set<std::string> serves; };
   struct AircraftType { std::string id; std::set<std::string> categories; };  // empty: any
   struct Callsign { std::string id, spoken; std::set<std::string> types; };   // empty: any
+  // D-430: an ATC unit and its frequencies, e.g. GROUND, "rajali ground", 121.7.
+  struct Unit { std::string id, spoken; std::vector<std::string> frequencies; };
   std::string id;
   bool placeholder = true;
   std::vector<std::string> runways;
   std::vector<Taxiway> taxiways;
   std::vector<AircraftType> aircraftTypes;
   std::vector<Callsign> callsigns;
+  std::vector<Unit> units;
 };
 
 // data/phraseology/replies (D-402). Never read by the speech corpus generator.
@@ -36,11 +39,17 @@ struct PilotReply {
   std::string id, text;  // text with {slot}s
   std::vector<std::string> slots;
   bool placeholder = true;
+  // D-429: the intent this reply reads back; empty if it is no readback. Complete: it says every
+  // required value of that intent (callsign included); "Rolling" is not complete.
+  std::string readbackOf;
+  bool completeReadback = false;
 };
 
 struct IntentInfo {
   std::set<std::string> slots;
+  std::set<std::string> required;  // parse.required
   std::set<std::string> optional;  // parse.optional
+  std::string shortName;           // D-429: for the screens, e.g. "Taxi"; empty: show the id
   bool placeholder = true;
 };
 
@@ -48,6 +57,11 @@ struct StepResponse {
   bool say = false;
   std::string reply;
   std::map<std::string, std::string> withField;  // optional field given -> this reply instead (O-3)
+  // D-430, CORRECT only. incompleteReply: a readback that leaves a value out, said at the scenario's
+  // readbackCheck.incompleteRate; the trainee must challenge it. alternates: said instead of reply,
+  // all equally often; no challenge is due after one.
+  std::string incompleteReply;
+  std::vector<std::string> alternates;
 };
 struct StepTransition { Outcome on = Outcome::Correct; std::string to; bool errorBranch = false; };
 struct StepOnEnter { std::string reply; Ns delay = 0; };
@@ -56,6 +70,7 @@ struct Expectation {
   std::vector<std::string> required;
   std::vector<std::string> optional;             // accepted if given, at most one; the readback includes it
   std::map<std::string, std::string> mustMatch;  // field -> generated parameter
+  std::map<std::string, std::pair<int, int>> ranges;  // D-430: field -> whole number from..to, chosen by the trainee
 };
 struct ScenarioStep {
   std::string id, label, phase;
@@ -68,15 +83,26 @@ struct ScenarioStep {
   int maxSayAgain = 0;  // 0: no limit
   bool final = false;
 };
-struct ParamGenerator { std::string pool, mustServe; };
+struct ParamGenerator { std::string pool, mustServe, unit; };  // unit: only for pool frequencies (D-430)
+// D-430: how the trainee challenges an incomplete readback. The challenge is judged like a step
+// that expects this intent; when correct, the pilot says the full readback.
+struct ReadbackCheck {
+  double incompleteRate = 0;  // 0 to 1: share of incompleteReply among the readbacks that have one
+  Expectation challenge;      // intent, required (callsign), mustMatch for any value it names
+};
 struct Scenario {
   std::string id, name, category, airfield, initialPhase, initialStep;
   bool placeholder = true;
+  // D-429: kept for the screens (5d, Builder); the engine does not use them.
+  std::vector<std::string> objectives;
+  std::string difficulty;  // empty, basic, intermediate or advanced
+  std::string sopRef, validatedBy, validatedAt;  // as in the file; validated needs all three
   std::map<std::string, ParamGenerator> generators;
   std::vector<ScenarioStep> steps;
   PressRule pressDuringPilot = PressRule::Interrupt;
   bool repeatInterruptedReply = true;
   Ns maxDuration = 0;  // 0: none
+  std::optional<ReadbackCheck> readbackCheck;
   const ScenarioStep* step(const std::string& id) const;
 };
 

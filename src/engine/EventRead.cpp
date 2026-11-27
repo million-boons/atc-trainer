@@ -61,6 +61,7 @@ bool header(const json& j, EventLogHeader& h, std::string& error) {
     h.replyToMs = (*d)[1].is_number() ? (*d)[1].get<int>() : 0;
   }
   h.radio = text(j, "radio");
+  h.pttStandIn = flag(j, "pttStandIn");  // D-435
   if (const auto p = j.find("plan"); p != j.end() && p->is_object()) {
     h.planId = text(*p, "id");
     h.planName = text(*p, "name");
@@ -118,7 +119,7 @@ bool event(const json& j, EngineEvent& e) {
     x.releaseToText = num<Ns>(j, "releaseToText");
     x.sttFault = text(j, "sttFault");
     e.body = EngineInput(x);
-  } else if (n == "pilot_started") e.body = EngineInput(in::PilotStarted{num<std::uint64_t>(j, "utterance")});
+  } else if (n == "pilot_started") e.body = EngineInput(in::PilotStarted{num<std::uint64_t>(j, "utterance"), num<Ns>(j, "sinceRelease")});
   else if (n == "pilot_ended") e.body = EngineInput(in::PilotEnded{num<std::uint64_t>(j, "utterance"), pilotEnd(text(j, "end"))});
   else if (n == "timer_fired") e.body = EngineInput(in::TimerFired{timer(text(j, "timer")), num<std::uint64_t>(j, "generation")});
   else if (n == "ptt_presence") e.body = EngineInput(in::PttPresence{flag(j, "present")});
@@ -151,6 +152,13 @@ bool event(const json& j, EngineEvent& e) {
     u.owed = flag(j, "owed");
     e.body = EngineOutput(out::PilotRequested{u});
   } else if (n == "atc_before_pilot") e.body = EngineOutput(out::AtcBeforePilot{num<std::uint64_t>(j, "tx")});
+  else if (n == "readback_check") {  // D-430
+    const std::string r = text(j, "result");
+    if (r != "caught" && r != "missed" && r != "unnecessary" && r != "open") return false;
+    e.body = EngineOutput(out::ReadbackCheck{text(j, "step"), num<std::uint64_t>(j, "tx"), num<std::uint64_t>(j, "utterance"),
+                                             r == "caught" ? out::ReadbackResult::Caught : r == "missed" ? out::ReadbackResult::Missed
+                                             : r == "unnecessary" ? out::ReadbackResult::Unnecessary : out::ReadbackResult::Open});
+  }
   else if (n == "no_reply") e.body = EngineOutput(out::NoReply{num<std::uint64_t>(j, "tx")});
   else if (n == "timer_set") e.body = EngineOutput(out::TimerSet{timer(text(j, "timer")), num<std::uint64_t>(j, "generation"), num<Ns>(j, "delay")});
   else if (n == "timer_cancelled") e.body = EngineOutput(out::TimerCancelled{timer(text(j, "timer"))});

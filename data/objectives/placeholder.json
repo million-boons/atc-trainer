@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "comment": "PLACEHOLDER - validate against approved SOP. The project's list of objectives (Builder B-2), the user's words of 2026-11-27 (D-435). Scenarios choose from it; not yet checked by the loader.",
+  "validation": {
+    "status": "placeholder"
+  },
+  "objectives": [
+    "Radio check",
+    "Taxi instructions",
+    "Holding point / hold short",
+    "Line-up",
+    "Take-off clearance",
+    "Circuit joining",
+    "Landing clearance",
+    "Frequency change",
+    "Readback discipline"
+  ]
+}

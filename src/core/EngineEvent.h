@@ -51,6 +51,7 @@ struct Recognised {  // in transmission order
 struct PilotStarted {
   static constexpr std::string_view kName = "pilot_started";
   std::uint64_t utterance = 0;
+  Ns sinceRelease = 0;  // D-342: from the release of the transmission it answers; 0 for the pilot's own calls
 };
 enum class PilotEnd { Completed, Interrupted, PressCameFirst, TimedOut, Superseded };  // Superseded: never spoken (D-333)
 struct PilotEnded {
@@ -125,6 +126,17 @@ struct InstructorAlert {  // e.g. too many "say again" in one step
   std::string why;
   bool choice = false;  // the instructor decides: in::InstructorContinue or in::InstructorStop (D-424)
 };
+// D-430: an incomplete readback was challenged in the next transmission (Caught), or the next
+// instruction came without a challenge (Missed: a trainee error); a challenge after a complete
+// readback is Unnecessary (a warning only); Open: the exercise ended while one was due.
+enum class ReadbackResult { Caught, Missed, Unnecessary, Open };
+struct ReadbackCheck {
+  static constexpr std::string_view kName = "readback_check";
+  std::string step;             // the step whose readback it is
+  std::uint64_t tx = 0;         // the challenge or the instruction; 0 for Open
+  std::uint64_t utterance = 0;  // the readback; 0 if there was none to repeat
+  ReadbackResult result = ReadbackResult::Caught;
+};
 enum class EndReason { Completed, InstructorStop, TimeLimit, ProgramClosed };  // ProgramClosed: D-333
 struct Ended {
   static constexpr std::string_view kName = "ended";
@@ -137,7 +149,7 @@ using EngineInput = std::variant<in::Started, in::TxOpened, in::TxClosed, in::Tx
                                  in::Recognised, in::PilotStarted, in::PilotEnded, in::TimerFired, in::PttPresence,
                                  in::InstructorStop, in::InstructorContinue, in::FallbackPttUsed, in::ProgramClosed>;
 using EngineOutput = std::variant<out::StepEntered, out::Judged, out::PilotRequested, out::NoReply, out::TimerSet,
-                                  out::TimerCancelled, out::InstructorAlert, out::Ended, out::AtcBeforePilot>;
+                                  out::TimerCancelled, out::InstructorAlert, out::Ended, out::AtcBeforePilot, out::ReadbackCheck>;
 
 struct EngineEvent {
   std::uint64_t seq = 0;  // from 1, no gaps

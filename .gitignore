@@ -19,3 +19,13 @@ __pycache__/
 *.part
 # One working copy per session (D-304)
 /.worktrees/
+# Never in git, even if copied into a working copy by mistake (D-343): audio, people data, logs, keys.
+*.mp3
+*.ogg
+people.json
+instructor.pin
+setup.json
+/exercise-audio/
+/voices/
+/voices-pending/
+/exercises/

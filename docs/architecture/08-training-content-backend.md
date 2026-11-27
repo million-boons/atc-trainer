@@ -43,7 +43,7 @@ Steps only from approved intents and replies and from airfield pools; new words 
 | Mistake → pilot response, timeouts, call-again count | `responses`, `timeoutSeconds`, `maxPilotCalls`, `maxSayAgain` | Writing |
 | Branches | `transitions` on an outcome, with `errorBranch` | Guards are **refused by the loader** |
 | Events | `unexpectedEvents` and `safetyRules`: **refused by the loader** unless empty | Engine work; until then "not built" on the screens (user) |
-| Objectives, difficulty, SOP reference | Checked, not kept in `Scenario` | Keep them (also needed by 5d) |
+| Objectives, difficulty, SOP reference | Kept in `Scenario` (D-429), with `validated_by` and `validated_at`; readbacks marked by `readbackOf`, intents' `shortName` kept | 5d still reads its own copy from the file (b2 may switch); the project list of objectives waits for the user's wording |
 | Check: missing phrases and clips | `loadExercise` errors, `checkCoverage` | One answer for the screen |
 | Check: PLACEHOLDER wording | `Exercise::placeholder` for the whole | Which text it is |
 | Check: unreachable steps | **Checked by the loader** (`checkGraph`: "cannot be reached from the initial step", "no final step can be reached"; corrected, an earlier version of this file said it was not) | A step that can never reach a final one |

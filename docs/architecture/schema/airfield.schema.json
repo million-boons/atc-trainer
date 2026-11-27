@@ -12,7 +12,9 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["status"],
-      "properties": { "status": { "enum": ["placeholder", "validated"] }, "sopRef": { "type": "string" }, "validatedBy": { "type": "string" } }
+      "properties": { "status": { "enum": ["placeholder", "validated"] }, "sopRef": { "type": "string" }, "validated_by": { "type": "string" }, "validated_at": { "type": "string" } },
+      "if": { "properties": { "status": { "const": "validated" } } },
+      "then": { "required": ["status", "sopRef", "validated_by", "validated_at"] }
     },
     "runways": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "^(0[1-9]|[12][0-9]|3[0-6])[LRC]?$" } },
     "taxiways": {

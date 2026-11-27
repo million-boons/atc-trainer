@@ -9,6 +9,7 @@
 #include <functional>
 #include <nlohmann/json.hpp>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -48,13 +49,6 @@ struct Departure : ::testing::Test {
     replies = readJson(d / "phraseology" / "replies" / "placeholder.json");
     phraseology = readJson(d / "phraseology" / "placeholder.json");
     ASSERT_TRUE(scenario.is_object() && airfield.is_object() && replies.is_object() && phraseology.is_object());
-    // LINE_UP comes with package 2e; until then the tests add it.
-    bool have = false;
-    for (const auto& i : phraseology["intents"]) have = have || i["id"] == "LINE_UP";
-    if (!have)
-      phraseology["intents"].push_back({{"id", "LINE_UP"},
-                                        {"examples", json::array({"{callsign} line up runway {runway}"})},
-                                        {"validation", {{"status", "draft"}}}});
   }
   void TearDown() override {
     std::error_code ec;
@@ -114,7 +108,7 @@ TEST_F(Departure, PlaceholderTextRefusesAssessedMode) {
 }
 
 TEST_F(Departure, OnePlaceholderReplyIsEnoughToRefuseAssessedMode) {
-  const json ok = {{"status", "validated"}, {"sopRef", "TEST"}, {"validatedBy", "TEST"}};
+  const json ok = {{"status", "validated"}, {"sopRef", "TEST"}, {"validated_by", "TEST"}, {"validated_at", "TEST"}};
   const json okText = {{"status", "validated"}, {"sopRef", "TEST"}, {"validated_by", "TEST"}, {"validated_at", "TEST"}};
   scenario["validation"] = airfield["validation"] = ok;
   replies["validation"] = phraseology["validation"] = {{"status", "validated"}};
@@ -129,7 +123,54 @@ TEST_F(Departure, OnePlaceholderReplyIsEnoughToRefuseAssessedMode) {
 
 TEST_F(Departure, ValidatedNeedsItsRecord) {
   scenario["validation"] = {{"status", "validated"}, {"sopRef", "TEST"}};
-  expectError(kFile, "/validation", "validatedBy");
+  expectError(kFile, "/validation", "validated_by");
+  expectError(kFile, "/validation", "validated_at");  // D-429
+  scenario["validation"]["validatedBy"] = "TEST";      // the old name
+  expectError(kFile, "/validation/validatedBy", "validated_by");
+}
+
+// D-429: what the screens need is kept.
+TEST_F(Departure, ScreenFieldsAreKept) {
+  scenario["objectives"] = {"PLACEHOLDER one", "PLACEHOLDER two"};
+  scenario["difficulty"] = "intermediate";
+  scenario["validation"] = {{"status", "placeholder"}, {"sopRef", "SOP-1"}};
+  ASSERT_TRUE(load()) << all();
+  EXPECT_EQ(e.scenario.objectives, (std::vector<std::string>{"PLACEHOLDER one", "PLACEHOLDER two"}));
+  EXPECT_EQ(e.scenario.difficulty, "intermediate");
+  EXPECT_EQ(e.scenario.sopRef, "SOP-1");
+  EXPECT_EQ(e.scenario.validatedAt, "");
+  EXPECT_EQ(e.intents.at("TAXI_INSTRUCTION").shortName, "Taxi");
+  EXPECT_EQ(e.intents.at("TAXI_INSTRUCTION").required, (std::set<std::string>{"callsign", "taxiway", "runway"}));
+  phraseology["intents"][0]["shortName"] = std::string(25, 'x');
+  expectError("placeholder.json", "/intents/0/shortName", "at most 24");
+}
+
+// D-429: a reply says which intent it reads back, and whether it says every required value.
+TEST_F(Departure, CorrectIsAnsweredWithAReadbackOfTheStepsIntent) {
+  ASSERT_TRUE(load()) << all();
+  EXPECT_EQ(e.replies.at("READBACK_TAXI").readbackOf, "TAXI_INSTRUCTION");
+  EXPECT_TRUE(e.replies.at("READBACK_TAXI").completeReadback);
+  const json good = replies;
+  const auto at = [&](const std::string& id) -> json& {
+    for (auto& r : replies["replies"])
+      if (r["id"] == id) return r;
+    throw std::runtime_error(id);
+  };
+  at("READBACK_TAKEOFF")["text"] = "rolling";  // deliberately incomplete: still a readback
+  ASSERT_TRUE(load()) << all();
+  EXPECT_FALSE(e.replies.at("READBACK_TAKEOFF").completeReadback);
+  replies = good;
+  at("READBACK_LINE_UP").erase("readbackOf");
+  expectError(kFile, "/steps/1/responses/CORRECT/reply", "READBACK_LINE_UP is no readback");
+  replies = good;
+  at("READBACK_LINE_UP")["readbackOf"] = "TAKEOFF_CLEARANCE";
+  expectError(kFile, "/steps/1/responses/CORRECT/reply", "which this step does not expect");
+  replies = good;
+  at("READBACK_TAXI_HOLD_SHORT").erase("readbackOf");
+  expectError(kFile, "/steps/0/responses/CORRECT/withField/hold_short", "is no readback");
+  replies = good;
+  at("QUERY")["readbackOf"] = "NOWHERE";
+  expectError("placeholder.json", "/replies/9/readbackOf", "no intent named NOWHERE");
 }
 
 // O-3: what is given is read back, and a field is optional only where the intent says so.
@@ -361,4 +402,119 @@ TEST(TemplateSlots, FindsNamesInOrderAndRefusesBadOnes) {
   EXPECT_TRUE(s.empty());
   for (const char* bad : {"{", "}", "{}", "{a", "a}", "{a{b}}", "{a b}", "{runway@initial}"})
     EXPECT_FALSE(templateSlots(bad, s)) << bad;
+}
+
+// D-430: what the circuit needs, on the departure data (test values, not the circuit's wording).
+namespace {
+struct Circuit : Departure {
+  void SetUp() override {
+    Departure::SetUp();
+    phraseology["intents"].push_back({{"id", "TEST_CHALLENGE"},
+                                      {"examples", json::array({"{callsign} confirm runway {runway}"})},
+                                      {"parse", {{"required", {"callsign"}}, {"optional", {"runway"}}}},
+                                      {"validation", {{"status", "draft"}}}});
+    replies["replies"].push_back({{"id", "TEST_LINING_UP"}, {"readbackOf", "LINE_UP_AND_WAIT"}, {"text", "lining up, {callsign}"}});
+    replies["replies"].push_back({{"id", "TEST_ROLLING"}, {"readbackOf", "TAKEOFF_CLEARANCE"}, {"text", "rolling, {callsign}"}});
+  }
+  json check(double rate = 0.25) const {
+    return {{"incompleteRate", rate},
+            {"challenge", {{"intent", "TEST_CHALLENGE"}, {"required", {"callsign"}}, {"optional", {"runway"}},
+                           {"mustMatch", {{"callsign", "{callsign}"}, {"runway", "{runway}"}}}}}};
+  }
+};
+}  // namespace
+
+TEST_F(Circuit, IncompleteReadbackNeedsItsCheckAndAFullOne) {
+  const json good = scenario;
+  step(1)["responses"]["CORRECT"]["incompleteReply"] = "TEST_LINING_UP";
+  expectError(kFile, "/steps/1/responses/CORRECT/incompleteReply", "needs readbackCheck");
+  scenario["readbackCheck"] = check();
+  ASSERT_TRUE(load()) << all();
+  EXPECT_EQ(e.scenario.step("LINE_UP")->responses.at(Outcome::Correct).incompleteReply, "TEST_LINING_UP");
+  ASSERT_TRUE(e.scenario.readbackCheck);
+  EXPECT_DOUBLE_EQ(e.scenario.readbackCheck->incompleteRate, 0.25);
+  EXPECT_EQ(e.scenario.readbackCheck->challenge.optional, std::vector<std::string>{"runway"});
+  EXPECT_TRUE(e.replies.count("TEST_LINING_UP"));  // its clips are required too
+  const json withCheck = scenario;
+  step(1)["responses"]["CORRECT"]["incompleteReply"] = "READBACK_LINE_UP";
+  expectError(kFile, "/steps/1/responses/CORRECT/incompleteReply", "not incomplete");
+  scenario = withCheck;
+  scenario["readbackCheck"]["incompleteRate"] = 1.5;
+  expectError(kFile, "/readbackCheck/incompleteRate", "from 0 to 1");
+  scenario = withCheck;
+  step(2)["responses"]["CORRECT"]["incompleteReply"] = "TEST_ROLLING";  // TAKEOFF leads to DONE
+  expectError(kFile, "/steps/2/responses/CORRECT/incompleteReply", "next step is final");
+  scenario = withCheck;
+  step(1)["responses"]["INCORRECT"]["incompleteReply"] = "TEST_LINING_UP";
+  expectError(kFile, "/steps/1/responses", "only for CORRECT");
+  scenario = good;
+  step(1)["responses"]["CORRECT"]["alternates"] = {"TEST_LINING_UP"};
+  ASSERT_TRUE(load()) << all();  // an alternate needs no check
+  EXPECT_EQ(e.scenario.step("LINE_UP")->responses.at(Outcome::Correct).alternates, std::vector<std::string>{"TEST_LINING_UP"});
+  step(1)["responses"]["CORRECT"]["alternates"] = {"READBACK_TAKEOFF"};
+  expectError(kFile, "/steps/1/responses/CORRECT/alternates/0", "which this step does not expect");
+}
+
+TEST_F(Circuit, ChallengeMayCheckAnOptionalValue) {
+  scenario["readbackCheck"] = check();
+  scenario["readbackCheck"]["challenge"]["mustMatch"]["taxiway"] = "{taxiway}";
+  expectError(kFile, "/readbackCheck/challenge/mustMatch", "neither a required nor an optional field");
+  scenario["readbackCheck"] = check();
+  scenario["readbackCheck"]["challenge"]["intent"] = "NOWHERE";
+  expectError(kFile, "/readbackCheck/challenge/intent", "unknown intent NOWHERE");
+}
+
+TEST_F(Circuit, FrequenciesComeFromTheirUnit) {
+  airfield["units"] = {{{"id", "GROUND"}, {"spoken", "sample ground"}, {"frequencies", {"121.7"}}},
+                       {{"id", "TOWER"}, {"spoken", "sample tower"}, {"frequencies", {"118.275"}}}};
+  scenario["generators"]["groundFrequency"] = {{"pool", "frequencies"}, {"unit", "GROUND"}};
+  ASSERT_TRUE(load()) << all();
+  ASSERT_EQ(e.airfield.units.size(), 2u);
+  for (std::uint64_t seed = 1; seed <= 20; ++seed) {
+    ParamValues v;
+    ASSERT_TRUE(generateParams(e.scenario, e.airfield, seed, v));
+    EXPECT_EQ(v.at("groundFrequency"), "121.7");
+  }
+  const json good = airfield;
+  airfield["units"][0]["frequencies"] = {"121,7"};
+  expectError("SAMPLE-AF.json", "/units/0/frequencies/0", "such as 121.7");
+  airfield = good;
+  scenario["generators"]["groundFrequency"]["unit"] = "APRON";
+  expectError(kFile, "/generators/groundFrequency/unit", "no unit APRON");
+  scenario["generators"]["groundFrequency"] = {{"pool", "frequencies"}};
+  expectError(kFile, "/generators/groundFrequency", "needs a unit");
+  scenario["generators"]["groundFrequency"] = {{"pool", "runways"}, {"unit", "GROUND"}};
+  expectError(kFile, "/generators/groundFrequency/unit", "only for pool frequencies");
+}
+
+TEST_F(Circuit, AValueTheTraineeChoosesNeedsARange) {
+  for (auto& i : phraseology["intents"])
+    if (i["id"] == "LINE_UP_AND_WAIT") i["examples"].push_back("{callsign} runway {runway} line up and wait read you {readability}");
+  step(1)["expects"][0]["required"].push_back("readability");
+  expectError(kFile, "/steps/1/expects/0", "needs a mustMatch or a check");
+  step(1)["expects"][0]["check"] = {{"readability", {{"range", {1, 5}}}}};
+  ASSERT_TRUE(load()) << all();
+  EXPECT_EQ(e.scenario.step("LINE_UP")->expects[0].ranges.at("readability"), (std::pair<int, int>{1, 5}));
+  step(1)["expects"][0]["check"]["readability"]["range"] = {5, 1};
+  expectError(kFile, "/steps/1/expects/0/check/readability/range", "from at most to");
+}
+
+// The shipped circuit (D-430, D-431). Needs stt's circuit intents (stt db77be4) in data/phraseology.
+TEST(ShippedCircuit, Loads) {
+  const std::string d = shippedData();
+  Exercise e;
+  std::vector<LoadError> errors;
+  ASSERT_TRUE(loadExercise(scenarioSources(d, d + "/scenarios/CIRCUIT-RAJALI.json"), e, errors)) << (errors.empty() ? "" : toString(errors[0]));
+  EXPECT_EQ(e.scenario.steps.size(), 10u);
+  EXPECT_EQ(e.scenario.initialStep, "RADIO_CHECK");
+  ASSERT_TRUE(e.scenario.readbackCheck);
+  EXPECT_EQ(e.scenario.readbackCheck->challenge.intent, "READBACK_CHALLENGE");
+  EXPECT_EQ(e.scenario.step("TAKEOFF")->responses.at(Outcome::Correct).incompleteReply, "CIRCUIT_READBACK_TAKEOFF_SHORT");
+  EXPECT_FALSE(e.replies.at("CIRCUIT_READBACK_TAKEOFF_SHORT").completeReadback);
+  EXPECT_TRUE(e.replies.at("CIRCUIT_READBACK_TAKEOFF").completeReadback);
+  EXPECT_EQ(e.scenario.step("RADIO_CHECK")->expects[0].ranges.at("readability"), (std::pair<int, int>{1, 5}));
+  EXPECT_TRUE(e.placeholder);
+  ParamValues v;
+  ASSERT_TRUE(generateParams(e.scenario, e.airfield, 1, v));
+  EXPECT_EQ(v, (ParamValues{{"callsign", "FALCON-12"}, {"frequency", "121.7"}, {"runway", "05"}}));
 }

@@ -21,8 +21,8 @@ void taxi(ExerciseController& c) {
 }
 void call(ExerciseController& c) { c.addPilot("10:41:20", "request taxi, EAGLE-421"); }
 void lineUp(ExerciseController& c) {
-  c.addAtc("10:43:02", "eagle four two one line up runway zero nine", "LINE UP", chips({"EAGLE-421", "RWY 09"}), "RECOGNIZED", true, "2.1 s");
-  c.addPilot("10:43:08", "line up runway 09, EAGLE-421");
+  c.addAtc("10:43:02", "eagle four two one runway zero nine line up and wait", "LINE UP AND WAIT", chips({"EAGLE-421", "RWY 09"}), "RECOGNIZED", true, "2.1 s");
+  c.addPilot("10:43:08", "lining up runway 09 and waiting, EAGLE-421");
 }
 
 QVariantMap stepRow(const QString& name, int level, const QString& outcome, int attempts, const QString& errors, const QString& response, const QString& again, const QString& missed = "0") {
@@ -46,13 +46,13 @@ void result(ExerciseController& c, bool stopped) {
       QVariantList{"10:41:20", "PILOT", "request taxi, EAGLE-421", "", 0},
       QVariantList{"10:41:32", "ATC", "eagle four two one taxi via alpha three runway zero nine", "CORRECT", int(L::Ok)},
       QVariantList{"10:41:38", "PILOT", "taxi via A3, runway 09, EAGLE-421", "", 0},
-      QVariantList{"10:42:10", "ATC", "eagle four two one line up runway two seven", "INCORRECT", int(L::Caution)},
+      QVariantList{"10:42:10", "ATC", "eagle four two one runway two seven line up and wait", "INCORRECT", int(L::Caution)},
       QVariantList{"10:42:16", "PILOT", "query instruction, EAGLE-421", "", 0},
-      QVariantList{"10:42:31", "ATC", "eagle four two one line up runway 0.9", t("AMBIGUOUS, not counted"), int(L::Caution)},
+      QVariantList{"10:42:31", "ATC", "eagle four two one runway 0.9 line up and wait", t("AMBIGUOUS, not counted"), int(L::Caution)},
       QVariantList{"10:42:38", "PILOT", "say again, EAGLE-421", "", 0}};
   if (!stopped) {
-    line << QVariantList{"10:43:02", "ATC", "eagle four two one line up runway zero nine", "CORRECT", int(L::Ok)}
-         << QVariantList{"10:43:08", "PILOT", "line up runway 09, EAGLE-421", "", 0};
+    line << QVariantList{"10:43:02", "ATC", "eagle four two one runway zero nine line up and wait", "CORRECT", int(L::Ok)}
+         << QVariantList{"10:43:08", "PILOT", "lining up runway 09 and waiting, EAGLE-421", "", 0};
   }
   c.setResult(QVariantMap{{"title", stopped ? t("STOPPED BY INSTRUCTOR") : t("COMPLETED")},
                {"level", int(stopped ? L::Caution : L::Ok)},
@@ -111,7 +111,7 @@ void show(ExerciseController& c, const QString& id, bool assessed, bool consent,
   }
   c.begin(std::move(x), assessed, consent, assessed ? t("PREVIEW: Assessed is off in the slice (placeholder text)") : QString());
   const auto steps = [&c](int done, int a, int b, int d) { c.setSteps({{t("Taxi"), a}, {t("Line up"), b}, {t("Takeoff"), d}}, done); };
-  const QString cTaxi = t("Taxi via A3, runway 09"), cLine = t("Line up runway 09"), cGo = t("Cleared for takeoff 09");
+  const QString cTaxi = t("Taxi via A3, runway 09"), cLine = t("Line up and wait runway 09"), cGo = t("Cleared for takeoff 09");
   C::Phase phase = C::Running;
   // Defaults: waiting for the second instruction.
   steps(1, 1, 0, 0);
@@ -144,21 +144,21 @@ void show(ExerciseController& c, const QString& id, bool assessed, bool consent,
   } else if (id == "examb") {
     steps(1, 1, 1, 0);
     taxi(c);
-    c.addAtc("10:43:02", "eagle four two one line up runway 0.9", "LINE UP", chips({"EAGLE-421", "RWY \"0.9\" ?"}), "AMBIGUOUS", false, "2.4 s");
+    c.addAtc("10:43:02", "eagle four two one runway 0.9 line up and wait", "LINE UP AND WAIT", chips({"EAGLE-421", "RWY \"0.9\" ?"}), "AMBIGUOUS", false, "2.4 s");
     c.addPilot("10:43:09", "say again, EAGLE-421");
     c.setNotice(L::Caution, t("Runway was not clear. Not counted as your error."), true);
     c.setAlert(L::Caution, t("Suspected speech recognition error"), true);
   } else if (id == "exwrong") {
     steps(1, 1, 1, 0);
     taxi(c);
-    c.addAtc("10:43:02", "eagle four two one line up runway two seven", "LINE UP", chips({"EAGLE-421", "RWY 27"}), "RECOGNIZED", true, "2.1 s");
+    c.addAtc("10:43:02", "eagle four two one runway two seven line up and wait", "LINE UP AND WAIT", chips({"EAGLE-421", "RWY 27"}), "RECOGNIZED", true, "2.1 s");
     c.addPilot("10:43:08", "query instruction, EAGLE-421");
     c.setNotice(L::Caution, t("Step not advanced: INCORRECT (runway)."), true);
     c.setAlert(L::Caution, t("Line up: attempt 1 INCORRECT"), true);
   } else if (id == "excs") {
     steps(1, 1, 1, 0);
     taxi(c);
-    c.addAtc("10:43:02", "eagle four five one line up runway zero nine", "LINE UP", chips({"EAGLE-451", "RWY 09"}), "RECOGNIZED", true, "2.1 s");
+    c.addAtc("10:43:02", "eagle four five one runway zero nine line up and wait", "LINE UP AND WAIT", chips({"EAGLE-451", "RWY 09"}), "RECOGNIZED", true, "2.1 s");
     c.addNote(L::Caution, t("No reply from the pilot"));
     c.setNotice(L::Caution, t("Step not advanced: WRONG CALLSIGN."), true);
     c.setAlert(L::Caution, t("Line up: attempt 1 WRONG CALLSIGN"), true);

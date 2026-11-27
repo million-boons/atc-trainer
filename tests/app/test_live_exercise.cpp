@@ -61,7 +61,7 @@ struct View : testing::Test {
   ParsedInstruction right(const std::string& step) {
     std::map<std::string, std::string> f{{"callsign", p["callsign"]}, {"runway", p["runway"]}};
     if (step == "TAXI") f["taxiway"] = p["taxiway"];
-    return Simulator::instruction(step == "TAXI" ? "TAXI_INSTRUCTION" : step == "LINE_UP" ? "LINE_UP" : "TAKEOFF_CLEARANCE", f);
+    return Simulator::instruction(step == "TAXI" ? "TAXI_INSTRUCTION" : step == "LINE_UP" ? "LINE_UP_AND_WAIT" : "TAKEOFF_CLEARANCE", f);
   }
   void say(ParsedInstruction i) {
     sim->transmit(std::move(i));

@@ -171,6 +171,10 @@ RadioCore::Events LiveBackend::events() {
       if (cfg_.studio) cfg_.studio->onPlay(end);
       return;
     }
+    if (what == LocalSound::History) {
+      if (cfg_.historyPlay) cfg_.historyPlay(end);
+      return;
+    }
     ui([this, what, end] {
       if (what == LocalSound::Tone) status_->onTone(end);
       else if (end == LocalEnd::Started) lab_->setNotice(L::None, {});

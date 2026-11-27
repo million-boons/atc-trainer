@@ -34,7 +34,7 @@ std::string lower(std::string s) {
 std::string at(ClipPosition p) { return "@" + std::string(toString(p)); }
 
 // Values a generator can take, from the airfield's pools.
-std::vector<std::string> poolValues(const Airfield& a, const std::string& pool) {
+std::vector<std::string> poolValues(const Airfield& a, const std::string& pool, const std::string& unit) {
   std::vector<std::string> v;
   if (pool == "runways") v = a.runways;
   if (pool == "taxiways")
@@ -43,6 +43,9 @@ std::vector<std::string> poolValues(const Airfield& a, const std::string& pool) 
     for (const auto& x : a.aircraftTypes) v.push_back(x.id);
   if (pool == "callsigns")
     for (const auto& x : a.callsigns) v.push_back(x.id);
+  if (pool == "frequencies")  // only its unit's (D-430): no clip for a frequency the scenario never says
+    for (const auto& u : a.units)
+      if (u.id == unit) v.insert(v.end(), u.frequencies.begin(), u.frequencies.end());
   return v;
 }
 
@@ -123,6 +126,7 @@ std::string valueClipId(const std::string& pool, const std::string& value, ClipP
   if (pool == "taxiways") name = "TAXIWAY";
   if (pool == "aircraftTypes") name = "AIRCRAFT_TYPE";
   if (pool == "callsigns") name = "CALLSIGN";
+  if (pool == "frequencies") name = "FREQUENCY";
   return name + "_" + slug(value) + at(p);
 }
 
@@ -168,7 +172,7 @@ bool requiredClips(const Exercise& e, std::map<std::string, RequiredClip>& out, 
         errors.push_back(id + ": no generator for {" + x.text + "}");
         continue;
       }
-      for (const auto& v : poolValues(e.airfield, g->second.pool)) {
+      for (const auto& v : poolValues(e.airfield, g->second.pool, g->second.unit)) {
         const std::string clip = valueClipId(g->second.pool, v, x.position);
         out.emplace(clip, RequiredClip{clip, "", g->second.pool, v, id});
       }

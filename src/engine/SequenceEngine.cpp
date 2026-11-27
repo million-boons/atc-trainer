@@ -87,11 +87,28 @@ void SequenceEngine::on(Ns t, const in::Recognised& x, Outputs& o) {
   const TxFacts facts = it->second;
   openTx_.erase(it);
   const ScenarioStep& st = step();
-  const Verdict v = validate(st, ctx_, x.instruction, facts, x.sttFault, cfg_.rules);
+  const auto& rc = exercise_->scenario.readbackCheck;
+  // D-430: a challenge of a readback is judged as if the step expected it, whatever the step is.
+  const bool challenge = rc && !x.instruction.intent.empty() && x.instruction.intent == rc->challenge.intent;
+  Verdict v;
+  if (challenge) {
+    ScenarioStep cs = st;
+    cs.expects = {rc->challenge};
+    v = validate(cs, ctx_, x.instruction, facts, x.sttFault, cfg_.rules);
+  } else {
+    v = validate(st, ctx_, x.instruction, facts, x.sttFault, cfg_.rules);
+  }
   ctx_.history.push_back({t, false, tx, st.id, x.instruction.rawText, v.outcome});
   // The trainee is there: the pilot's calls start again from the beginning.
   pilotCalls_ = 0;
   callsExhausted_ = false;
+  if (challenge && v.outcome == Outcome::Correct) return answerChallenge(tx, o);
+  // An instruction that was understood, given while a challenge was due: the chance is gone.
+  // Unclear speech ("say again") does not use it up (assistant, D-431).
+  if (due_ && !challenge && v.outcome != Outcome::Ambiguous && v.outcome != Outcome::Unintelligible) {
+    o.push_back(out::ReadbackCheck{due_->step, tx, due_->utterance, out::ReadbackResult::Missed});
+    due_.reset();
+  }
 
   out::Judged j;
   j.step = st.id;
@@ -109,17 +126,62 @@ void SequenceEngine::on(Ns t, const in::Recognised& x, Outputs& o) {
   }
   const auto r = st.responses.find(v.outcome);
   if (r != st.responses.end() && r->second.say) {
-    std::string reply = r->second.reply;
-    for (const auto& [field, with] : r->second.withField)
-      if (const auto f = x.instruction.fields.find(field); f != x.instruction.fields.end() && !f->second.value.empty()) reply = with;
-    say(reply, v.outcome, tx, false, o);
+    const StepResponse& resp = r->second;
+    std::string reply = resp.reply;
+    bool withApplied = false;
+    for (const auto& [field, with] : resp.withField)
+      if (const auto f = x.instruction.fields.find(field); f != x.instruction.fields.end() && !f->second.value.empty()) {
+        reply = with;
+        withApplied = true;
+      }
+    // D-430: which readback the pilot gives. The RNG is used only by a step that has a choice, so
+    // the replies of scenarios without one are as before.
+    bool incomplete = false;
+    if (v.outcome == Outcome::Correct && !withApplied) {
+      if (!resp.alternates.empty()) {
+        const std::size_t k = static_cast<std::size_t>(rng_() % (resp.alternates.size() + 1));
+        if (k > 0) reply = resp.alternates[k - 1];
+      } else if (!resp.incompleteReply.empty() && rc && rc->incompleteRate > 0) {
+        const double u = static_cast<double>(rng_() >> 11) * 0x1.0p-53;  // [0, 1)
+        if (u < rc->incompleteRate) {
+          reply = resp.incompleteReply;
+          incomplete = true;
+        }
+      }
+    }
+    const std::uint64_t said = say(reply, v.outcome, tx, false, o).id;
+    if (v.outcome == Outcome::Correct) {
+      if (incomplete)
+        due_ = Readback{st.id, resp.reply, said};
+      else
+        lastReadback_ = Readback{st.id, withApplied ? reply : resp.reply, said};
+    }
   } else {
     o.push_back(out::NoReply{tx});
   }
   if (!early && (v.outcome == Outcome::Ambiguous || v.outcome == Outcome::Unintelligible))
     if (++sayAgain_ == st.maxSayAgain)
       o.push_back(out::InstructorAlert{st.id + ": not understood " + std::to_string(sayAgain_) + " times"});
-  takeBranch(v.outcome, o);
+  if (!challenge) takeBranch(v.outcome, o);  // a failed challenge takes no branch of the step
+}
+
+// D-430: the pilot gives the full readback. Without an incomplete one due, the challenge was
+// unnecessary (a warning only) and the latest readback is said again.
+void SequenceEngine::answerChallenge(std::uint64_t tx, Outputs& o) {
+  if (due_) {
+    const Readback d = *due_;
+    due_.reset();
+    o.push_back(out::ReadbackCheck{d.step, tx, d.utterance, out::ReadbackResult::Caught});
+    lastReadback_ = Readback{d.step, d.fullReply, say(d.fullReply, Outcome::Correct, tx, false, o).id};
+    return;
+  }
+  if (lastReadback_) {
+    o.push_back(out::ReadbackCheck{lastReadback_->step, tx, lastReadback_->utterance, out::ReadbackResult::Unnecessary});
+    lastReadback_->utterance = say(lastReadback_->fullReply, Outcome::Correct, tx, false, o).id;
+    return;
+  }
+  o.push_back(out::ReadbackCheck{step().id, tx, 0, out::ReadbackResult::Unnecessary});
+  o.push_back(out::NoReply{tx});
 }
 
 void SequenceEngine::on(Ns t, const in::PilotStarted& x, Outputs&) {
@@ -278,6 +340,10 @@ void SequenceEngine::stepTimedOut(Outputs& o) {
 
 void SequenceEngine::finish(out::EndReason why, Outputs& o) {
   for (const auto k : {in::Timer::StepTimeout, in::Timer::OnEnter, in::Timer::ExerciseLimit}) cancelTimer(k, o);
+  if (due_) {  // D-430: ended before the trainee could speak again
+    o.push_back(out::ReadbackCheck{due_->step, 0, due_->utterance, out::ReadbackResult::Open});
+    due_.reset();
+  }
   status_ = Status::Ended;
   o.push_back(out::Ended{why});
 }

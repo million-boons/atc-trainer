@@ -95,6 +95,16 @@ struct Builder {
     ++r.atcBeforePilot;
     early.insert(x.tx);
   }
+  void on(const out::ReadbackCheck& x) {
+    auto* s = step(x.step);
+    if (!s) return;
+    switch (x.result) {
+      case out::ReadbackResult::Caught: ++s->readbackCaught; break;
+      case out::ReadbackResult::Missed: ++s->readbackMissed; break;
+      case out::ReadbackResult::Unnecessary: ++s->unnecessaryChallenges; break;
+      case out::ReadbackResult::Open: ++s->readbackOpen; break;
+    }
+  }
   void on(const out::NoReply&) {}
   void on(const out::TimerSet&) {}
   void on(const out::TimerCancelled&) {}

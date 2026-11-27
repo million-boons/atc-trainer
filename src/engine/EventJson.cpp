@@ -27,6 +27,15 @@ const char* name(out::EndReason r) {
   return r == out::EndReason::Completed ? "completed" : r == out::EndReason::InstructorStop ? "instructor_stop"
          : r == out::EndReason::ProgramClosed ? "program_closed" : "time_limit";
 }
+const char* name(out::ReadbackResult r) {
+  switch (r) {
+    case out::ReadbackResult::Caught: return "caught";
+    case out::ReadbackResult::Missed: return "missed";
+    case out::ReadbackResult::Unnecessary: return "unnecessary";
+    case out::ReadbackResult::Open: return "open";
+  }
+  return "";
+}
 std::string str(std::string_view s) { return std::string(s); }
 
 json j(const in::Started&) { return json::object(); }
@@ -60,7 +69,11 @@ json j(const in::Recognised& x) {
           {"releaseToText", x.releaseToText},
           {"sttFault", x.sttFault}};
 }
-json j(const in::PilotStarted& x) { return json{{"utterance", x.utterance}}; }
+json j(const in::PilotStarted& x) {
+  json v{{"utterance", x.utterance}};
+  if (x.sinceRelease) v["sinceRelease"] = x.sinceRelease;  // D-342
+  return v;
+}
 json j(const in::PilotEnded& x) { return {{"utterance", x.utterance}, {"end", name(x.end)}}; }
 json j(const in::TimerFired& x) { return {{"timer", name(x.timer)}, {"generation", x.generation}}; }
 json j(const in::PttPresence& x) { return json{{"present", x.present}}; }
@@ -82,6 +95,9 @@ json j(const out::PilotRequested& x) {
           {"owed", u.owed}};
 }
 json j(const out::AtcBeforePilot& x) { return json{{"tx", x.tx}}; }
+json j(const out::ReadbackCheck& x) {
+  return {{"step", x.step}, {"tx", x.tx}, {"utterance", x.utterance}, {"result", name(x.result)}};
+}
 json j(const out::NoReply& x) { return json{{"tx", x.tx}}; }
 json j(const out::TimerSet& x) { return {{"timer", name(x.timer)}, {"generation", x.generation}, {"delay", x.delay}}; }
 json j(const out::TimerCancelled& x) { return json{{"timer", name(x.timer)}}; }
@@ -109,6 +125,7 @@ std::string headerJson(const EventLogHeader& h) {
                {"replyDelayMs", {h.replyFromMs, h.replyToMs}},
                {"radio", h.radio}};
   if (!h.planId.empty()) j["plan"] = {{"id", h.planId}, {"name", h.planName}, {"preset", h.planPreset}, {"run", h.planRun}};
+  if (h.pttStandIn) j["pttStandIn"] = true;  // D-435; left out otherwise, so older headers stay as they were
   return line(j);
 }
 

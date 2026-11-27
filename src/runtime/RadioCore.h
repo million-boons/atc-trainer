@@ -65,7 +65,7 @@ struct RadioTx {
   bool recognising = false;         // a speech result will come
 };
 
-enum class LocalSound { Recording, Tone, Studio };
+enum class LocalSound { Recording, Tone, Studio, History };
 enum class LocalEnd { Started, Completed, Interrupted, Refused, Failed };
 
 struct PttTest {

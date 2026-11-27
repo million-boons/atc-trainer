@@ -37,6 +37,12 @@ class ConsentView {
     std::lock_guard l(m_);
     return p && mayUsePilotVoice(*p, versions_);
   }
+  // Recording consent only (D-101, D-108): exercise audio and its playback (EA-2).
+  bool mayBeRecorded(const std::string& id) const {
+    const auto p = find(id);
+    std::lock_guard l(m_);
+    return p && atc::mayRecord(*p, versions_);
+  }
   bool mayRecord(const std::string& id) const {
     const auto p = find(id);
     std::lock_guard l(m_);

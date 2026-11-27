@@ -96,7 +96,8 @@ HistoryRow row(const Built& b, const std::string& id, int reclassified) {
   r.reclassified = reclassified;
   return r;
 }
-HistoryDetail detailOf(const Built& b, const std::string& id, const std::vector<json>& rv) {
+HistoryDetail detailOf(const Built& b, const std::string& id, const std::vector<json>& rv, const ExerciseAudio* audio = nullptr,
+                       const std::function<bool(const std::string&)>& mayPlay = {}, std::map<std::size_t, std::uint64_t>* txOf = nullptr) {
   HistoryDetail d;
   d.row = row(b, id, int(rv.size()));
   d.model = b.log.header.modelId;
@@ -169,6 +170,18 @@ HistoryDetail detailOf(const Built& b, const std::string& id, const std::vector<
     d.entries[std::size_t(entry)].reviews.push_back({r.value("verdict", ""), r.value("note", ""), r.value("role", ""), r.value("at", "")});
   }
   if (!b.log.ended) d.entries.push_back({HistoryEntry::Kind::Note, "", "The log stops here: fault", "", 3});
+  // Exercise audio (11): saved and still allowed (EA-2).
+  if (audio) {
+    const auto saved = audio->saved(id);
+    const bool may = !saved.empty() && mayPlay && mayPlay(audio->speaker(id));
+    for (const auto& [tx, entry] : atc) {
+      if (txOf) (*txOf)[entry] = tx;
+      if (!saved.count(tx)) continue;
+      d.entries[entry].audio = may;
+      if (!may) d.entries[entry].noAudio = "consent withdrawn: not played";
+    }
+    d.audioNote = audio->note(id);
+  }
   return d;
 }
 }  // namespace
@@ -272,7 +285,7 @@ HistoryBackend HistoryService::backend() {
     post([this, f, id, done = std::move(done)] {
       const Built b = build(cfg_.data, f);
       if (!b.log.error.empty()) return done({}, b.log.error);
-      done(detailOf(b, id, reviews(cfg_.logs + "/" + id + ".review.jsonl")), "");
+      done(detailOf(b, id, reviews(cfg_.logs + "/" + id + ".review.jsonl"), cfg_.audio.get(), cfg_.mayPlay), "");
     });
   };
   b.reclassify = [this](const std::string& id, int entry, const std::string& verdict, const std::string& note, HistoryBackend::Done done) {
@@ -298,12 +311,54 @@ HistoryBackend HistoryService::backend() {
       if (!appendPrivateLine(cfg_.logs + "/deletions.log", line.dump())) return done("the deletion cannot be logged: nothing was deleted");
       std::remove(f.c_str());
       std::remove((cfg_.logs + "/" + id + ".review.jsonl").c_str());
+      if (cfg_.audio) cfg_.audio->remove(id);
       done("");
     });
   };
-  b.play = [](const std::string&, int, bool, HistoryBackend::Done done) { done("exercise audio is not stored (D-314)"); };
-  b.stopPlay = [] {};
+  b.play = [this, allowed](const std::string& id, int entry, bool keyedOnly, HistoryBackend::Done done) {
+    const std::string f = file(id);
+    if (f.empty()) return done("this result is not there");
+    EventLogHeader h;
+    std::string error;
+    if (!readEventLogHeader(f, h, error)) return done(error);
+    if (std::string why; !allowed(h.traineeId, why)) return done(why);  // EA-5
+    if (!cfg_.audio || !rules_.play) return done("no audio saved");
+    post([this, f, id, entry, keyedOnly, done = std::move(done)] {
+      std::map<std::size_t, std::uint64_t> txOf;
+      const HistoryDetail d = detailOf(build(cfg_.data, f), id, {}, cfg_.audio.get(), cfg_.mayPlay, &txOf);
+      if (entry < 0 || std::size_t(entry) >= d.entries.size()) return done("no such entry");
+      const HistoryEntry& e = d.entries[std::size_t(entry)];
+      if (!e.audio) return done(e.noAudio.empty() ? "no audio saved" : e.noAudio);
+      auto clip = cfg_.audio->read(id, txOf[std::size_t(entry)]);
+      if (!clip) return done("the audio cannot be read");
+      if (keyedOnly && clip->keyed > 0 && std::size_t(clip->preRoll) < clip->samples.size()) {
+        const auto from = clip->samples.begin() + clip->preRoll;
+        clip->samples.assign(from, from + std::min<std::ptrdiff_t>(clip->keyed, clip->samples.end() - from));
+      }
+      HistoryBackend::Done before;
+      {
+        std::lock_guard l(pm_);
+        before = std::exchange(playing_, done);
+      }
+      if (before) before("replaced by another playback");
+      rules_.play(std::move(clip->samples), clip->rate);
+    });
+  };
+  b.stopPlay = [this] {
+    if (rules_.stop) rules_.stop();
+  };
   return b;
+}
+
+void HistoryService::onPlay(LocalEnd e) {
+  if (e == LocalEnd::Started) return;
+  HistoryBackend::Done done;
+  {
+    std::lock_guard l(pm_);
+    done = std::exchange(playing_, {});
+  }
+  if (!done) return;
+  done(e == LocalEnd::Refused ? "the radio is in use" : e == LocalEnd::Failed ? "it could not be played: no audio output" : "");
 }
 
 int HistoryService::guests() const {

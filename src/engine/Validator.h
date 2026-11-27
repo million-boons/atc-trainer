@@ -46,6 +46,9 @@ struct ValidatorRules {
   bool clippedIsUnintelligible = false;
 };
 
+// D-434: heard is expected with exactly one digit left out, the name part equal: EAGLE-42 or EAGLE-41 for EAGLE-421.
+bool oneDigitMissing(const std::string& heard, const std::string& expected);
+
 // The checks of 03 section 2, in that order. No value is ever corrected: fields are compared
 // as they are. There are no safety rules yet, so UNSAFE does not occur.
 Verdict validate(const ScenarioStep& step, const ScenarioContext& ctx, const ParsedInstruction& p, const TxFacts& facts,

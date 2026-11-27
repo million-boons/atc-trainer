@@ -48,6 +48,7 @@ struct ExerciseOptions {
   RadioIntensity radio = RadioIntensity::Light;
   // D-334, a plan: its exact values (checked again here, never corrected), reply delay, and what is logged of it.
   std::optional<ParamValues> values;
+  bool pttStandIn = false;  // D-435: the run used the mouse stand-in, not the pedal; marked in the header
   std::optional<std::pair<Ns, Ns>> replyDelay;
   struct Plan {
     std::string id, name, preset;
@@ -75,6 +76,7 @@ class ExerciseRuntime {
     std::function<void(Ns, const EngineOutput&)> output;
     std::function<void(const ExerciseResult&)> ended;
     std::function<void(const std::string&)> fault;            // missing sound, lost log entries, recogniser silent
+    std::function<void(const RadioTx&)> audio;                // a closed transmission of the exercise (D-108, 11)
   };
   ExerciseRuntime(RuntimeConfig cfg, ParserRules rules, ISpeechModel& speech, Callbacks cb);
   ~ExerciseRuntime();
@@ -114,6 +116,8 @@ class ExerciseRuntime {
     std::mt19937_64 takes;
     std::map<in::Timer, Due> timers;
     std::map<std::uint64_t, std::vector<std::int16_t>> sounds;  // by utterance, until it was heard
+    std::map<std::uint64_t, Ns> released;          // by transmission (D-342)
+    std::map<std::uint64_t, std::uint64_t> answers;  // utterance -> the transmission it answers
     bool fallback = false;
     bool lostReported = false;
     std::string modelId, modelConfig;                           // locked
