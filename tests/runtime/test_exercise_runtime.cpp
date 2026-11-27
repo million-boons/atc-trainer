@@ -153,6 +153,7 @@ struct Rig {
   std::vector<EngineOutput> outputs;
   std::optional<ExerciseResult> result;
   int startedOk = 0;
+  std::vector<std::pair<std::uint64_t, std::size_t>> audio;  // tx, samples handed over for keeping (11)
   std::shared_ptr<MemoryLog::Store> log = std::make_shared<MemoryLog::Store>();
   PreparedExercise ready;
   ExerciseOptions opt;
@@ -171,6 +172,7 @@ struct Rig {
     cb.started = [this](bool ok, const std::string& why) { ok ? void(++startedOk) : refusals.push_back(why); };
     cb.output = [this](Ns, const EngineOutput& o) { outputs.push_back(o); };
     cb.ended = [this](const ExerciseResult& r) { result = r; };
+    cb.audio = [this](const RadioTx& t) { audio.emplace_back(t.id, t.audio.size()); };
     cb.fault = [this](const std::string& s) { faults.push_back(s); order.push_back("fault"); };
     cb.input = [this](Ns, const EngineInput& i) { order.push_back(std::visit([](const auto& x) { return std::string(x.kName); }, i)); };
     run = std::make_unique<ExerciseRuntime>(rc, rules, model, cb);
@@ -662,6 +664,19 @@ TEST(ExerciseRuntime, APlansValuesRunAndAreLogged) {
     if (c.id == other["callsign"]) {
       EXPECT_NE(said.find(c.id), std::string::npos) << said;
     }
+}
+
+// 11: each closed transmission of the exercise is handed over with its audio; nothing else (Lab, short tap).
+TEST(ExerciseRuntime, TheAudioOfEachTransmissionIsHandedOver) {
+  Rig r;
+  r.down(); r.pass(10); r.up(); r.pass(400);  // a short tap before the start: not the exercise's
+  ASSERT_EQ(r.start(), "");
+  r.hearPilot();
+  const auto tx = r.transmit();
+  r.down(); r.pass(50); r.up(); r.pass(400);  // a short tap: cancelled, no audio
+  ASSERT_EQ(r.audio.size(), 1u);
+  EXPECT_EQ(r.audio[0].first, tx);
+  EXPECT_GT(r.audio[0].second, 16000u);  // pre-roll, 1.5 s, tail
 }
 
 TEST(ExerciseRuntime, StartIsRefusedWithAReason) {

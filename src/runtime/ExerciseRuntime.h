@@ -75,6 +75,7 @@ class ExerciseRuntime {
     std::function<void(Ns, const EngineOutput&)> output;
     std::function<void(const ExerciseResult&)> ended;
     std::function<void(const std::string&)> fault;            // missing sound, lost log entries, recogniser silent
+    std::function<void(const RadioTx&)> audio;                // a closed transmission of the exercise (D-108, 11)
   };
   ExerciseRuntime(RuntimeConfig cfg, ParserRules rules, ISpeechModel& speech, Callbacks cb);
   ~ExerciseRuntime();

@@ -16,7 +16,7 @@ if(TARGET atc_exercise AND TARGET atc_storage)
     ${CMAKE_SOURCE_DIR}/src/phraseology/PhraseologyEdit.cpp ${CMAKE_SOURCE_DIR}/src/storage/DataCopy.cpp
     ${CMAKE_SOURCE_DIR}/src/app/PlanStore.cpp ${CMAKE_SOURCE_DIR}/src/app/PlannerService.cpp
     ${CMAKE_SOURCE_DIR}/src/app/ScenarioService.cpp ${CMAKE_SOURCE_DIR}/src/app/HistoryService.cpp ${CMAKE_SOURCE_DIR}/src/app/SetupService.cpp
-    ${CMAKE_SOURCE_DIR}/src/engine/EventRead.cpp)
+    ${CMAKE_SOURCE_DIR}/src/engine/EventRead.cpp ${CMAKE_SOURCE_DIR}/src/storage/ExerciseAudio.cpp)
   target_include_directories(atc_studio SYSTEM PRIVATE ${TP}/json)
   target_link_libraries(atc_studio PUBLIC atc_exercise atc_storage)
 endif()

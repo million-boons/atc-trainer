@@ -287,6 +287,7 @@ RadioCore::Events ExerciseRuntime::wrap(RadioCore::Events lab) {
     const Ns now = core_->now();
     waiting_[t.id] = now + cfg_.recogniseLimit;
     if (!running()) return answer(t.id);
+    if (cb_.audio && !closing_) cb_.audio(t);  // kept only under the rules of 11; decided there
     in::TxClosed c;
     c.tx = t.id;
     c.release = t.release;
