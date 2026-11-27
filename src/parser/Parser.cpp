@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <set>
@@ -222,6 +223,12 @@ class Reader {
       std::string value;
       for (const auto& form : slot.forms)
         if (std::string v = fit(form, at, end); !v.empty()) value = v;
+      if (!value.empty() && name == "callsign" && !rules_.callsignDigits.empty()) {  // D-204
+        const auto dash = value.find('-');
+        const auto it = rules_.callsignDigits.find(value.substr(0, dash));
+        const int n = static_cast<int>(value.size() - dash - 1);
+        if (it == rules_.callsignDigits.end() ? n != 3 : !it->second.count(n)) value.clear();
+      }
       if (!value.empty() && slot.hi > 0) {
         std::string d;
         for (char c : value)
@@ -391,6 +398,39 @@ bool loadParserRules(const std::string& file, ParserRules& out, std::string& err
     r.slots.emplace(name, std::move(s));
   }
   out = std::move(r);
+  return true;
+}
+
+bool loadCallsignDigits(const std::string& dir, ParserRules& rules, std::string& error) {
+  namespace fs = std::filesystem;
+  std::error_code ec;
+  std::vector<fs::path> files;
+  for (const auto& e : fs::directory_iterator(dir, ec))
+    if (e.path().extension() == ".json") files.push_back(e.path());
+  if (ec || files.empty()) {
+    error = dir + ": no airfield files";
+    return false;
+  }
+  std::sort(files.begin(), files.end());
+  std::map<std::string, std::set<int>> digits;
+  for (const auto& f : files) {
+    std::ifstream in(f);
+    const json j = json::parse(in, nullptr, false);
+    const auto fail = [&](const std::string& why) {
+      error = f.string() + ": " + why;
+      return false;
+    };
+    if (!j.is_object() || !j.contains("callsigns") || !j["callsigns"].is_array()) return fail("no callsigns list");
+    for (const auto& c : j["callsigns"]) {
+      const std::string id = c.is_object() && c.contains("id") && c["id"].is_string() ? c["id"].get<std::string>() : "";
+      const auto dash = id.find('-');
+      const std::string d = dash == std::string::npos ? "" : id.substr(dash + 1);
+      if (dash == 0 || d.empty() || !std::all_of(d.begin(), d.end(), [](unsigned char x) { return std::isdigit(x); }))
+        return fail("callsign id must be NAME-digits: " + id);
+      digits[id.substr(0, dash)].insert(static_cast<int>(d.size()));
+    }
+  }
+  rules.callsignDigits = std::move(digits);
   return true;
 }
 

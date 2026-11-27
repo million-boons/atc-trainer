@@ -2,6 +2,7 @@
 //   parse_cli [--rules FILE] TEXT...           one result as JSON
 //   parse_cli [--rules FILE] < LINES           one JSON result per line
 //   parse_cli [--rules FILE] --score RUN.csv   a stt_bench run: the text heard against the text read.
+//   [--airfields DIR]  callsign digit counts (D-204); default data/airfields
 //     The text read is parsed too. WRONG = accepted with anything different from it.
 #include <cstdio>
 #include <fstream>
@@ -79,21 +80,24 @@ int score(const std::string& file, const ParserRules& rules) {
 }  // namespace
 
 int main(int argc, char** argv) {
-  std::string file, csv, words, error;
+  std::string file, csv, words, error, airfields;
   for (int i = 1; i < argc; ++i) {
     const std::string k = argv[i];
     if (k == "--rules" && i + 1 < argc) file = argv[++i];
     else if (k == "--score" && i + 1 < argc) csv = argv[++i];
-    else if (k.rfind("--", 0) == 0) return std::fprintf(stderr, "usage: parse_cli [--rules FILE] [--score RUN.csv | TEXT...]\n"), 2;
+    else if (k == "--airfields" && i + 1 < argc) airfields = argv[++i];
+    else if (k.rfind("--", 0) == 0) return std::fprintf(stderr, "usage: parse_cli [--rules FILE] [--airfields DIR] [--score RUN.csv | TEXT...]\n"), 2;
     else words += (words.empty() ? "" : " ") + k;
   }
-  if (file.empty()) {
+  if (file.empty() || airfields.empty()) {
     Paths p;
     if (!resolvePaths(systemPathInputs(), p, error)) return std::fprintf(stderr, "%s\n", error.c_str()), 1;
-    file = p.data + "/phraseology/placeholder.json";
+    if (file.empty()) file = p.data + "/phraseology/placeholder.json";
+    if (airfields.empty()) airfields = p.data + "/airfields";
   }
   ParserRules rules;
   if (!loadParserRules(file, rules, error)) return std::fprintf(stderr, "%s\n", error.c_str()), 1;
+  if (!loadCallsignDigits(airfields, rules, error)) return std::fprintf(stderr, "%s\n", error.c_str()), 1;  // D-204
   if (rules.placeholder) std::fprintf(stderr, "note: PLACEHOLDER phraseology, not approved\n");
   if (!csv.empty()) return score(csv, rules);
   if (!words.empty()) return std::puts(toJson(parseInstruction(text(words), rules)).dump().c_str()), 0;

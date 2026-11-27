@@ -202,7 +202,7 @@
   "words": ["Rajali", "Arakkonam"]
  },
  "parse": {
-  "comment": "PLACEHOLDER. How the parser finds values (02 section 4). Slots without a marker start with a pool name (callsign). Every word must be explained: there are no filler words. Runway marker \"run with\": how Whisper writes \"runway\" for speaker s1 (D-201), to re-check with the dev speakers. Circuit intents (D-203): the longest cue wins (\"taxi to holding point\" over \"taxi\", \"line up and wait\" over \"line up\"); \"hold short\" said with another instruction that has the flag is that instruction's flag; \"rajali tower\" is accepted in the radio check reply, not required (C-3 open). \"readback\" and \"read back\", \"takeoff\" and \"take off\" are written forms of the same words.",
+  "comment": "PLACEHOLDER. How the parser finds values (02 section 4). Slots without a marker start with a pool name (callsign). Every word must be explained: there are no filler words. Runway marker \"run with\": how Whisper writes \"runway\" for speaker s1 (D-201), to re-check with the dev speakers. Circuit intents (D-203): the longest cue wins (\"taxi to holding point\" over \"taxi\", \"line up and wait\" over \"line up\"); \"hold short\" said with another instruction that has the flag is that instruction's flag; \"rajali tower\" is accepted in the radio check reply, not required (C-3, ruled by the user). \"clear to land\" is a landing cue (D-204): how Whisper writes \"cleared to land\" for s1, to re-check with the dev speakers; a trainee who says \"clear to land\" is not corrected. \"readback\" and \"read back\", \"takeoff\" and \"take off\" are written forms of the same words.",
   "markers": {
    "runway": ["runway", "run with"],
    "taxiway": ["via", "taxiway"],
@@ -270,7 +270,7 @@
     "{callsign} runway {runway} cleared to land"
    ],
    "parse": {
-    "cues": ["cleared to land"],
+    "cues": ["cleared to land", "clear to land"],
     "required": ["callsign", "runway"],
     "optional": []
    },
