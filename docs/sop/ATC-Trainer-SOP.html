@@ -46,11 +46,11 @@
 <h1>Military ATC Training Simulator<br>Standard Operating Procedure: operation and manual testing</h1>
 
 <table class="meta">
-  <tr><td>Document</td><td>ATC-Trainer-SOP, version 0.1 DRAFT</td></tr>
+  <tr><td>Document</td><td>ATC-Trainer-SOP, version 0.2 DRAFT (0.1: same day, before the pedal)</td></tr>
   <tr><td>Date</td><td>2026-11-27</td></tr>
-  <tr><td>Applies to build</td><td>branch <code>main</code>, commit <code>15472d0</code> (full build 0 warnings, 792 of 792 tests), launched from <code>.worktrees/runtime/build/bin</code></td></tr>
+  <tr><td>Applies to build</td><td>branch <code>main</code>, commit <code>ec73011</code> (code of <code>873c65d</code>: full build, 792 of 792 tests; the Preon foot pedal configured, G1-P passed, D-338/D-339), launched from <code>.worktrees/runtime/build/bin</code></td></tr>
   <tr><td>Machine</td><td>Training panel: i3, 4 GB, Ubuntu 22.04, 1280×800 touch display, offline</td></tr>
-  <tr><td>Written from</td><td>CHECKLIST-3C-2026-11-25, CHECKLIST-STUDIO-PLANNER, user guide (trainee and instructor), 04-ui.md, decisions.md, and the program's code at that commit</td></tr>
+  <tr><td>Written from</td><td>CHECKLIST-3C-2026-11-25, CHECKLIST-STUDIO-PLANNER, user guide (trainee and instructor), 04-ui.md, decisions.md, CHECKLIST-G1P-2026-11-27, and the program's code at that commit</td></tr>
   <tr><td>Status</td><td>Draft for the user's review. Nothing in this document has been approved by the unit.</td></tr>
 </table>
 
@@ -97,8 +97,8 @@
   <tbody>
   <tr><td>Training panel</td><td>Runs the trainer, 1280×800 touch display</td><td>Primary layout 1280×800; 1920×1080 also supported</td></tr>
   <tr><td>Logitech H540 USB headset</td><td>Microphone and earphones for the exercise</td><td>Sound input <b>and</b> output must both be the H540</td></tr>
-  <tr><td>PTT, mouse stand-in</td><td>Right mouse button of the Dell wireless mouse (LITEON dongle) = push to talk</td><td>Accepted as stand-in (D-309). Status shows <b>PTT STAND-IN</b></td></tr>
-  <tr><td>PTT, foot pedal</td><td>USB foot pedal = push to talk</td><td><b>Pending</b>: learning a pedal in Settings answers "not built yet"</td></tr>
+  <tr><td>PTT, foot pedal</td><td><b>Microchip "Preon"</b> USB foot pedal, USB ID <code>04d8:0055</code> = push to talk (press = transmit, lift = stop). Device <code>/dev/input/by-id/usb-Microchip_Technology_Inc._Preon-event-mouse</code>, link <code>/dev/input/atc-pedal</code></td><td><b>The PTT of this build</b> (G1-P passed, D-339). Status shows PTT <b>OK</b>, "foot pedal (Preon)". Any other USB device is refused as the pedal. Access is given by the installer's rule; no <code>setfacl</code> needed, also after replug, log-out or reboot. Pressing it gives no right-click on the desktop</td></tr>
+  <tr><td>PTT, mouse stand-in (fallback)</td><td>Right button of the Dell wireless mouse (LITEON dongle), only when the program is started with <code>--ptt-device stand-in</code> (3.1)</td><td>Fallback only (D-338). Status shows PTT <b>STAND-IN</b> (warns). Needs <code>setfacl</code> after each replug (E5)</td></tr>
   <tr><td>Fallback PTT</td><td><b>Screen PTT</b> button, and the Space key</td><td>Available; its use is written in the result ("Fallback PTT used: yes")</td></tr>
   <tr><td>Keyboard</td><td>Typing trainee IDs and names</td><td>Needed: there is no on-screen keyboard. The instructor PIN has an on-screen keypad</td></tr>
   </tbody>
@@ -112,14 +112,14 @@
   <tr><td class="n">E2</td><td>Network off</td><td>The trainer must work offline. Switch Wi-Fi and cable off</td><td class="pf"><span class="box"></span></td></tr>
   <tr><td class="n">E3</td><td>H540 connected and chosen</td><td>Ubuntu <b>Settings &gt; Sound</b>: Output device = H540, Input device = H540. Output volume up, input not muted</td><td class="pf"><span class="box"></span></td></tr>
   <tr><td class="n">E4</td><td>H540 automatic gain (AGC) off</td><td>See 2.3</td><td class="pf"><span class="box"></span></td></tr>
-  <tr><td class="n">E5</td><td>Mouse access for the PTT stand-in</td><td>Only if it was lost (after replugging the dongle or a reboot):<br><code>sudo setfacl -m u:user:r /dev/input/by-id/usb-LITEON_Dell_Wireless_Device-if01-event-mouse</code></td><td class="pf"><span class="box"></span></td></tr>
+  <tr><td class="n">E5</td><td>Foot pedal plugged in; mouse access only for the fallback</td><td>The Preon pedal is plugged in (no access step needed). <b>Only</b> if the mouse stand-in is used (3.1), after each replug of its dongle or a reboot:<br><code>sudo setfacl -m u:user:r /dev/input/by-id/usb-LITEON_Dell_Wireless_Device-if01-event-mouse</code></td><td class="pf"><span class="box"></span></td></tr>
   <tr><td class="n">E6</td><td>Instructor PIN is set</td><td>If none is set (Settings &gt; Instructor shows it), see 4.3. Never write the PIN in a file</td><td class="pf"><span class="box"></span></td></tr>
   <tr><td class="n">E7</td><td>Voice bank file</td><td><code>~/.config/atc-trainer/paths.conf</code> names the bank, e.g. <code>voices=/home/user/.local/share/atc-trainer/voices/en_US-norman-medium</code>. Do not delete or move that folder</td><td class="pf"><span class="box"></span></td></tr>
   </tbody>
 </table>
 
 <h3>2.3 H540 automatic gain control (AGC) off</h3>
-<p>The H540's AGC must be off and its capture level kept (D-37, D-51). On 2026-11-24 it read off with capture 70 %, but nothing on the panel enforced it then. The installer <code>deploy/setup_panel.sh</code> makes it persistent; whether it is installed on the panel: <span class="tc">TO CONFIRM</span> (check with <code>./deploy/setup_panel.sh --verify</code>, no sudo).</p>
+<p>The H540's AGC must be off and its capture level kept (D-37, D-51). On 2026-11-24 it read off with capture 70 %, but nothing on the panel enforced it then. The installer <code>deploy/setup_panel.sh</code> makes it persistent (AGC off, capture level kept at login and replug) and installs the pedal rule. The user ran it on the panel on 2026-11-27 (<code>RESULT: PASS</code>, D-339). Check at any time, without sudo: <code>./deploy/setup_panel.sh --verify</code> (in <code>.worktrees/runtime</code>). If it fails, the user runs <code>sudo ./deploy/setup_panel.sh</code> again with the H540 and the pedal plugged in; report in <code>~/atc-setup-report.txt</code>.</p>
 <p>Manual check:</p>
 <pre>cat /proc/asound/cards                       # find the H540's card number N (a USB-Audio line)
 amixer -c N controls | grep -i gain          # name of the AGC control
@@ -139,14 +139,15 @@ amixer -c N cset name='Auto Gain Control' off   # only if it reads "on"</pre>
   <li>Start the program, <b>without <code>--root</code></b> (with it the voice bank of <code>paths.conf</code> is not read, D-308):
 <pre>cd /home/user/projects/atc-trainer/.worktrees/runtime
 ./build/bin/atc_trainer --size 1280x800</pre>
-  For the large layout: <code>--size 1920x1080</code>.</li>
+  For the large layout: <code>--size 1920x1080</code>.<br>
+  <b>Only if the pedal fails</b> (fallback, D-338): add <code>--ptt-device stand-in</code> to use the right mouse button; PTT then shows <b>STAND-IN</b>. Run E5's <code>setfacl</code> line first.</li>
   <li>The Dashboard opens. Nobody is logged in. The status bar shows the chips <b>Mic</b>, <b>Speaker</b>, <b>PTT</b>, <b>STT</b>, <b>VOICE BANK</b>, the scenario, and the clock (UTC and local).</li>
   <li>Wait for <b>VOICE BANK</b> to go from <b>CHECKING</b> to <b>COVERAGE OK</b> by itself.</li>
   <li>Readiness (each tile states READY, WARNS or BLOCKS START):
     <ul>
       <li>Microphone: <b>Test</b> (5 s level). Speak normally; peaks around −12 dBFS, band −20 to −6 dBFS.</li>
       <li>Speaker: <b>Test tone</b>, listen to the end, then <b>I heard it</b>. This is the only way to OK.</li>
-      <li>PTT: <b>Test</b>, hold 2 s.</li>
+      <li>PTT: tile <b>OK</b>, "foot pedal (Preon)" (not STAND-IN). <b>Test</b>, hold the pedal 2 s: "Held 2.xx s: OK".</li>
       <li>Speech model: <b>Load exercise model</b> (Whisper tiny + generated prompt). Wait for <b>READY</b>.</li>
     </ul>
   </li>
@@ -276,10 +277,11 @@ amixer -c N cset name='Auto Gain Control' off   # only if it reads "on"</pre>
 
 <h3>6.3 PTT technique</h3>
 <ul>
-  <li><b>Press and hold</b> PTT, <b>then</b> speak, <b>release</b> after the last word. PTT: right mouse button (stand-in), or <b>Screen PTT</b>, or Space.</li>
+  <li><b>Press and hold</b> PTT, <b>then</b> speak, <b>release</b> after the last word. PTT: the <b>foot pedal</b>; if it fails, <b>Screen PTT</b> or Space (and, if the program was started with the stand-in, the right mouse button).</li>
   <li><b>TX</b> (amber) = you transmit. <b>RX</b> (cyan) = the pilot speaks.</li>
+  <li>Lift your foot fully between transmissions. A press held more than 30 s is closed as <b>STUCK</b> ("Lift your foot to transmit again").</li>
   <li>A short tap is not a transmission (Settings &gt; PTT, "Short tap below", starting value 250 ms).</li>
-  <li>Pressing while the pilot speaks cuts him off (<b>PILOT CUT</b>) in the departure scenario (rule "interrupt").</li>
+  <li>Pressing while the pilot speaks cuts the pilot off (<b>PILOT CUT</b>) in the departure scenario (rule "interrupt").</li>
   <li>Do not release in the middle of a sentence ("Released early").</li>
 </ul>
 
@@ -289,7 +291,7 @@ amixer -c N cset name='Auto Gain Control' off   # only if it reads "on"</pre>
   <li>Digits one by one: "four two one", "zero nine", "two seven". "Niner" is accepted as nine, likewise "tree", "fife", "fower", "alfa".</li>
   <li>Phonetic alphabet for letters: A3 = "alpha three", B2 = "bravo two".</li>
   <li>Standard phraseology, even pace, normal loudness. Wait for the readback; correct it if wrong; repeat clearly after "say again".</li>
-  <li>No answer at all: check the callsign. The pilot answers only to his own callsign.</li>
+  <li>No answer at all: check the callsign. The pilot answers only to their own callsign.</li>
 </ul>
 
 <h3>6.5 Practice and Assessed</h3>
@@ -329,10 +331,13 @@ amixer -c N cset name='Auto Gain Control' off   # only if it reads "on"</pre>
   <tr><td class="n">1.2</td><td>Nothing loaded yet</td><td>START EXERCISE disabled; "Cannot start" names the speech model</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
   <tr><td class="n">1.3</td><td>Microphone <b>Test</b>, speak 5 s</td><td>Level moves; peaks about −12 dBFS; Mic <b>OK</b>; "Mic open – not transmitting" while idle</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
   <tr><td class="n">1.4</td><td>Speaker <b>Test tone</b>, then <b>I heard it</b></td><td>Tone audible in the H540; Speaker <b>OK</b></td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
-  <tr><td class="n">1.5</td><td>PTT <b>Test</b>, hold right button 2 s</td><td>Measured hold time shown; PTT <b>STAND-IN</b> (warns only); nothing transmitted</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">1.5</td><td>PTT <b>Test</b>, hold the pedal 2 s</td><td>"Held 2.xx s: OK"; PTT <b>OK</b>, "foot pedal (Preon)", not STAND-IN; nothing transmitted</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
   <tr><td class="n">1.6</td><td><b>Load exercise model</b></td><td>STT goes to <b>READY</b>; START EXERCISE enabled</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
   <tr><td class="n">1.7</td><td>Hold PTT on the Dashboard, speak</td><td><b>TX</b> shown in the radio bar while held</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
-  <tr><td class="n">1.8</td><td>Pull the mouse dongle (not in an exercise); replug; run the <code>setfacl</code> line</td><td>PTT <b>MISSING</b>, "PTT device lost"; after replug and <code>setfacl</code> PTT works again</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">1.8</td><td>Unplug the pedal while holding it (not in an exercise); plug it back in</td><td>Transmission closes (LOST); PTT <b>MISSING</b>, "PTT disconnected"; after the replug PTT <b>OK</b> again within a few seconds, <b>without</b> <code>setfacl</code>; a transmission works</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">1.9</td><td>Hold the pedal more than 30 s</td><td>Closed at 30 s as <b>STUCK</b>; "Lift your foot to transmit again"; a new press works only after lifting</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">1.10</td><td>Press the pedal with the pointer on the desktop (program not in front)</td><td>No right-click menu</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">1.11</td><td>Fallback (optional): quit, start with <code>--ptt-device stand-in</code> after E5's <code>setfacl</code>; PTT Test with the right mouse button</td><td>PTT <b>STAND-IN</b> (warns only); hold time shown. Quit and start normally again</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
   </tbody>
 </table>
 
@@ -365,7 +370,7 @@ amixer -c N cset name='Auto Gain Control' off   # only if it reads "on"</pre>
   <tr><td class="n">3.5</td><td>Tap PTT about 0.15 s</td><td>No transmission, no reply</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
   <tr><td class="n">3.6</td><td>Release in the middle of a sentence</td><td>"Released early" in the result; not advanced or say again</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
   <tr><td class="n">3.7</td><td>Start and press within 1 s, speak over the moment of the call</td><td>PTT works; pilot calls right after release; "ATC called before pilot"; no attempt counted</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
-  <tr><td class="n">3.8</td><td>Pull the mouse dongle during the exercise</td><td>Paused, dialog; <b>Use Screen PTT</b> continues; result "Fallback PTT used: yes". Afterwards <code>setfacl</code> again</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
+  <tr><td class="n">3.8</td><td>Unplug the pedal during the exercise</td><td>Paused, dialog; <b>Use Screen PTT</b> continues; result "Fallback PTT used: yes". (Replug instead: continues after the replug.)</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
   <tr><td class="n">3.9</td><td><b>STOP</b> while the pilot speaks</td><td>Silent at once; result <b>STOPPED BY INSTRUCTOR</b></td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
   <tr><td class="n">3.10</td><td>Dashboard, Lab, Settings during an exercise</td><td>Not reachable; they say why</td><td class="pf"><span class="box"></span>P <span class="box"></span>F</td><td class="rm"></td></tr>
   </tbody>
@@ -481,7 +486,10 @@ amixer -c N cset name='Auto Gain Control' off   # only if it reads "on"</pre>
 <table>
   <thead><tr><th>Symptom</th><th>Likely cause</th><th>Action</th></tr></thead>
   <tbody>
-  <tr><td><b>PTT MISSING</b> (blocks Start)</td><td>Dongle unplugged, or read access lost after replug/reboot</td><td>Replug the dongle, then<br><code>sudo setfacl -m u:user:r /dev/input/by-id/usb-LITEON_Dell_Wireless_Device-if01-event-mouse</code><br>During an exercise: <b>Use Screen PTT</b> continues; the result records it</td></tr>
+  <tr><td><b>PTT MISSING</b> (blocks Start)</td><td>Pedal unplugged; or the installer's pedal rule is missing; or (stand-in only) mouse access lost after replug/reboot</td><td>Pedal: replug it; the tile turns OK within a few seconds. Still MISSING: <code>./deploy/setup_panel.sh --verify</code>; if it fails, the user runs the installer again (2.3). Last resort: the stand-in (3.1).<br>Stand-in: replug the dongle, then <code>sudo setfacl -m u:user:r /dev/input/by-id/usb-LITEON_Dell_Wireless_Device-if01-event-mouse</code><br>During an exercise: <b>Use Screen PTT</b> continues; the result records it</td></tr>
+  <tr><td>PTT <b>STAND-IN</b> when the pedal was expected</td><td>Program started with <code>--ptt-device stand-in</code></td><td>Quit; start exactly as in 3.1 without it</td></tr>
+  <tr><td>PTT <b>STUCK</b></td><td>Pressed more than 30 s, or the foot rests on the pedal</td><td>Lift the foot; press again</td></tr>
+  <tr><td>Another USB device refused as PTT</td><td>Only the Preon (<code>04d8:0055</code>) is accepted as the pedal</td><td>Use the Preon; or the stand-in (3.1)</td></tr>
   <tr><td>PTT <b>NO HOLD</b></td><td>PTT test hold not detected</td><td>Repeat the PTT test, hold 2 s steadily</td></tr>
   <tr><td>Mic <b>NO SIGNAL</b></td><td>Microphone open but delivering nothing for 1 s</td><td>Check the H540 is the input in Ubuntu Sound settings; replug; run Mic Test again</td></tr>
   <tr><td>Mic <b>MUTED</b> / <b>LOST</b></td><td>Input muted, or headset unplugged</td><td>Unmute (Sound settings or headset mute); replug; Mic Test</td></tr>
@@ -505,7 +513,7 @@ amixer -c N cset name='Auto Gain Control' off   # only if it reads "on"</pre>
 <ul>
   <li><b>Placeholder wording.</b> All scenario and phraseology text is PLACEHOLDER until validated against the approved SOP. Assessed mode is therefore not available; Practice only. There is no pass mark.</li>
   <li><b>Pilot voice.</b> The pilot clips are synthetic (Piper, voice en_US-norman-medium), made offline on the panel. The pilot says "niner". The user's listening check of the new clips (runway 09, hold short, spot check) is open (D-329).</li>
-  <li><b>Pedal pending.</b> The foot pedal is not yet set up; the right mouse button is the stand-in (D-309). Pedal learning in Settings is not built.</li>
+  <li><b>One pedal.</b> Only the Preon pedal (<code>04d8:0055</code>) is set up (D-338). Learning another pedal in Settings is not built yet; the mouse stand-in is a fallback only and needs <code>setfacl</code> after each replug.</li>
   <li><b>Recognition speed and accuracy.</b> Frequent "say again" is expected: the best measured result is 25 of 40 instructions fully correct, for one speaker. Release-to-text time on the panel is still to be measured (T2.11). This SOP's tests are not a speech accuracy test.</li>
   <li><b>No exercise audio.</b> Exercise audio is never stored (D-314); Assessment cannot play it.</li>
   <li><b>No real voice recording</b> until the unit approves the consent texts (ST-5).</li>
@@ -521,15 +529,15 @@ amixer -c N cset name='Auto Gain Control' off   # only if it reads "on"</pre>
 <table class="meta">
   <tr><td>Tester (name, role)</td><td></td></tr>
   <tr><td>Date and time</td><td></td></tr>
-  <tr><td>Build (commit)</td><td><code>15472d0</code> &nbsp; other: ____________</td></tr>
+  <tr><td>Build (commit)</td><td><code>ec73011</code> &nbsp; other: ____________</td></tr>
   <tr><td>Screen size used</td><td><span class="box"></span>1280×800 &nbsp; <span class="box"></span>1920×1080</td></tr>
-  <tr><td>PTT used</td><td><span class="box"></span>mouse stand-in &nbsp; <span class="box"></span>Screen PTT &nbsp; <span class="box"></span>Space &nbsp; <span class="box"></span>pedal</td></tr>
+  <tr><td>PTT used</td><td><span class="box"></span>foot pedal (Preon) &nbsp; <span class="box"></span>mouse stand-in &nbsp; <span class="box"></span>Screen PTT &nbsp; <span class="box"></span>Space</td></tr>
 </table>
 
 <table>
   <thead><tr><th>Procedure</th><th>Steps passed / total</th><th>Findings (step numbers)</th></tr></thead>
   <tbody>
-  <tr><td>T1 G1 hardware</td><td>&nbsp;&nbsp;&nbsp;&nbsp; / 8</td><td></td></tr>
+  <tr><td>T1 G1 hardware</td><td>&nbsp;&nbsp;&nbsp;&nbsp; / 11</td><td></td></tr>
   <tr><td>T2 Departure, normal</td><td>&nbsp;&nbsp;&nbsp;&nbsp; / 11</td><td></td></tr>
   <tr><td>T3 Departure, mistakes</td><td>&nbsp;&nbsp;&nbsp;&nbsp; / 10</td><td></td></tr>
   <tr><td>T4 Half-duplex, key-over</td><td>&nbsp;&nbsp;&nbsp;&nbsp; / 4</td><td></td></tr>
@@ -556,7 +564,7 @@ amixer -c N cset name='Auto Gain Control' off   # only if it reads "on"</pre>
   <tr><td>Approved by (unit)</td><td></td><td></td><td></td></tr>
   </tbody>
 </table>
-<p class="small">End of document. ATC-Trainer-SOP v0.1 DRAFT, 2026-11-27, build 15472d0.</p>
+<p class="small">End of document. ATC-Trainer-SOP v0.2 DRAFT, 2026-11-27, build ec73011.</p>
 </section>
 
 </body>

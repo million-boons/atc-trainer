@@ -19,6 +19,7 @@ struct HistoryRow {
   End end = End::Completed;    // a log that stops early is a fault
   int stepsDone = 0, steps = 0, errors = 0, missed = 0, suspected = 0, ptt = 0, reclassified = 0;
   int responseMs = -1;         // median; -1: none
+  bool scenarioChanged = false; // the log header's scenario hash differs from today's file (D-340)
 };
 
 struct HistoryReview {
@@ -33,7 +34,8 @@ struct HistoryEntry {
   bool error = false;          // a trainee error, as the engine judged it
   bool suspected = false;      // suspected recognition error: never counted as a trainee error
   std::string step{}, heard{}, parsed{}, expected{}, cls{}, delay{};
-  bool audio = false;          // saved with consent
+  bool audio = false;          // saved with consent, and the consent is still yes (EA-2): may be played
+  std::string noAudio{};       // audio false: why, e.g. "consent withdrawn: not played" (EA-2); empty: "no audio saved"
   std::vector<HistoryReview> reviews{};  // beside the original, which never changes
 };
 
@@ -41,6 +43,7 @@ struct HistoryDetail {
   HistoryRow row{};
   std::string model{}, callsign{};
   bool fallbackPtt = false;
+  std::string audioNote{};     // the whole result, e.g. "Exercise audio not saved: disk nearly full" (11 §1); empty: nothing to say
   std::vector<std::string> missedSteps{}, pttNotes{}, suspectedNotes{};
   std::vector<HistoryEntry> entries{};
 };
@@ -53,6 +56,8 @@ struct HistoryBackend {
   // instructor; verdict: "trainee", "stt" or "none" (the screen shows words for them)
   std::function<void(const std::string& id, int entry, const std::string& verdict, const std::string& note, Done)> reclassify;
   std::function<void(const std::string& id, Done)> remove;   // instructor; logged first (H-3)
+  // Done when the playback ends (why empty), or at once with why when refused (radio in use, no audio, withdrawn consent).
+  // The trainee plays their own results, the instructor all (EA-5); the backend checks the role again.
   std::function<void(const std::string& id, int entry, bool keyedOnly, Done)> play;
-  std::function<void()> stopPlay;
+  std::function<void()> stopPlay;  // ends a playback at once (D-300); its Done follows
 };

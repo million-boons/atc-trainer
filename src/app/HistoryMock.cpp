@@ -90,7 +90,11 @@ HistoryBackend mockHistory(std::int64_t now) {
   rows[0].run = 3;
   rows[4].assessed = true;
   rows[4].placeholder = false;
+  rows[5].scenarioChanged = true;
   for (const HistoryRow& r : rows) all->push_back(detail(r));
+  for (HistoryEntry& e : (*all)[5].entries)  // h6: consent withdrawn since (EA-2)
+    if (e.audio) e.audio = false, e.noAudio = "consent withdrawn: not played";
+  (*all)[4].audioNote = "Exercise audio not saved: disk nearly full";  // h5
   const auto find = [all](const std::string& id) { return std::find_if(all->begin(), all->end(), [&](const HistoryDetail& d) { return d.row.id == id; }); };
 
   HistoryBackend b;
