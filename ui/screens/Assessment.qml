@@ -162,6 +162,7 @@ Item {
                 spacing: Theme.s8
                 StateIcon { level: s.h.level || 0; size: Theme.px(16); anchors.verticalCenter: parent.verticalCenter }
                 Label { text: s.h.end || ""; font { pixelSize: Theme.h2; weight: Font.Bold } }
+                Tag { visible: (s.h.changed || "") !== ""; text: s.h.changed || ""; anchors.verticalCenter: parent.verticalCenter }
                 Tag { visible: s.h.placeholder === true; text: qsTr("PLACEHOLDER"); anchors.verticalCenter: parent.verticalCenter }
             }
         }

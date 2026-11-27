@@ -90,6 +90,7 @@ HistoryBackend mockHistory(std::int64_t now) {
   rows[0].run = 3;
   rows[4].assessed = true;
   rows[4].placeholder = false;
+  rows[5].scenarioChanged = true;
   for (const HistoryRow& r : rows) all->push_back(detail(r));
   const auto find = [all](const std::string& id) { return std::find_if(all->begin(), all->end(), [&](const HistoryDetail& d) { return d.row.id == id; }); };
 

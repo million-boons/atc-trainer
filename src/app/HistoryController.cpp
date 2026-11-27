@@ -272,7 +272,8 @@ QVariantMap HistoryController::head() const {
           {"callsign", q(detail_->callsign)}, {"mode", modeText(r.assessed)},
           {"when", tr("%1 to %2").arg(date(r.startedMs), clock(r.endedMs))}, {"end", endText(r.end).toUpper()}, {"level", endLevel(r.end)},
           {"sub", tr("%1 of %2 steps   %3   fallback PTT used: %4   Model %5").arg(r.stepsDone).arg(r.steps).arg(length(r.endedMs - r.startedMs), detail_->fallbackPtt ? tr("yes") : tr("no"), q(detail_->model))},
-          {"placeholder", r.placeholder}};
+          {"placeholder", r.placeholder},
+          {"changed", r.scenarioChanged ? tr("Scenario changed since this run") : QString()}};
 }
 
 // Facts. The readback row is hidden (H-4); there is no score.

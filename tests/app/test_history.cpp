@@ -203,6 +203,14 @@ TEST_F(History, DebriefShowsFactsAndNoScore) {
   EXPECT_FALSE(h->head().contains("name"));  // ID only (H-2)
 }
 
+TEST_F(History, ChangedScenarioIsSaidInTheHeader) {  // D-340
+  trainee("S01");
+  open("h1");
+  EXPECT_EQ(h->head()["changed"].toString(), "");
+  open("h6");
+  EXPECT_EQ(h->head()["changed"].toString(), "Scenario changed since this run");
+}
+
 TEST_F(History, EntryFilters) {
   trainee("S01");
   open("h1");

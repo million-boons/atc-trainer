@@ -19,6 +19,7 @@ struct HistoryRow {
   End end = End::Completed;    // a log that stops early is a fault
   int stepsDone = 0, steps = 0, errors = 0, missed = 0, suspected = 0, ptt = 0, reclassified = 0;
   int responseMs = -1;         // median; -1: none
+  bool scenarioChanged = false; // the log header's scenario hash differs from today's file (D-340)
 };
 
 struct HistoryReview {
