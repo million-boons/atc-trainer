@@ -301,6 +301,34 @@ TEST_F(Engine, WrongCallsignGetsSilence) {
   ASSERT_EQ(outputs<out::NoReply>().size(), 1u);
   EXPECT_EQ(outputs<out::NoReply>()[0].tx, 1u);
 }
+// D-434: the own callsign with one digit lost is "say again" and a suspected recognition error.
+TEST(Callsign, OneDigitMissingIsANearMiss) {
+  EXPECT_TRUE(oneDigitMissing("EAGLE-42", "EAGLE-421"));
+  EXPECT_TRUE(oneDigitMissing("EAGLE-41", "EAGLE-421"));
+  EXPECT_TRUE(oneDigitMissing("EAGLE-21", "EAGLE-421"));
+  EXPECT_TRUE(oneDigitMissing("FALCON-1", "FALCON-12"));
+  EXPECT_FALSE(oneDigitMissing("EAGLE-421", "EAGLE-421"));
+  EXPECT_FALSE(oneDigitMissing("EAGLE-4", "EAGLE-421"));    // two missing
+  EXPECT_FALSE(oneDigitMissing("EAGLE-321", "EAGLE-421"));  // a wrong digit
+  EXPECT_FALSE(oneDigitMissing("EAGLE-4210", "EAGLE-421"));
+  EXPECT_FALSE(oneDigitMissing("HAWK-42", "EAGLE-421"));
+  EXPECT_FALSE(oneDigitMissing("EAGLE-", "EAGLE-1"));
+  EXPECT_FALSE(oneDigitMissing("EAGLE42", "EAGLE-421"));
+}
+TEST_F(Engine, OwnCallsignWithADigitLostGetsSayAgainNotSilence) {
+  const std::string own = param("callsign");
+  for (std::size_t cut = own.rfind('-') + 1; cut < own.size(); ++cut) {
+    auto p = taxi();
+    p.fields["callsign"].value = own.substr(0, cut) + own.substr(cut + 1);
+    expectStays(p, Outcome::Ambiguous, "one digit missing");
+    EXPECT_TRUE(lastJudged().suspectedStt);
+    EXPECT_TRUE(outputs<out::NoReply>().empty());
+    EXPECT_EQ(outputs<out::PilotRequested>().back().utterance.replyId, "SAY_AGAIN");
+    const auto r = buildResult(ex->scenario, log.events);
+    EXPECT_TRUE(r.steps[0].errors.empty());  // not the trainee's error
+    EXPECT_EQ(r.steps[0].suspectedStt, 1);
+  }
+}
 TEST_F(Engine, MissingCallsignOrFieldAsksForIt) {
   auto p = taxi();
   p.fields.erase("callsign");

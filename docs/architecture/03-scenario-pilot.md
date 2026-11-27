@@ -46,7 +46,7 @@ stateDiagram-v2
 | # | Check | Failing outcome |
 |---|---|---|
 | 1 | Recognition class UNRECOGNIZED/AMBIGUOUS | UNINTELLIGIBLE / AMBIGUOUS |
-| 2 | Callsign missing / different | MISSING_INFO / WRONG_CALLSIGN |
+| 2 | Callsign missing / different; the own callsign with one digit missing (D-434) | MISSING_INFO / WRONG_CALLSIGN; AMBIGUOUS ("say again", suspected recognition error) |
 | 3 | Safety rule (configured) | UNSAFE |
 | 4 | Conflict with issued clearance | CONFLICT |
 | 5 | Required parameter missing | MISSING_INFO |
