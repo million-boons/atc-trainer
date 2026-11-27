@@ -367,7 +367,7 @@ struct LiveDeparture : Live {
     ASSERT_FALSE(call.empty());
     const std::string rwy = card["runway"] == "09" ? "zero nine" : "two seven", twy = card["taxiway"] == "A3" ? "alpha three" : "bravo two";
     std::lock_guard l(wordsMutex);
-    words = {call + " taxi via " + twy + " runway " + rwy, call + " line up runway " + rwy, call + " runway " + rwy + " cleared for takeoff"};
+    words = {call + " taxi via " + twy + " runway " + rwy, call + " runway " + rwy + " line up and wait", call + " runway " + rwy + " cleared for takeoff"};
   }
   QStringList logLines() const {
     QStringList l;

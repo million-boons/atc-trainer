@@ -82,7 +82,7 @@ std::string exercise(const fs::path& dir, const std::string& session, const std:
     if (complete) {
       sim.transmit(Simulator::instruction("TAXI_INSTRUCTION", {{"callsign", v["callsign"]}, {"taxiway", v["taxiway"]}, {"runway", v["runway"]}}));
       sim.waitForPilot();
-      sim.transmit(Simulator::instruction("LINE_UP", {{"callsign", v["callsign"]}, {"runway", v["runway"]}}));
+      sim.transmit(Simulator::instruction("LINE_UP_AND_WAIT", {{"callsign", v["callsign"]}, {"runway", v["runway"]}}));
       sim.waitForPilot();
       sim.transmit(Simulator::instruction("TAKEOFF_CLEARANCE", {{"callsign", v["callsign"]}, {"runway", v["runway"]}}));
       sim.waitForPilot();
@@ -337,7 +337,9 @@ TEST(ScenarioServiceTest, ListsChecksAndSelects) {
   std::vector<ScenarioInfo> list;
   b.load([&](std::vector<ScenarioInfo> l, const std::string& why) { list = std::move(l); EXPECT_EQ(why, ""); });
   s.wait();
-  ASSERT_EQ(list.size(), 1u);
+  const auto dep = std::find_if(list.begin(), list.end(), [](const ScenarioInfo& i) { return i.id == "DEPARTURE-01"; });
+  ASSERT_NE(dep, list.end());
+  std::rotate(list.begin(), dep, dep + 1);  // the departure first: the checks below are about it
   EXPECT_EQ(list[0].id, "DEPARTURE-01");
   EXPECT_EQ(list[0].category, "departure");
   EXPECT_EQ(list[0].difficulty, "basic");

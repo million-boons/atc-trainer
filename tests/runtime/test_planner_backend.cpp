@@ -2,6 +2,8 @@
 #include <gtest/gtest.h>
 #include <unistd.h>
 
+#include <algorithm>
+
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -88,9 +90,11 @@ struct Planner {
     EXPECT_FALSE(c.scenarios.empty());
     Plan p;
     p.name = fixed ? "Fixed" : "Random";
-    p.scenario = c.scenarios[0].id;
+    const auto it = std::find_if(c.scenarios.begin(), c.scenarios.end(), [](const PlanScenario& x) { return x.id == "DEPARTURE-01"; });
+    EXPECT_NE(it, c.scenarios.end());
+    p.scenario = it->id;
     p.fixed = fixed;
-    p.values = c.scenarios[0].combinations[0];
+    p.values = it->combinations[0];
     return p;
   }
 };
@@ -139,8 +143,9 @@ TEST(PlanStoreTest, PlansRunsAndABrokenFileThatIsNeverOverwritten) {
 TEST(PlannerServiceTest, ScenariosWithAllCombinationsAndPools) {
   Planner x;
   const auto c = x.load();
-  ASSERT_EQ(c.scenarios.size(), 1u);
-  const auto& s = c.scenarios[0];
+  const auto it = std::find_if(c.scenarios.begin(), c.scenarios.end(), [](const PlanScenario& p) { return p.id == "DEPARTURE-01"; });
+  ASSERT_NE(it, c.scenarios.end());
+  const auto& s = *it;
   EXPECT_TRUE(s.errors.empty());
   EXPECT_EQ(s.combinations.size(), 4u);
   EXPECT_FALSE(s.tooMany);
@@ -181,7 +186,9 @@ TEST(PlannerServiceTest, SavingChecksEverythingAndOnlyTheInstructorSaves) {
   ASSERT_EQ(w, "");
   const auto c = x.load();
   ASSERT_EQ(c.plans.size(), 1u);
-  EXPECT_EQ(c.plans[0].scenarioHash, c.scenarios[0].hash);
+  const auto dep = std::find_if(c.scenarios.begin(), c.scenarios.end(), [](const PlanScenario& p) { return p.id == "DEPARTURE-01"; });
+  ASSERT_NE(dep, c.scenarios.end());
+  EXPECT_EQ(c.plans[0].scenarioHash, dep->hash);
   EXPECT_EQ(c.plans[0].savedAt, "2026-11-26 10:00");
   EXPECT_EQ(c.plans[0].valuesError, "");
 }
@@ -280,7 +287,9 @@ TEST(PlannerServiceTest, AChangedScenarioOrValuesThatNoLongerFitCannotStart) {
   text.replace(text.find("\"scenarioHash\": \"") + 17, 4, "0000");
   std::ofstream(file) << text;
   const auto c = x.load();  // read again, as the screen does when it opens
-  EXPECT_NE(c.plans[0].scenarioHash, c.scenarios[0].hash);
+  const auto dep = std::find_if(c.scenarios.begin(), c.scenarios.end(), [](const PlanScenario& p) { return p.id == "DEPARTURE-01"; });
+  ASSERT_NE(dep, c.scenarios.end());
+  EXPECT_NE(c.plans[0].scenarioHash, dep->hash);
   EXPECT_NE(x.choose(id).second.find("Scenario changed"), std::string::npos);
   PlanValues v = x.plan().values;
   v.taxiway = v.taxiway == "A3" ? "B2" : "A3";

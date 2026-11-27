@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <filesystem>
@@ -80,7 +81,7 @@ TEST(Phrases, OnlyTheChangedEntryDiffersAndTheOrderStays) {
     PhraseSet s;
     std::string error, out;
     ASSERT_TRUE(readPhraseology(data() + "/phraseology", s, error)) << error;
-    PhraseEntry e = get(s, reply ? "SAY_AGAIN" : "LINE_UP", reply);
+    PhraseEntry e = get(s, reply ? "SAY_AGAIN" : "LINE_UP_AND_WAIT", reply);
     const std::string bytes = slurp(data() + "/phraseology/" + e.file);
     e.texts[0] = reply ? "repeat please, {callsign}" : "{callsign} line up on runway {runway}";
     ASSERT_EQ(changeEntry(bytes, e, {"instructor", "2026-11-26"}, out), "");
@@ -634,12 +635,12 @@ TEST(StudioService, LoadsWordingUseAndClips) {
   EXPECT_EQ(c.activeVoice, "en_US-norman-medium");
   EXPECT_EQ(c.voice, "own");
   EXPECT_EQ(c.notice, "");
-  ASSERT_EQ(c.scenarios.size(), 1u);
+  ASSERT_TRUE(std::any_of(c.scenarios.begin(), c.scenarios.end(), [](const StudioScenario& s) { return s.id == "DEPARTURE-01"; }));
   const auto e = x.entry("READBACK_TAXI_HOLD_SHORT");
   ASSERT_EQ(e.usedBy.size(), 1u);
   EXPECT_NE(e.usedBy[0].find("CORRECT, hold_short"), std::string::npos) << e.usedBy[0];
   EXPECT_TRUE(e.placeholderFile);
-  EXPECT_FALSE(x.entry("LINE_UP", false).usedBy.empty());
+  EXPECT_FALSE(x.entry("LINE_UP_AND_WAIT", false).usedBy.empty());
   const auto clips = x.clips();
   Exercise ex;
   std::vector<LoadError> errors;

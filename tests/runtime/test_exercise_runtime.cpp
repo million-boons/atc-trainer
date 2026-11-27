@@ -265,7 +265,7 @@ struct Rig {
     return spoken.at(x);
   }
   std::string taxi(const std::string& runway = {}) const { return v("callsign") + " taxi via " + v("taxiway") + " runway " + (runway.empty() ? v("runway") : runway); }
-  std::string lineUp() const { return v("callsign") + " line up runway " + v("runway"); }
+  std::string lineUp() const { return v("callsign") + " runway " + v("runway") + " line up and wait"; }  // D-430
   std::string takeoff() const { return v("callsign") + " runway " + v("runway") + " cleared for takeoff"; }
   std::string otherRunway() const { return v("runway") == "zero nine" ? "two seven" : "zero nine"; }
 
@@ -567,7 +567,8 @@ TEST(ExerciseRuntime, SilentOrBrokenRecogniserIsNoTraineeError) {
   r.pass(10);
   EXPECT_EQ(r.logged<in::Recognised>().size(), 1u);  // exactly one per transmission
   EXPECT_EQ(r.logged<out::StepEntered>().size(), 1u);
-  r.hearPilot();
+  r.pass(4000);  // the "say again" was due at once (D-342: 5 s since the release is more than any delay); let it end
+  ASSERT_FALSE(r.sounding);
   // The model vanishes: recorded as a fault too.
   r.speech.model = false;
   r.down(); r.pass(1500); r.up(); r.pass(400);
@@ -1153,7 +1154,7 @@ TEST(ExerciseRuntimeThreads, DepartureWithRealThreadsLockedModelAndLogFile) {
     if (c.id == p["callsign"]) call = c.spoken;
   const std::string rwy = p["runway"] == "09" ? "zero nine" : "two seven", twy = p["taxiway"] == "A3" ? "alpha three" : "bravo two";
   auto words = std::make_shared<std::vector<std::string>>(std::vector<std::string>{
-      call + " taxi via " + twy + " runway " + rwy, call + " line up runway " + rwy, call + " runway " + rwy + " cleared for takeoff"});
+      call + " taxi via " + twy + " runway " + rwy, call + " runway " + rwy + " line up and wait", call + " runway " + rwy + " cleared for takeoff"});
 
   ExerciseRuntime* runtime = nullptr;
   std::atomic<int> labResults{0}, faults{0}, ended{0};
