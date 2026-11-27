@@ -73,6 +73,8 @@ HistoryRow row(const Built& b, const std::string& id, int reclassified) {
   r.run = h.planRun;
   r.assessed = h.mode == ExerciseMode::Assessed;
   r.placeholder = !b.exercise || b.exercise->placeholder;
+  // D-340: built with today's files; the log's hash says whether they are the ones of the run.
+  r.scenarioChanged = !b.exercise || b.exercise->hash != h.scenarioHash;
   r.startedMs = h.startedMs;
   r.endedMs = h.startedMs + b.result.duration / 1'000'000;
   r.end = !b.log.ended || !b.result.end ? End::Fault : *b.result.end == out::EndReason::Completed ? End::Completed : End::Stopped;
