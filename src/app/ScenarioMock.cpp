@@ -13,7 +13,7 @@ ScenarioBackend mockScenarios(std::function<void(const ScenarioInfo&)> selected)
     s.airfield = "SAMPLE-AF";
     s.rule = "interrupt";
     s.objectives = {"PLACEHOLDER - validate against approved SOP"};
-    const ScenarioStepInfo all[] = {{"Taxi", "TAXI_INSTRUCTION", 30, 2}, {"Line up", "LINE_UP", 30, 2}, {"Takeoff", "TAKEOFF_CLEARANCE", 30, 2}};
+    const ScenarioStepInfo all[] = {{"Taxi", "TAXI_INSTRUCTION", 30, 2}, {"Line up", "LINE_UP_AND_WAIT", 30, 2}, {"Takeoff", "TAKEOFF_CLEARANCE", 30, 2}};
     for (int i = 0; i < steps; ++i) s.steps.push_back(all[i % 3]);
     s.callsigns = s.types = s.runways = s.taxiways = 2;
     return s;

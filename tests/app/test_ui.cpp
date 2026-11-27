@@ -1107,7 +1107,7 @@ TEST_F(Ui, DebriefIsFactsWithoutAScore) {
   clickButton("Errors");
   EXPECT_FALSE(allText().contains("say again, EAGLE-421"));
   clickButton("All");
-  clickText("eagle four two one line up runway two seven");
+  clickText("eagle four two one runway two seven line up and wait");
   clickButton("Reclassify...");
   EXPECT_TRUE(allText().contains("Original: INCORRECT runway. It is kept; both are shown."));
   clickButton("Not an error");

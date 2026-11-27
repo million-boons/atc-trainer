@@ -161,7 +161,7 @@ StudioBackend mockStudio() {
   en.push_back(entry("READY_DEPARTURE", "{callsign}, ready for departure runway {runway}", "DEPARTURE-01  Line up: pilot call"));
   en.push_back(entry("READBACK_TAXI", "taxi via {taxiway} runway {runway}, {callsign}", "DEPARTURE-01  Taxi: CORRECT"));
   en.push_back(entry("READBACK_TAXI_HOLD_SHORT", "taxi via {taxiway} hold short runway {runway}, {callsign}", "DEPARTURE-01  Taxi: CORRECT, hold short"));
-  en.push_back(entry("READBACK_LINE_UP", "line up runway {runway}, {callsign}", "DEPARTURE-01  Line up: CORRECT"));
+  en.push_back(entry("READBACK_LINE_UP", "lining up runway {runway} and waiting, {callsign}", "DEPARTURE-01  Line up: CORRECT"));
   en.push_back(entry("READBACK_TAKEOFF", "runway {runway} cleared for takeoff, {callsign}", "DEPARTURE-01  Takeoff: CORRECT"));
   en.push_back(entry("REQUEST_MISSING", "say again all parts, {callsign}", "DEPARTURE-01  every step: MISSING_INFO"));
   en.push_back(entry("SAY_AGAIN", "say again, {callsign}", "DEPARTURE-01  every step: AMBIGUOUS, UNINTELLIGIBLE"));
@@ -171,7 +171,7 @@ StudioBackend mockStudio() {
   StudioEntry taxi = entry("TAXI_INSTRUCTION", "{callsign} taxi via {taxiway} runway {runway}", "DEPARTURE-01  Taxi", false);
   taxi.texts.push_back("{callsign} taxi via {taxiway} hold short runway {runway}");
   en.push_back(taxi);
-  en.push_back(entry("LINE_UP", "{callsign} line up runway {runway}", "DEPARTURE-01  Line up", false));
+  en.push_back(entry("LINE_UP_AND_WAIT", "{callsign} runway {runway} line up and wait", "DEPARTURE-01  Line up", false));
   en.push_back(entry("TAKEOFF_CLEARANCE", "{callsign} runway {runway} cleared for takeoff", "DEPARTURE-01  Takeoff", false));
   en.push_back(entry("LANDING_CLEARANCE", "{callsign} runway {runway} cleared to land", "", false));
   b->content.scenarios = {{"DEPARTURE-01", "SAMPLE-AF"}};
